@@ -1,0 +1,12 @@
+{
+  "Author": "You",
+  "Name": "Mentor Roulette Tracker",
+  "InternalName": "MentorRouletteTracker",
+  "AssemblyVersion": "1.0.0.0",
+  "Punchline": "Tracks duty stats for Mentor Roulette runs.",
+  "Description": "Tracks duty name, duty type, join-in-progress status, wipe count, and Lalafell headcount for each duty run, with CSV export.",
+  "ApplicableVersion": "any",
+  "RepoUrl": "",
+  "Tags": [ "utility", "tracking" ],
+  "DalamudApiLevel": 15
+}
