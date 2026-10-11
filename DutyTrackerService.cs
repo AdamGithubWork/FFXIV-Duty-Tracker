@@ -3,6 +3,7 @@ using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Lumina.Excel.Sheets;
 using System;
@@ -58,7 +59,6 @@ namespace MentorRouletteTracker
             this.clientState.TerritoryChanged += OnTerritoryChanged;
             this.dutyState.DutyStarted += OnDutyStarted;
             this.dutyState.DutyWiped += OnDutyWiped;
-            this.dutyState.DutyRecommenced += OnDutyRecommenced;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
         }
@@ -68,7 +68,6 @@ namespace MentorRouletteTracker
             this.clientState.TerritoryChanged -= OnTerritoryChanged;
             this.dutyState.DutyStarted -= OnDutyStarted;
             this.dutyState.DutyWiped -= OnDutyWiped;
-            this.dutyState.DutyRecommenced -= OnDutyRecommenced;
             this.dutyState.DutyCompleted -= OnDutyCompleted;
             this.framework.Update -= OnFrameworkUpdate;
         }
@@ -86,24 +85,18 @@ namespace MentorRouletteTracker
                 return;
 
             if (!Armed)
-            {
-                log.Debug(
-                    "MentorRouletteTracker: entered a duty but tracking is disarmed.");
-
                 return;
-            }
 
             current = new DutyRecord
             {
                 DutyName = CapitalizeFirstLetter(
                     cfc.Value.Name.ExtractText()),
-
-                DutyType = ResolveContentTypeName(cfc.Value),
+                DutyType = 
+                    cfc.Value.ContentType.Value.Name.ExtractText(),
             };
 
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
-
             current.JoinedInProgress = dutyState.IsDutyStarted;
         }
 
@@ -113,9 +106,6 @@ namespace MentorRouletteTracker
                 current.JoinedInProgress = false;
         }
 
-        private void OnDutyRecommenced(IDutyStateEventArgs args)
-        {
-        }
 
         private void OnDutyWiped(IDutyStateEventArgs args)
         {
@@ -429,11 +419,10 @@ namespace MentorRouletteTracker
             _ => "Unknown",
         };
 
-        private ContentFinderCondition? FindContentFinderCondition(
-            uint territoryId)
+        // Finds information regarding the current duty given territory ID
+        private ContentFinderCondition? FindContentFinderCondition(uint territoryId)
         {
-            var sheet =
-                dataManager.GetExcelSheet<ContentFinderCondition>();
+            var sheet = dataManager.GetExcelSheet<ContentFinderCondition>();
 
             if (sheet == null)
                 return null;
@@ -446,7 +435,6 @@ namespace MentorRouletteTracker
                     return row;
                 }
             }
-
             return null;
         }
 
@@ -459,22 +447,5 @@ namespace MentorRouletteTracker
                    value.Substring(1);
         }
 
-        private static string ResolveContentTypeName(
-            ContentFinderCondition cfc)
-        {
-            try
-            {
-                var typeName =
-                    cfc.ContentType.Value.Name.ExtractText();
-
-                return string.IsNullOrWhiteSpace(typeName)
-                    ? "Unknown"
-                    : typeName;
-            }
-            catch
-            {
-                return "Unknown";
-            }
-        }
     }
 }
