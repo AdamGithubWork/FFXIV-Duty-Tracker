@@ -2,9 +2,11 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.DutyState;
+using Dalamud.Game.Gui.PartyFinder.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using Lumina.Data.Files.Excel;
 using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
@@ -96,12 +98,26 @@ namespace MentorRouletteTracker
                 $"ContentLinkType: {cfc.Value.ContentLinkType}, " +
                 $"PvP: {cfc.Value.PvP}, " +
                 $"HighEndDuty: {cfc.Value.HighEndDuty}");
+            var duty = cfc.Value;
+            var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
+            var dutyType = duty.ContentType.Value.Name.ExtractText();
+            if (dutyName.Contains("Savage"))
+            {
+                dutyType = "Savage Raids";
+            }
+            else if (dutyName.Contains("(Extreme)"))
+            {
+                dutyType = "Extreme Trials";
+            }
+            else if (duty.AllianceRoulette)
+            {
+                dutyType = "Alliance Raids";
+            }
 
             current = new DutyRecord
             {
-                DutyName = CapitalizeFirstLetter(
-                    cfc.Value.Name.ExtractText()),
-                DutyType = cfc.Value.ContentType.Value.Name.ExtractText(),
+                DutyName = dutyName,
+                DutyType = dutyType,
             };
 
             countedPlayersForCurrentRun.Clear();
