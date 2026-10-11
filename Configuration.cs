@@ -14,9 +14,6 @@ namespace MentorRouletteTracker
 
         public List<SeenPlayer> SeenPlayers { get; set; } = new();
 
-        /// <summary>If true, only logs runs entered via Duty Roulette (Mentor).</summary>
-        public bool MentorRouletteOnly { get; set; } = true;
-
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
 

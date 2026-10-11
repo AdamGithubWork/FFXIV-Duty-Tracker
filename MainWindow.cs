@@ -22,6 +22,13 @@ namespace MentorRouletteTracker
         private bool openDeleteConfirmation;
         private bool showDetailWindow;
 
+        private DutyRecord? recordToEdit;
+
+        private bool openEditRecord;
+        private int editWipeCount;
+        private bool editJoinedInProgress;
+        private string editError = string.Empty;
+
         public MainWindow(
             Configuration config,
             DutyTrackerService tracker,
@@ -68,14 +75,20 @@ namespace MentorRouletteTracker
             }
 
             DrawDetailWindow();
-
+            if (openEditRecord)
+            {
+                ImGui.OpenPopup("EditDutyRecord");
+                openEditRecord = false;
+            }
+            DrawEditRecordWindow();
             if (openDeleteConfirmation)
             {
                 ImGui.OpenPopup("ConfirmDeleteRecord");
                 openDeleteConfirmation = false;
             }
-
             DrawDeleteConfirmation();
+            
+            
         }
 
         private void DrawRecordsTab()
@@ -275,13 +288,15 @@ namespace MentorRouletteTracker
                         ImGui.TextUnformatted(r.DutyName);
 
                         ImGui.Separator();
-
+                        if (ImGui.MenuItem("Edit record"))
+                        {
+                            StartEditingRecord(r);
+                        }
                         if (ImGui.MenuItem("Delete record"))
                         {
                             recordPendingDeletion = r;
                             openDeleteConfirmation = true;
                         }
-
                         ImGui.EndPopup();
                     }
 
@@ -320,6 +335,64 @@ namespace MentorRouletteTracker
             }
         }
 
+        private void StartEditingRecord(DutyRecord record)
+        {
+            recordToEdit = record;
+            editWipeCount = record.WipeCount;
+            editJoinedInProgress = record.JoinedInProgress;
+            editError = string.Empty;
+            openEditRecord = true;
+        }
+
+        private void DrawEditRecordWindow()
+        {
+            if (!ImGui.BeginPopupModal("EditDutyRecord", ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                return;
+            }
+            if (recordToEdit == null)
+            {
+                ImGui.CloseCurrentPopup();
+                ImGui.EndPopup();
+                return;
+            }
+            ImGui.Text("Edit duty record");
+            ImGui.Separator();
+            ImGui.InputInt("Wipes", ref editWipeCount);
+            ImGui.Checkbox("Joined in progress", ref editJoinedInProgress);
+            if (!string.IsNullOrEmpty(editError))
+            {
+                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), editError);
+            }
+            ImGui.Separator();
+            if (ImGui.Button("Save"))
+            {
+                if (editWipeCount < 0)
+                {
+                    editError = "Wipe count cannot be negative";
+                }
+                else if (editWipeCount > 99)
+                {
+                    editError = "Wipe count shouldn't be over 99";
+                }
+                else
+                {
+                    recordToEdit.WipeCount = editWipeCount;
+                    recordToEdit.JoinedInProgress = editJoinedInProgress;
+                    config.Save();
+                    recordToEdit = null;
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                recordToEdit = null;
+                editError = string.Empty;
+                ImGui.CloseCurrentPopup() ;
+            }
+            ImGui.EndPopup() ;
+        }
         private void DrawDeleteConfirmation()
         {
             if (!ImGui.BeginPopupModal(
