@@ -70,7 +70,11 @@ namespace MentorRouletteTracker
                     DrawPeopleTab();
                     ImGui.EndTabItem();
                 }
-
+                if (ImGui.BeginTabItem("Settings"))
+                {
+                    DrawSettingsTab();
+                    ImGui.EndTabItem();
+                }
                 ImGui.EndTabBar();
             }
 
@@ -1368,7 +1372,42 @@ namespace MentorRouletteTracker
                 ImGui.EndTable();
             }
         }
+        private void DrawSettingsTab()
+        {
+            ImGui.Text("Tracking Options");
+            ImGui.TextDisabled("Check each duty type you would like recorded");
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+            var contentTypes = new (uint Id, string Name)[]
+            {
+                (2, "Dungeons"),
+                (3, "Guildhests"),
+                (4, "Trials"),
+                (5, "Raids"),
+                (6, "PvP"),
+                (21, "Deep Dungeons"),
+                (28, "Ultimate Raids"),
+                (30, "V&C Dungeon Finder"),
+                (37, "Chaotic Alliance Raid")
+            };
 
+            foreach (var contentType in contentTypes)
+            {
+                var isTracked =
+                    config.TrackedContentTypeIds.Contains(contentType.Id);
+
+                if (ImGui.Checkbox(contentType.Name, ref isTracked))
+                {
+                    if (isTracked)
+                        config.TrackedContentTypeIds.Add(contentType.Id);
+                    else
+                        config.TrackedContentTypeIds.Remove(contentType.Id);
+
+                    config.Save();
+                }
+            }
+        }
         private void DrawPeopleTab()
         {
             ImGui.Text("People Seen");

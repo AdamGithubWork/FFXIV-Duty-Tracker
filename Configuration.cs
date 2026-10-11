@@ -13,6 +13,19 @@ namespace MentorRouletteTracker
         public List<DutyRecord> Records { get; set; } = new();
 
         public List<SeenPlayer> SeenPlayers { get; set; } = new();
+        
+        public List<uint> TrackedContentTypeIds { get; set; } = new()
+        {
+            2,  // Dungeons
+            3,  // Guildhests
+            4,  // Trials
+            5,  // Raids
+            6,  // PvP
+            21, // Deep Dungeons
+            28, // Ultimate Raids
+            30, // V&C Dungeon Finder
+            37  // Chaotic Alliance Raid
+        };
 
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;

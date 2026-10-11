@@ -25,7 +25,6 @@ namespace MentorRouletteTracker
         private readonly Configuration config;
 
         private DutyRecord? current;
-        private ushort lastTerritoryId;
 
         private readonly HashSet<string> countedPlayersForCurrentRun = new();
 
@@ -71,10 +70,10 @@ namespace MentorRouletteTracker
             this.dutyState.DutyCompleted -= OnDutyCompleted;
             this.framework.Update -= OnFrameworkUpdate;
         }
-
+        
         private void OnTerritoryChanged(uint territoryId)
         {
-            lastTerritoryId = (ushort)territoryId;
+            
 
             if (current != null)
                 FinalizeCurrent(completed: false);
@@ -87,12 +86,22 @@ namespace MentorRouletteTracker
             if (!Armed)
                 return;
 
+            if (!config.TrackedContentTypeIds.Contains(cfc.Value.ContentType.RowId))
+                return;
+
+            log.Information(
+                $"Duty: {cfc.Value.Name.ExtractText()}, " +
+                $"ContentType: '{cfc.Value.ContentType.Value.Name.ExtractText()}', " +
+                $"ContentUICategory: '{cfc.Value.ContentUICategory.Value.Name.ExtractText()}', " +
+                $"ContentLinkType: {cfc.Value.ContentLinkType}, " +
+                $"PvP: {cfc.Value.PvP}, " +
+                $"HighEndDuty: {cfc.Value.HighEndDuty}");
+
             current = new DutyRecord
             {
                 DutyName = CapitalizeFirstLetter(
                     cfc.Value.Name.ExtractText()),
-                DutyType = 
-                    cfc.Value.ContentType.Value.Name.ExtractText(),
+                DutyType = cfc.Value.ContentType.Value.Name.ExtractText(),
             };
 
             countedPlayersForCurrentRun.Clear();
@@ -398,7 +407,7 @@ namespace MentorRouletteTracker
 
             config.Save();
         }
-
+        
         private static string RaceIdToName(byte raceId) => raceId switch
         {
             1 => "Hyur",
