@@ -91,13 +91,6 @@ namespace MentorRouletteTracker
             if (!config.TrackedContentTypeIds.Contains(cfc.Value.ContentType.RowId))
                 return;
 
-            log.Information(
-                $"Duty: {cfc.Value.Name.ExtractText()}, " +
-                $"ContentType: '{cfc.Value.ContentType.Value.Name.ExtractText()}', " +
-                $"ContentUICategory: '{cfc.Value.ContentUICategory.Value.Name.ExtractText()}', " +
-                $"ContentLinkType: {cfc.Value.ContentLinkType}, " +
-                $"PvP: {cfc.Value.PvP}, " +
-                $"HighEndDuty: {cfc.Value.HighEndDuty}");
             var duty = cfc.Value;
             var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
             var dutyType = duty.ContentType.Value.Name.ExtractText();
@@ -187,54 +180,6 @@ namespace MentorRouletteTracker
                 return;
 
             var localPlayerName = localPlayer.Name.TextValue;
-
-            // Local player job.
-            var localPlayerJob = localPlayer.ClassJob.RowId != 0
-                ? localPlayer.ClassJob.Value.Abbreviation.ExtractText()
-                : "Unknown";
-
-            // Local player race.
-            var localPlayerRaceId =
-                localPlayer.Customize[(int)CustomizeIndex.Race];
-
-            var localPlayerRace = RaceIdToName(localPlayerRaceId);
-
-            // Local player gender.
-            var localPlayerGenderId =
-                localPlayer.Customize[(int)CustomizeIndex.Gender];
-
-            var localPlayerGender = GenderIdToName(localPlayerGenderId);
-
-            // Always capture the local player in the party snapshot so
-            // they appear in the duty detail window.
-            var localPlayerSnapshot = current.Party
-                .FirstOrDefault(x => x.Name == localPlayerName);
-
-            if (localPlayerSnapshot == null)
-            {
-                current.Party.Add(new PartyMemberSnapshot
-                {
-                    Name = localPlayerName,
-                    Job = localPlayerJob,
-                    Race = localPlayerRace,
-                    Gender = localPlayerGender,
-                    DeathCount = 0
-                });
-
-                log.Info(
-                    $"Local player captured: {localPlayerName} | " +
-                    $"Job: {localPlayerJob} | " +
-                    $"Race: {localPlayerRace} | " +
-                    $"Gender: {localPlayerGender}");
-            }
-            else
-            {
-                localPlayerSnapshot.Job = localPlayerJob;
-                localPlayerSnapshot.Race = localPlayerRace;
-                localPlayerSnapshot.Gender = localPlayerGender;
-            }
-
-            // Capture every other party member.
             foreach (var member in partyList)
             {
                 var name = member.Name.TextValue;
@@ -246,12 +191,7 @@ namespace MentorRouletteTracker
                 if (name == localPlayerName)
                     continue;
 
-                var isDead = member.GameObject?.IsDead ?? false;
-
-                var job = member.ClassJob.IsValid
-                    ? member.ClassJob.Value.Abbreviation.ExtractText()
-                    : "Unknown";
-
+                var job = member.ClassJob.Value.Abbreviation.ExtractText();
                 var race = "Unknown";
                 var gender = "Unknown";
 
@@ -268,162 +208,120 @@ namespace MentorRouletteTracker
                     gender = GenderIdToName(genderId);
                 }
 
-                var existing = current.Party
-                    .FirstOrDefault(x => x.Name == name);
+                var isDead = member.GameObject?.IsDead ?? false;
 
-                if (existing == null)
-                {
-                    existing = new PartyMemberSnapshot
-                    {
-                        Name = name,
-                        Job = job,
-                        Race = race,
-                        Gender = gender,
-                        DeathCount = 0
-                    };
-
-                    current.Party.Add(existing);
-
-                    log.Info(
-                        $"Party member captured: {name} | " +
-                        $"Job: {job} | " +
-                        $"Race: {race} | " +
-                        $"Gender: {gender}");
-                }
-                else
-                {
-                    if (existing.Job == "Unknown" && job != "Unknown")
-                    {
-                        existing.Job = job;
-
-                        log.Info(
-                            $"Updated job: {name} | Job: {job}");
-                    }
-
-                    if (existing.Race == "Unknown" && race != "Unknown")
-                    {
-                        existing.Race = race;
-
-                        log.Info(
-                            $"Updated race: {name} | Race: {race}");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(existing.Gender) ||
-                        existing.Gender == "Unknown")
-                    {
-                        if (gender != "Unknown")
-                        {
-                            existing.Gender = gender;
-
-                            log.Info(
-                                $"Updated gender: {name} | Gender: {gender}");
-                        }
-                    }
-                }
-
-                // Track deaths for other party members only.
-                // The local player's deaths are intentionally excluded.
-                if (isDead &&
-                    previousDeathStates.TryGetValue(name, out var wasDead) &&
-                    !wasDead)
-                {
-                    existing.DeathCount++;
-
-                    log.Info(
-                        $"Party member died: {name} | " +
-                        $"Race: {existing.Race} | " +
-                        $"Gender: {existing.Gender} | " +
-                        $"Deaths: {existing.DeathCount}");
-                }
-
-                previousDeathStates[name] = isDead;
-
-                // Count each other player only once for People Seen.
-                if (countedPlayersForCurrentRun.Add(name))
-                {
-                    var seenPlayer = config.SeenPlayers
-                        .FirstOrDefault(x => x.Name == name);
-
-                    if (seenPlayer == null)
-                    {
-                        seenPlayer = new SeenPlayer
-                        {
-                            Name = name,
-                            Race = race,
-                            Gender = gender,
-                            TimesSeen = 1
-                        };
-
-                        config.SeenPlayers.Add(seenPlayer);
-
-                        log.Info(
-                            $"New player seen: {name} | " +
-                            $"Race: {race} | " +
-                            $"Gender: {gender}");
-                    }
-                    else
-                    {
-                        seenPlayer.TimesSeen++;
-
-                        if (seenPlayer.Race == "Unknown" &&
-                            race != "Unknown")
-                        {
-                            seenPlayer.Race = race;
-                        }
-
-                        if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
-                             seenPlayer.Gender == "Unknown") &&
-                            gender != "Unknown")
-                        {
-                            seenPlayer.Gender = gender;
-                        }
-
-                        log.Info(
-                            $"Player seen again: {name} | " +
-                            $"Times Seen: {seenPlayer.TimesSeen}");
-                    }
-                }
-                else
-                {
-                    var seenPlayer = config.SeenPlayers
-                        .FirstOrDefault(x => x.Name == name);
-
-                    if (seenPlayer != null)
-                    {
-                        if (seenPlayer.Race == "Unknown" &&
-                            race != "Unknown")
-                        {
-                            seenPlayer.Race = race;
-
-                            log.Info(
-                                $"Updated known player race: {name} | " +
-                                $"Race: {race}");
-                        }
-
-                        if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
-                             seenPlayer.Gender == "Unknown") &&
-                            gender != "Unknown")
-                        {
-                            seenPlayer.Gender = gender;
-
-                            log.Info(
-                                $"Updated known player gender: {name} | " +
-                                $"Gender: {gender}");
-                        }
-                    }
-                }
+                ProcessPlayer(name, job, race, gender, isDead);
             }
+            var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
 
-            // The local player is intentionally excluded from this statistic.
-            current.LalafellCount = current.Party.Count(
-                x => x.Race == "Lalafell" &&
-                     x.Name != localPlayerName);
+            var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
 
+            var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
+
+            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayer.IsDead);
+
+            // Count other Lalafells, excluding the local player.
+            current.LalafellCount = current.Party.Count(x =>
+                x.Race == "Lalafell" &&
+                x.Name != localPlayerName);
             current.PlayerJob = localPlayerJob;
 
             config.Save();
         }
-        
+
+        private void ProcessPlayer(string name, string job, string race, string gender, bool isDead)
+        {
+            // Find or create this player's snapshot for the current duty.
+            var snapshot = current!.Party
+                .FirstOrDefault(x => x.Name == name);
+
+            if (snapshot == null)
+            {
+                snapshot = new PartyMemberSnapshot
+                {
+                    Name = name,
+                    Job = job,
+                    Race = race,
+                    Gender = gender,
+                    DeathCount = 0
+                };
+
+                current.Party.Add(snapshot);
+            }
+            else
+            {
+                // Fill in information that was previously unavailable.
+                if (snapshot.Job == "Unknown" && job != "Unknown")
+                    snapshot.Job = job;
+
+                if (snapshot.Race == "Unknown" && race != "Unknown")
+                    snapshot.Race = race;
+
+                if ((string.IsNullOrWhiteSpace(snapshot.Gender) ||
+                     snapshot.Gender == "Unknown") &&
+                    gender != "Unknown")
+                {
+                    snapshot.Gender = gender;
+                }
+            }
+
+            // Detect a transition from alive to dead.
+            if (isDead &&
+                previousDeathStates.TryGetValue(name, out var wasDead) &&
+                !wasDead)
+            {
+                snapshot.DeathCount++;
+
+            }
+
+            previousDeathStates[name] = isDead;
+
+            // Find or create this player's long-term People Seen record.
+            var seenPlayer = config.SeenPlayers
+                .FirstOrDefault(x => x.Name == name);
+
+            if (countedPlayersForCurrentRun.Add(name))
+            {
+                if (seenPlayer == null)
+                {
+                    seenPlayer = new SeenPlayer
+                    {
+                        Name = name,
+                        Race = race,
+                        Gender = gender,
+                        TimesSeen = 1
+                    };
+
+                    config.SeenPlayers.Add(seenPlayer);
+
+                    log.Info($"New player seen: {name}");
+                }
+                else
+                {
+                    seenPlayer.TimesSeen++;
+
+                    log.Info(
+                        $"Player seen again: {name} | " +
+                        $"Times Seen: {seenPlayer.TimesSeen}");
+                }
+            }
+
+            // Update demographic information whenever it becomes available,
+            // even if this player was already counted during this duty.
+            if (seenPlayer != null)
+            {
+                if (seenPlayer.Race == "Unknown" && race != "Unknown")
+                    seenPlayer.Race = race;
+
+                if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
+                     seenPlayer.Gender == "Unknown") &&
+                    gender != "Unknown")
+                {
+                    seenPlayer.Gender = gender;
+                }
+            }
+        }
+
         private static string RaceIdToName(byte raceId) => raceId switch
         {
             1 => "Hyur",
