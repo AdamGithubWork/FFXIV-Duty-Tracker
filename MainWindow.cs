@@ -464,11 +464,8 @@ namespace MentorRouletteTracker
         {
             config.SeenPlayers.Clear();
 
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
             var people = config.Records
                 .SelectMany(x => x.Party)
-                .Where(x => x.Name != localPlayerName)
                 .GroupBy(x => x.Name);
 
             foreach (var group in people)
@@ -754,8 +751,8 @@ namespace MentorRouletteTracker
                         Deaths = x.Sum(y =>
                             y.Party
                                 .Where(p =>
-                                    !string.IsNullOrWhiteSpace(p.Name) &&
-                                    p.Name != objectTable.LocalPlayer?.Name.TextValue)
+                                    !string.IsNullOrWhiteSpace(p.Name) && (config.IncludeSelfInStatistics ||
+                                    p.Name != objectTable.LocalPlayer?.Name.TextValue))
                                 .Sum(p => p.DeathCount)),
 
                         TotalWipes = x.Sum(y => y.WipeCount),
@@ -975,7 +972,7 @@ namespace MentorRouletteTracker
             var characters = records
                 .SelectMany(x => x.Party)
                 .Where(x =>
-                    x.Name != localPlayerName &&
+                    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Race) &&
                     x.Race != "Unknown")
                 .ToList();
@@ -1262,7 +1259,7 @@ namespace MentorRouletteTracker
             var jobStats = records
                 .SelectMany(x => x.Party)
                 .Where(x =>
-                    x.Name != localPlayerName &&
+                    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Job) &&
                     x.Job != "Unknown")
                 .GroupBy(x => x.Job)
@@ -1374,7 +1371,7 @@ namespace MentorRouletteTracker
         }
         private void DrawSettingsTab()
         {
-            ImGui.Text("Tracking Options");
+            ImGui.Text("Duty Tracking Options");
             ImGui.TextDisabled("Check each duty type you would like recorded");
             ImGui.Spacing();
             ImGui.Separator();
@@ -1407,6 +1404,20 @@ namespace MentorRouletteTracker
                     config.Save();
                 }
             }
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+            ImGui.Text("Player Tracking Options");
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+            bool includeSelf = config.IncludeSelfInStatistics;
+
+            if (ImGui.Checkbox("Include yourself in statistics", ref includeSelf))
+            {
+                config.IncludeSelfInStatistics = includeSelf;
+                config.Save();
+            }
         }
         private void DrawPeopleTab()
         {
@@ -1419,10 +1430,15 @@ namespace MentorRouletteTracker
             }
 
             ImGui.Spacing();
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
-            var uniquePeople = config.SeenPlayers.Count;
+            var people = config.SeenPlayers
+                .Where(x => config.IncludeSelfInStatistics || x.Name != localPlayerName)
+                .ToList();
 
-            var uniqueLalafell = config.SeenPlayers.Count(
+            var uniquePeople = people.Count;
+
+            var uniqueLalafell = people.Count(
                 x => x.Race == "Lalafell");
 
             ImGui.Text($"Unique people seen: {uniquePeople}");
@@ -1439,7 +1455,7 @@ namespace MentorRouletteTracker
 
             ImGui.Spacing();
 
-            if (config.SeenPlayers.Count == 0)
+            if (people.Count == 0)
             {
                 ImGui.TextDisabled(
                     "No players have been recorded yet.");
@@ -1469,8 +1485,6 @@ namespace MentorRouletteTracker
                     ImGuiTableColumnFlags.PreferSortDescending);
 
                 ImGui.TableHeadersRow();
-
-                var people = config.SeenPlayers.ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
 
@@ -1651,14 +1665,13 @@ namespace MentorRouletteTracker
 
                             ImGui.TableSetColumnIndex(4);
 
-                            if (member.Name == localPlayerName)
+                            if (member.Name == localPlayerName && !config.IncludeSelfInStatistics)
                             {
                                 ImGui.TextUnformatted("-");
                             }
                             else
                             {
-                                ImGui.TextUnformatted(
-                                    member.DeathCount.ToString());
+                                ImGui.TextUnformatted(member.DeathCount.ToString());
                             }
                         }
 

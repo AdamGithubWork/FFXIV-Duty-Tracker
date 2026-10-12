@@ -26,7 +26,7 @@ namespace MentorRouletteTracker
             30, // V&C Dungeon Finder
             37  // Chaotic Alliance Raid
         };
-
+        public bool IncludeSelfInStatistics { get; set; } = false;
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
 
