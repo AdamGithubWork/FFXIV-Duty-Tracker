@@ -62,6 +62,16 @@ namespace MentorRouletteTracker
             this.dutyState.DutyWiped += OnDutyWiped;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
+            if (config.PendingDuty != null)
+            {
+                current = config.PendingDuty;
+
+                countedPlayersForCurrentRun.UnionWith(
+                    current.Party.Select(x => x.Name)
+                );
+
+                log.Info($"Restored pending duty: {current.DutyName}");
+            }
         }
 
         public void Dispose()
@@ -75,12 +85,21 @@ namespace MentorRouletteTracker
         
         private void OnTerritoryChanged(uint territoryId)
         {
-            
 
-            if (current != null)
-                FinalizeCurrent(completed: false);
 
             var cfc = FindContentFinderCondition(territoryId);
+
+            if (current != null)
+            {
+                if (cfc != null &&
+                    current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
+                {
+                    previousDeathStates.Clear();
+                    return;
+                }
+
+                FinalizeCurrent(completed: false);
+            }
 
             if (cfc == null)
                 return;
@@ -116,6 +135,8 @@ namespace MentorRouletteTracker
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
             current.JoinedInProgress = dutyState.IsDutyStarted;
+            config.PendingDuty = current;
+            config.Save();
         }
 
         private void OnDutyStarted(IDutyStateEventArgs args)
@@ -159,6 +180,7 @@ namespace MentorRouletteTracker
             current.TimeInDuty = DateTime.Now - current.Timestamp;
 
             config.Records.Add(current);
+            config.PendingDuty = null;
             config.Save();
 
             RecordFinalized?.Invoke(current);
@@ -208,9 +230,13 @@ namespace MentorRouletteTracker
                     gender = GenderIdToName(genderId);
                 }
 
-                var isDead = member.GameObject?.IsDead ?? false;
+                if (member.GameObject == null)
+                    continue;
+
+                var isDead = member.GameObject.IsDead;
 
                 ProcessPlayer(name, job, race, gender, isDead);
+
             }
             var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
 

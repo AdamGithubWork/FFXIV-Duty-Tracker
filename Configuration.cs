@@ -30,6 +30,8 @@ namespace MentorRouletteTracker
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
 
+        public DutyRecord? PendingDuty { get; set; }
+
         public void Initialize(IDalamudPluginInterface pi)
         {
             this.pluginInterface = pi;
