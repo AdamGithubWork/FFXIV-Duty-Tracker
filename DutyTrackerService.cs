@@ -214,6 +214,7 @@ namespace MentorRouletteTracker
                     continue;
 
                 var job = member.ClassJob.Value.Abbreviation.ExtractText();
+                var world = member.World.Value.Name.ExtractText();
                 var race = "Unknown";
                 var gender = "Unknown";
 
@@ -235,7 +236,7 @@ namespace MentorRouletteTracker
 
                 var isDead = member.GameObject.IsDead;
 
-                ProcessPlayer(name, job, race, gender, isDead);
+                ProcessPlayer(name, job, race, gender, world, isDead);
 
             }
             if (config.TrackAllianceMembers && partyList.IsAlliance)
@@ -258,10 +259,10 @@ namespace MentorRouletteTracker
                         continue;
 
                     var job = member.ClassJob.Value.Abbreviation.ExtractText();
-
+                    var world = member.World.Value.Name.ExtractText();
                     var race = "Unknown";
                     var gender = "Unknown";
-
+                    
                     if (member.GameObject is ICharacter character)
                     {
                         race = RaceIdToName(
@@ -271,16 +272,18 @@ namespace MentorRouletteTracker
                             character.Customize[(int)CustomizeIndex.Gender]);
                     }
 
-                    ProcessPlayer(name, job, race, gender, member.GameObject?.IsDead);
+                    ProcessPlayer(name, job, race, gender, world, member.GameObject?.IsDead);
                 }
             }
             var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
+
+            var localPlayerWorld = localPlayer.HomeWorld.Value.Name.ExtractText();
 
             var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
 
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
 
-            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayer.IsDead);
+            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayer.IsDead);
 
             // Count other Lalafells, excluding the local player.
             current.LalafellCount = current.Party.Count(x =>
@@ -291,7 +294,7 @@ namespace MentorRouletteTracker
             config.Save();
         }
 
-        private void ProcessPlayer(string name, string job, string race, string gender, bool? isDead)
+        private void ProcessPlayer(string name, string job, string race, string gender, string world, bool? isDead)
         {
             // Find or create this player's snapshot for the current duty.
             var snapshot = current!.Party
@@ -305,6 +308,7 @@ namespace MentorRouletteTracker
                     Job = job,
                     Race = race,
                     Gender = gender,
+                    World = world,
                     DeathCount = 0
                 };
 
@@ -319,12 +323,11 @@ namespace MentorRouletteTracker
                 if (snapshot.Race == "Unknown" && race != "Unknown")
                     snapshot.Race = race;
 
-                if ((string.IsNullOrWhiteSpace(snapshot.Gender) ||
-                     snapshot.Gender == "Unknown") &&
-                    gender != "Unknown")
-                {
+                if ((string.IsNullOrWhiteSpace(snapshot.Gender) || snapshot.Gender == "Unknown") && gender != "Unknown")
                     snapshot.Gender = gender;
-                }
+
+                if (string.IsNullOrWhiteSpace(snapshot.World) &&!string.IsNullOrWhiteSpace(world))
+                    snapshot.World = world;
             }
 
             // Detect a transition from alive to dead.
@@ -355,6 +358,7 @@ namespace MentorRouletteTracker
                         Name = name,
                         Race = race,
                         Gender = gender,
+                        World = world,
                         TimesSeen = 1
                     };
 
@@ -376,15 +380,12 @@ namespace MentorRouletteTracker
             // even if this player was already counted during this duty.
             if (seenPlayer != null)
             {
+                if (string.IsNullOrWhiteSpace(seenPlayer.World) &&!string.IsNullOrWhiteSpace(world))
+                    seenPlayer.World = world;
                 if (seenPlayer.Race == "Unknown" && race != "Unknown")
                     seenPlayer.Race = race;
-
-                if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
-                     seenPlayer.Gender == "Unknown") &&
-                    gender != "Unknown")
-                {
+                if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) || seenPlayer.Gender == "Unknown") && gender != "Unknown")
                     seenPlayer.Gender = gender;
-                }
             }
         }
 
