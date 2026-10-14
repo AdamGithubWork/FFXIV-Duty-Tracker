@@ -13,7 +13,7 @@ namespace MentorRouletteTracker
         public List<DutyRecord> Records { get; set; } = new();
 
         public List<SeenPlayer> SeenPlayers { get; set; } = new();
-        
+        public bool TrackAllianceMembers { get; set; } = false;
         public List<uint> TrackedContentTypeIds { get; set; } = new()
         {
             2,  // Dungeons

@@ -1418,6 +1418,13 @@ namespace MentorRouletteTracker
                 config.IncludeSelfInStatistics = includeSelf;
                 config.Save();
             }
+            bool trackAlliance = config.TrackAllianceMembers;
+
+            if (ImGui.Checkbox("Track alliance members", ref trackAlliance))
+            {
+                config.TrackAllianceMembers = trackAlliance;
+                config.Save();
+            }
         }
         private void DrawPeopleTab()
         {

@@ -238,6 +238,42 @@ namespace MentorRouletteTracker
                 ProcessPlayer(name, job, race, gender, isDead);
 
             }
+            if (config.TrackAllianceMembers && partyList.IsAlliance)
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    var address = partyList.GetAllianceMemberAddress(i);
+
+                    if (address == nint.Zero)
+                        continue;
+
+                    var member = partyList.CreateAllianceMemberReference(address);
+
+                    if (member == null)
+                        continue;
+
+                    var name = member.Name.TextValue;
+
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+
+                    var job = member.ClassJob.Value.Abbreviation.ExtractText();
+
+                    var race = "Unknown";
+                    var gender = "Unknown";
+
+                    if (member.GameObject is ICharacter character)
+                    {
+                        race = RaceIdToName(
+                            character.Customize[(int)CustomizeIndex.Race]);
+
+                        gender = GenderIdToName(
+                            character.Customize[(int)CustomizeIndex.Gender]);
+                    }
+
+                    ProcessPlayer(name, job, race, gender, member.GameObject?.IsDead);
+                }
+            }
             var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
 
             var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
@@ -255,7 +291,7 @@ namespace MentorRouletteTracker
             config.Save();
         }
 
-        private void ProcessPlayer(string name, string job, string race, string gender, bool isDead)
+        private void ProcessPlayer(string name, string job, string race, string gender, bool? isDead)
         {
             // Find or create this player's snapshot for the current duty.
             var snapshot = current!.Party
@@ -292,15 +328,19 @@ namespace MentorRouletteTracker
             }
 
             // Detect a transition from alive to dead.
-            if (isDead &&
-                previousDeathStates.TryGetValue(name, out var wasDead) &&
-                !wasDead)
+            if (isDead.HasValue)
             {
-                snapshot.DeathCount++;
+                if (isDead.Value && previousDeathStates.TryGetValue(name, out var wasDead) && !wasDead)
+                {
+                    snapshot.DeathCount++;
+                }
 
+                previousDeathStates[name] = isDead.Value;
             }
-
-            previousDeathStates[name] = isDead;
+            else
+            {
+                previousDeathStates.Remove(name);
+            }
 
             // Find or create this player's long-term People Seen record.
             var seenPlayer = config.SeenPlayers
