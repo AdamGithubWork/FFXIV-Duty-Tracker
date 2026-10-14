@@ -464,9 +464,7 @@ namespace MentorRouletteTracker
         {
             config.SeenPlayers.Clear();
 
-            var people = config.Records
-                .SelectMany(x => x.Party)
-                .GroupBy(x => x.Name);
+            var people = config.Records.SelectMany(x => x.Party).GroupBy(x => new { x.Name, x.World });
 
             foreach (var group in people)
             {
@@ -482,7 +480,8 @@ namespace MentorRouletteTracker
 
                 config.SeenPlayers.Add(new SeenPlayer
                 {
-                    Name = group.Key,
+                    Name = group.Key.Name,
+                    World = group.Key.World,
                     Race = race,
                     Gender = gender,
                     TimesSeen = group.Count()
@@ -1472,7 +1471,7 @@ namespace MentorRouletteTracker
 
             if (ImGui.BeginTable(
                     "peopleTable",
-                    4,
+                    5,
                     ImGuiTableFlags.Borders |
                     ImGuiTableFlags.RowBg |
                     ImGuiTableFlags.ScrollY |
@@ -1483,7 +1482,7 @@ namespace MentorRouletteTracker
                 ImGui.TableSetupColumn(
                     "Name",
                     ImGuiTableColumnFlags.PreferSortAscending);
-
+                ImGui.TableSetupColumn("World");
                 ImGui.TableSetupColumn("Race");
                 ImGui.TableSetupColumn("Gender");
 
@@ -1506,28 +1505,20 @@ namespace MentorRouletteTracker
                             : people.OrderByDescending(x => x.Name).ToList(),
 
                         1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? people.OrderBy(x => x.Race)
-                                .ThenBy(x => x.Name)
-                                .ToList()
-                            : people.OrderByDescending(x => x.Race)
-                                .ThenBy(x => x.Name)
-                                .ToList(),
+                            ? people.OrderBy(x => x.World).ThenBy(x => x.Name).ToList()
+                            : people.OrderByDescending(x => x.World).ThenBy(x => x.Name).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? people.OrderBy(x => x.Gender)
-                                .ThenBy(x => x.Name)
-                                .ToList()
-                            : people.OrderByDescending(x => x.Gender)
-                                .ThenBy(x => x.Name)
-                                .ToList(),
+                            ? people.OrderBy(x => x.Race).ThenBy(x => x.Name).ToList()
+                            : people.OrderByDescending(x => x.Race).ThenBy(x => x.Name).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? people.OrderBy(x => x.TimesSeen)
-                                .ThenBy(x => x.Name)
-                                .ToList()
-                            : people.OrderByDescending(x => x.TimesSeen)
-                                .ThenBy(x => x.Name)
-                                .ToList(),
+                            ? people.OrderBy(x => x.Gender).ThenBy(x => x.Name).ToList()
+                            : people.OrderByDescending(x => x.Gender).ThenBy(x => x.Name).ToList(),
+
+                        4 => spec.SortDirection == ImGuiSortDirection.Ascending
+                            ? people.OrderBy(x => x.TimesSeen).ThenBy(x => x.Name).ToList()
+                            : people.OrderByDescending(x => x.TimesSeen).ThenBy(x => x.Name).ToList(),
 
                         _ => people
                     };
@@ -1543,12 +1534,15 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(player.Name);
 
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(player.Race);
+                    ImGui.TextUnformatted(player.World);
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(player.Gender);
+                    ImGui.TextUnformatted(player.Race);
 
                     ImGui.TableSetColumnIndex(3);
+                    ImGui.TextUnformatted(player.Gender);
+
+                    ImGui.TableSetColumnIndex(4);
                     ImGui.TextUnformatted(
                         player.TimesSeen.ToString());
                 }

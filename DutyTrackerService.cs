@@ -11,6 +11,7 @@ using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace MentorRouletteTracker
 {
@@ -66,9 +67,7 @@ namespace MentorRouletteTracker
             {
                 current = config.PendingDuty;
 
-                countedPlayersForCurrentRun.UnionWith(
-                    current.Party.Select(x => x.Name)
-                );
+                countedPlayersForCurrentRun.UnionWith(current.Party.Select(x => $"{x.Name}@{x.World}"));
 
                 log.Info($"Restored pending duty: {current.DutyName}");
             }
@@ -296,9 +295,9 @@ namespace MentorRouletteTracker
 
         private void ProcessPlayer(string name, string job, string race, string gender, string world, bool? isDead)
         {
+            var playerKey = $"{name}@{world}";
             // Find or create this player's snapshot for the current duty.
-            var snapshot = current!.Party
-                .FirstOrDefault(x => x.Name == name);
+            var snapshot = current!.Party.FirstOrDefault(x => x.Name == name && x.World == world);
 
             if (snapshot == null)
             {
@@ -333,23 +332,21 @@ namespace MentorRouletteTracker
             // Detect a transition from alive to dead.
             if (isDead.HasValue)
             {
-                if (isDead.Value && previousDeathStates.TryGetValue(name, out var wasDead) && !wasDead)
-                {
-                    snapshot.DeathCount++;
+                if (isDead.Value && previousDeathStates.TryGetValue(playerKey, out var wasDead) && !wasDead) { 
+                    snapshot.DeathCount++; 
                 }
 
-                previousDeathStates[name] = isDead.Value;
+                previousDeathStates[playerKey] = isDead.Value;
             }
             else
             {
-                previousDeathStates.Remove(name);
+                previousDeathStates.Remove(playerKey);
             }
 
             // Find or create this player's long-term People Seen record.
-            var seenPlayer = config.SeenPlayers
-                .FirstOrDefault(x => x.Name == name);
+            var seenPlayer = config.SeenPlayers.FirstOrDefault(x => x.Name == name && x.World == world);
 
-            if (countedPlayersForCurrentRun.Add(name))
+            if (countedPlayersForCurrentRun.Add(playerKey))
             {
                 if (seenPlayer == null)
                 {
@@ -371,7 +368,7 @@ namespace MentorRouletteTracker
                     seenPlayer.TimesSeen++;
 
                     log.Info(
-                        $"Player seen again: {name} | " +
+                        $"Player seen again: {playerKey} | " +
                         $"Times Seen: {seenPlayer.TimesSeen}");
                 }
             }
