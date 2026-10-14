@@ -3,6 +3,7 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using System.Linq;
 
 namespace MentorRouletteTracker
 {
@@ -37,9 +38,19 @@ namespace MentorRouletteTracker
             this.commandManager = commandManager;
             this.log = log;
 
-            config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            config.Initialize(pluginInterface);
+            var savedConfig = pluginInterface.GetPluginConfig() as Configuration;
 
+            config = savedConfig ?? new Configuration();
+
+            if (savedConfig == null)
+            {
+                config.TrackedContentTypeIds.AddRange(
+                    new uint[] { 2, 3, 4, 5, 6, 21, 28, 30, 37 });
+            }
+            config.Initialize(pluginInterface);
+            config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
+
+            config.Save();
             tracker = new DutyTrackerService(
                 clientState,
                 dutyState,
