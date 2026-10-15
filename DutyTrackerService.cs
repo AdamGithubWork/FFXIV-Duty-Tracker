@@ -46,6 +46,7 @@ namespace MentorRouletteTracker
             IDataManager dataManager,
             IFramework framework,
             IPluginLog log,
+
             Configuration config)
         {
             this.clientState = clientState;
@@ -216,7 +217,8 @@ namespace MentorRouletteTracker
                 var world = member.World.Value.Name.ExtractText();
                 var race = "Unknown";
                 var gender = "Unknown";
-
+                var status = "Unknown";
+                
                 if (member.GameObject is ICharacter character)
                 {
                     var raceId =
@@ -228,6 +230,12 @@ namespace MentorRouletteTracker
                         character.Customize[(int)CustomizeIndex.Gender];
 
                     gender = GenderIdToName(genderId);
+                    if (character.OnlineStatus.IsValid)
+                    {
+                        status = character.OnlineStatus.Value.Name.ExtractText();
+
+                        log.Info($"Player: {name} | Status: {status} | ID: {character.OnlineStatus.RowId}");
+                    }
                 }
 
                 if (member.GameObject == null)
@@ -235,7 +243,7 @@ namespace MentorRouletteTracker
 
                 var isDead = member.GameObject.IsDead;
 
-                ProcessPlayer(name, job, race, gender, world, isDead);
+                ProcessPlayer(name, job, race, gender, world, status, isDead);
 
             }
             if (config.TrackAllianceMembers && partyList.IsAlliance)
@@ -261,7 +269,8 @@ namespace MentorRouletteTracker
                     var world = member.World.Value.Name.ExtractText();
                     var race = "Unknown";
                     var gender = "Unknown";
-                    
+                    var status = "Unknown";
+
                     if (member.GameObject is ICharacter character)
                     {
                         race = RaceIdToName(
@@ -269,9 +278,10 @@ namespace MentorRouletteTracker
 
                         gender = GenderIdToName(
                             character.Customize[(int)CustomizeIndex.Gender]);
+                        character.OnlineStatus.Value.Name.ExtractText();
                     }
 
-                    ProcessPlayer(name, job, race, gender, world, member.GameObject?.IsDead);
+                    ProcessPlayer(name, job, race, gender, world, status, member.GameObject?.IsDead);
                 }
             }
             var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
@@ -282,7 +292,9 @@ namespace MentorRouletteTracker
 
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
 
-            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayer.IsDead);
+            var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
+
+            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayerStatus, localPlayer.IsDead);
 
             // Count other Lalafells, excluding the local player.
             current.LalafellCount = current.Party.Count(x =>
@@ -293,7 +305,7 @@ namespace MentorRouletteTracker
             config.Save();
         }
 
-        private void ProcessPlayer(string name, string job, string race, string gender, string world, bool? isDead)
+        private void ProcessPlayer(string name, string job, string race, string gender, string world, string status, bool? isDead)
         {
             var playerKey = $"{name}@{world}";
             // Find or create this player's snapshot for the current duty.
@@ -308,6 +320,7 @@ namespace MentorRouletteTracker
                     Race = race,
                     Gender = gender,
                     World = world,
+                    Status = status,
                     DeathCount = 0
                 };
 
@@ -327,6 +340,10 @@ namespace MentorRouletteTracker
 
                 if (string.IsNullOrWhiteSpace(snapshot.World) &&!string.IsNullOrWhiteSpace(world))
                     snapshot.World = world;
+                if ((string.IsNullOrWhiteSpace(snapshot.Status) || snapshot.Status == "Unknown") && !string.IsNullOrWhiteSpace(status) &&status != "Unknown")
+                {
+                    snapshot.Status = status;
+                }
             }
 
             // Detect a transition from alive to dead.

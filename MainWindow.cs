@@ -1625,7 +1625,7 @@ namespace MentorRouletteTracker
 
                     if (ImGui.BeginTable(
                             "partyDetail",
-                            6,
+                            7,
                             ImGuiTableFlags.Borders |
                             ImGuiTableFlags.RowBg |
                             ImGuiTableFlags.Resizable |
@@ -1637,6 +1637,7 @@ namespace MentorRouletteTracker
                         ImGui.TableSetupColumn("Job");
                         ImGui.TableSetupColumn("Race");
                         ImGui.TableSetupColumn("Gender");
+                        ImGui.TableSetupColumn("Status");
                         ImGui.TableSetupColumn("Deaths");
 
                         ImGui.TableHeadersRow();
@@ -1670,6 +1671,10 @@ namespace MentorRouletteTracker
                                     : sortedParty.OrderByDescending(x => x.Gender).ToList(),
 
                                 5 => ascending
+                                    ? sortedParty.OrderBy(x => x.Status ?? "Unknown").ToList()
+                                    : sortedParty.OrderByDescending(x => x.Status ?? "Unknown").ToList(),
+
+                                6 => ascending
                                     ? sortedParty.OrderBy(x => x.DeathCount).ToList()
                                     : sortedParty.OrderByDescending(x => x.DeathCount).ToList(),
 
@@ -1705,7 +1710,10 @@ namespace MentorRouletteTracker
                             ImGui.TableSetColumnIndex(4);
                             ImGui.TextUnformatted(member.Gender);
 
-                            ImGui.TableSetColumnIndex(5);
+                            ImGui.TableSetColumnIndex(5); ;
+                            ImGui.TextUnformatted(member.Status);
+
+                            ImGui.TableSetColumnIndex(6);
 
                             if (member.Name == localPlayerName && !config.IncludeSelfInStatistics)
                             {
