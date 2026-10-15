@@ -16,5 +16,6 @@ namespace MentorRouletteTracker
         public string PlayerJob { get; set; } = string.Empty;
         public TimeSpan TimeInDuty { get; set; }
         public List<PartyMemberSnapshot> Party { get; set; } = new();
+        public string Note { get; set; } = string.Empty;
     }
 }

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
 
 namespace MentorRouletteTracker
@@ -28,6 +30,9 @@ namespace MentorRouletteTracker
         private int editWipeCount;
         private bool editJoinedInProgress;
         private string editError = string.Empty;
+        private bool showNoteWindow = false;
+        private string noteDraft = string.Empty;
+        private DutyRecord? noteRecord = null;
 
         public MainWindow(
             Configuration config,
@@ -79,6 +84,7 @@ namespace MentorRouletteTracker
             }
 
             DrawDetailWindow();
+            DrawNoteWindow();
             if (openEditRecord)
             {
                 ImGui.OpenPopup("EditDutyRecord");
@@ -1733,6 +1739,21 @@ namespace MentorRouletteTracker
                     ImGui.TextDisabled(
                         "No party details were captured for this run.");
                 }
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+                ImGui.PushFont(UiBuilder.IconFont);
+
+                if (ImGui.Button(FontAwesomeIcon.Edit.ToIconString()))
+                {
+                    noteRecord = r;
+                    noteDraft = r.Note ?? string.Empty;
+                    showNoteWindow = true;
+                }
+
+                ImGui.PopFont();
+                ImGui.SameLine();
+                ImGui.TextWrapped($"Notes: {r.Note}");
             }
 
             ImGui.End();
@@ -1744,7 +1765,57 @@ namespace MentorRouletteTracker
                 selectedRecord = null;
             }
         }
+        private void DrawNoteWindow()
+        {
+            if (!showNoteWindow || noteRecord == null)
+                return;
 
+            ImGui.SetNextWindowSize(
+                new Vector2(450, 300),
+                ImGuiCond.FirstUseEver);
+
+            var isOpen = showNoteWindow;
+
+            if (ImGui.Begin(
+                $"Duty Notes - {noteRecord.DutyName}###DutyNotes",
+                ref isOpen))
+            {
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                ImGui.InputTextMultiline(
+                    "##NoteText",
+                    ref noteDraft,
+                    4096,
+                    new Vector2(-1, 180));
+
+                ImGui.Spacing();
+
+                if (ImGui.Button("Save"))
+                {
+                    noteRecord.Note = noteDraft;
+                    config.Save();
+                    isOpen = false;
+                }
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Cancel"))
+                {
+                    isOpen = false;
+                }
+            }
+
+            ImGui.End();
+
+            showNoteWindow = isOpen;
+
+            if (!showNoteWindow)
+            {
+                noteRecord = null;
+                noteDraft = string.Empty;
+            }
+        }
         private static int GetJobRoleOrder(string job)
         {
             return job switch
