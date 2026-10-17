@@ -656,7 +656,7 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawLalafellStatistics(records);
+                DrawSelectedPlayerStatistics(records);
 
                 ImGui.Spacing();
                 ImGui.Separator();
@@ -790,18 +790,39 @@ namespace MentorRouletteTracker
                 ImGui.EndTable();
             }
         }
-
-        private void DrawLalafellStatistics(List<DutyRecord> records)
+        private HashSet<string> GetTargetRaces()
         {
-            ImGui.Text("Lalafell Statistics");
+            return new HashSet<string>(selectedPlayerRaces);
+        }
+        private void DrawSelectedPlayerStatistics(List<DutyRecord> records)
+        {
+            var targetRaces = GetTargetRaces();
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+            var title = targetRaces.Count == 0
+                ? "All Players"
+                : string.Join(" + ", targetRaces.OrderBy(x => x));
+
+            ImGui.Text($"{title} Statistics");
 
             ImGui.Spacing();
 
+            var matchingPlayers = records
+                .SelectMany(x => x.Party)
+                .Where(x =>
+                    (targetRaces.Count == 0 || targetRaces.Contains(x.Race)) &&
+                    MatchesPlayerFilters(x) &&
+                    (config.IncludeSelfInStatistics || x.Name != localPlayerName))
+                .ToList();
+            var matchingCounts = records
+                .Select(record => record.Party.Count(player =>
+                    (targetRaces.Count == 0 || targetRaces.Contains(player.Race)) &&
+                    MatchesPlayerFilters(player) &&
+                    (config.IncludeSelfInStatistics || player.Name != localPlayerName)))
+                .ToList();
             var currentDrought = 0;
-
-            for (var i = records.Count - 1; i >= 0; i--)
+            for (var i = matchingCounts.Count - 1; i >= 0; i--)
             {
-                if (records[i].LalafellCount > 0)
+                if (matchingCounts[i] > 0)
                     break;
 
                 currentDrought++;
@@ -810,14 +831,12 @@ namespace MentorRouletteTracker
             var longestDrought = 0;
             var drought = 0;
 
-            foreach (var record in records)
+            foreach (var count in matchingCounts)
             {
-                if (record.LalafellCount == 0)
+                if (count == 0)
                 {
                     drought++;
-
-                    longestDrought =
-                        Math.Max(longestDrought, drought);
+                    longestDrought = Math.Max(longestDrought, drought);
                 }
                 else
                 {
@@ -825,15 +844,15 @@ namespace MentorRouletteTracker
                 }
             }
 
-            var totalLalafell =
-                records.Sum(x => x.LalafellCount);
+            var totalEncounters = matchingCounts.Sum();
 
-            var dutiesWithLalafell =
-                records.Count(x => x.LalafellCount > 0);
+            var dutiesWithMatchingPlayers =
+                matchingCounts.Count(count => count > 0);
 
-            var uniqueLalafell =
-                config.SeenPlayers.Count(
-                    x => x.Race == "Lalafell");
+            var uniquePlayers = matchingPlayers
+                .Select(x => (x.Name, x.World))
+                .Distinct()
+                .Count();
 
             if (ImGui.BeginTable(
                     "lalaStats",
@@ -846,23 +865,23 @@ namespace MentorRouletteTracker
                 ImGui.TableSetupColumn("Value");
 
                 DrawStatisticRow(
-                    "Unique Lalafell Seen",
-                    uniqueLalafell.ToString());
+                    "Unique Players Seen",
+                    uniquePlayers.ToString());
 
                 DrawStatisticRow(
-                    "Total Lalafell Encounters",
-                    totalLalafell.ToString());
+                    "Total Encounters",
+                    totalEncounters.ToString());
 
                 DrawStatisticRow(
-                    "Duties With Lalafell",
-                    dutiesWithLalafell.ToString());
+                    "Duties With Matching Players",
+                    dutiesWithMatchingPlayers.ToString());
 
                 DrawStatisticRow(
-                    "Duties Since Last Lalafell",
+                    "Duties Since Last Encounter",
                     currentDrought.ToString());
 
                 DrawStatisticRow(
-                    "Longest Lalafell Drought",
+                    "Longest Encounter Drought",
                     $"{longestDrought} duties");
 
                 ImGui.EndTable();
