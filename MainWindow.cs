@@ -17,6 +17,9 @@ namespace MentorRouletteTracker
         private readonly HashSet<string> selectedPlayerStatuses = new();
         private readonly HashSet<string> selectedPlayerRaces = new();
         private readonly HashSet<string> selectedPlayerGenders = new();
+        private int selectedTimeRange = 0;
+        private DateTime customStartDate = DateTime.Today.AddDays(-30);
+        private DateTime customEndDate = DateTime.Today;
         private readonly HashSet<string> selectedPlayerJobs = new();
         private readonly HashSet<string> selectedPlayerWorlds = new();
         private readonly Configuration config;
@@ -525,6 +528,13 @@ namespace MentorRouletteTracker
             return matchesStatus && matchesRace && matchesGender &&
                    matchesJob && matchesWorld;
         }
+        private static bool IsValidDate(int year, int month, int day)
+        {
+            return year >= 1 && year <= 9999 &&
+                   month >= 1 && month <= 12 &&
+                   day >= 1 &&
+                   day <= DateTime.DaysInMonth(year, month);
+        }
         private void DrawStatisticsTab()
         {
             var dutyTypes = config.Records
@@ -534,13 +544,13 @@ namespace MentorRouletteTracker
                 .OrderBy(x => x)
                 .ToList();
             var playerStatuses = new[]
-            {
-    "Battle Mentor",
-    "Sprout",
-    "Party Member",
-    "Returner",
-    "Trade Mentor"
-};
+                        {
+                "Battle Mentor",
+                "Sprout",
+                "Party Member",
+                "Returner",
+                "Trade Mentor"
+            };
             var playerWorlds = config.Records
                 .SelectMany(x => x.Party)
                 .Select(x => x.World)
@@ -607,19 +617,70 @@ namespace MentorRouletteTracker
 
                     if (ImGui.BeginTabItem("Time"))
                     {
-                        ImGui.TextDisabled("Time filters coming soon.");
+                        var timeRanges = new[]
+                        {
+                            "All Time",
+                            "Last 7 Days",
+                            "Last 30 Days",
+                            "Last 90 Days",
+                            "Custom Range"
+                        };
 
+                        ImGui.Combo(
+                            "Time Range",
+                            ref selectedTimeRange,
+                            timeRanges,
+                            timeRanges.Length);
+                        if (selectedTimeRange == 4)
+                        {
+                            int startYear = customStartDate.Year;
+                            int startMonth = customStartDate.Month;
+                            int startDay = customStartDate.Day;
+
+                            int endYear = customEndDate.Year;
+                            int endMonth = customEndDate.Month;
+                            int endDay = customEndDate.Day;
+
+                            ImGui.Text("Start Date");
+                            ImGui.InputInt("Year##Start", ref startYear);
+                            ImGui.InputInt("Month##Start", ref startMonth);
+                            ImGui.InputInt("Day##Start", ref startDay);
+
+                            ImGui.Spacing();
+
+                            ImGui.Text("End Date");
+                            ImGui.InputInt("Year##End", ref endYear);
+                            ImGui.InputInt("Month##End", ref endMonth);
+                            ImGui.InputInt("Day##End", ref endDay);
+
+                            if (IsValidDate(startYear, startMonth, startDay))
+                                customStartDate = new DateTime(startYear, startMonth, startDay);
+
+                            if (IsValidDate(endYear, endMonth, endDay))
+                                customEndDate = new DateTime(endYear, endMonth, endDay);
+                        }
                         ImGui.EndTabItem();
                     }
 
                     ImGui.EndTabBar();
                 }
             }
+            var now = DateTime.Now;
+
             var records = config.Records
                 .Where(x => x.Completed)
                 .Where(x =>
                     selectedDutyTypes.Count == 0 ||
                     selectedDutyTypes.Contains(x.DutyType))
+                .Where(x => selectedTimeRange switch
+                {
+                    1 => x.Timestamp >= now.AddDays(-7),
+                    2 => x.Timestamp >= now.AddDays(-30),
+                    3 => x.Timestamp >= now.AddDays(-90),
+                    4 => x.Timestamp >= customStartDate.Date && x.Timestamp < customEndDate.Date.AddDays(1),
+                    _ => true
+                })
+                .OrderBy(x => x.Timestamp)
                 .ToList();
 
             if (ImGui.BeginChild(
