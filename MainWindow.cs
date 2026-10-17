@@ -560,6 +560,15 @@ namespace MentorRouletteTracker
                 .ToList();
             if (ImGui.CollapsingHeader("Filters"))
             {
+                if (ImGui.Button("Clear All Filters"))
+                {
+                    selectedDutyTypes.Clear();
+                    selectedPlayerStatuses.Clear();
+                    selectedPlayerRaces.Clear();
+                    selectedPlayerGenders.Clear();
+
+                    selectedTimeRange = 0;
+                }
                 if (ImGui.BeginTabBar("StatisticsFilterTabs"))
                 {
                     if (ImGui.BeginTabItem("Duty"))
@@ -571,11 +580,6 @@ namespace MentorRouletteTracker
 
                     if (ImGui.BeginTabItem("Players"))
                     {
-                        if (ImGui.Button("Clear Player Statuses"))
-                        {
-                            selectedPlayerStatuses.Clear();
-                        }
-
                         ImGui.Separator();
 
                         ImGui.Text("Status");
