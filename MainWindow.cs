@@ -13,6 +13,8 @@ namespace MentorRouletteTracker
 {
     public class MainWindow : Window, IDisposable
     {
+        private readonly HashSet<string> selectedDutyTypes = new();
+        private readonly HashSet<string> selectedPlayerStatuses = new();
         private readonly Configuration config;
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
@@ -494,11 +496,88 @@ namespace MentorRouletteTracker
                 });
             }
         }
-
+        private bool MatchesPlayerFilters(PartyMemberSnapshot player)
+        {
+            return selectedPlayerStatuses.Count == 0 ||
+                   selectedPlayerStatuses.Contains(player.Status);
+        }
         private void DrawStatisticsTab()
         {
+            var dutyTypes = config.Records
+                .Select(x => x.DutyType)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+            var playerStatuses = config.Records
+                .SelectMany(x => x.Party)
+                .Select(x => x.Status)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+            if (ImGui.CollapsingHeader("Filters"))
+            {
+                if (ImGui.BeginTabBar("StatisticsFilterTabs"))
+                {
+                    if (ImGui.BeginTabItem("Duty"))
+                    {
+                        foreach (var dutyType in dutyTypes)
+                        {
+                            bool selected = selectedDutyTypes.Contains(dutyType);
+
+                            if (ImGui.Checkbox(dutyType, ref selected))
+                            {
+                                if (selected)
+                                    selectedDutyTypes.Add(dutyType);
+                                else
+                                    selectedDutyTypes.Remove(dutyType);
+                            }
+                        }
+
+                        ImGui.EndTabItem();
+                    }
+
+                    if (ImGui.BeginTabItem("Players"))
+                    {
+                        if (ImGui.Button("Clear Player Statuses"))
+                        {
+                            selectedPlayerStatuses.Clear();
+                        }
+
+                        ImGui.Separator();
+
+                        foreach (var status in playerStatuses)
+                        {
+                            bool selected = selectedPlayerStatuses.Contains(status);
+
+                            if (ImGui.Checkbox(status, ref selected))
+                            {
+                                if (selected)
+                                    selectedPlayerStatuses.Add(status);
+                                else
+                                    selectedPlayerStatuses.Remove(status);
+                            }
+                        }
+
+                        ImGui.EndTabItem();
+                    }
+
+                    if (ImGui.BeginTabItem("Time"))
+                    {
+                        ImGui.TextDisabled("Time filters coming soon.");
+
+                        ImGui.EndTabItem();
+                    }
+
+                    ImGui.EndTabBar();
+                }
+            }
             var records = config.Records
                 .Where(x => x.Completed)
+                .Where(x =>
+                    selectedDutyTypes.Count == 0 ||
+                    selectedDutyTypes.Contains(x.DutyType))
                 .ToList();
 
             if (ImGui.BeginChild(
