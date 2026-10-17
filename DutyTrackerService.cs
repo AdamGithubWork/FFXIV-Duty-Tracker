@@ -278,7 +278,10 @@ namespace MentorRouletteTracker
 
                         gender = GenderIdToName(
                             character.Customize[(int)CustomizeIndex.Gender]);
-                        character.OnlineStatus.Value.Name.ExtractText();
+                        if (character.OnlineStatus.IsValid)
+                        {
+                            status = character.OnlineStatus.Value.Name.ExtractText();
+                        }
                     }
 
                     ProcessPlayer(name, job, race, gender, world, status, member.GameObject?.IsDead);
@@ -304,9 +307,19 @@ namespace MentorRouletteTracker
 
             config.Save();
         }
-
+        private static string NormalizePlayerStatus(string status)
+        {
+            return status switch
+            {
+                "New Adventurer" => "Sprout",
+                "Party Leader" => "Party Member",
+                "Viewing Cutscene" => "Unknown",
+                _ => status
+            };
+        }
         private void ProcessPlayer(string name, string job, string race, string gender, string world, string status, bool? isDead)
         {
+            status = NormalizePlayerStatus(status);
             var playerKey = $"{name}@{world}";
             // Find or create this player's snapshot for the current duty.
             var snapshot = current!.Party.FirstOrDefault(x => x.Name == name && x.World == world);

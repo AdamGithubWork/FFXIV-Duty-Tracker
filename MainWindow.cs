@@ -15,6 +15,10 @@ namespace MentorRouletteTracker
     {
         private readonly HashSet<string> selectedDutyTypes = new();
         private readonly HashSet<string> selectedPlayerStatuses = new();
+        private readonly HashSet<string> selectedPlayerRaces = new();
+        private readonly HashSet<string> selectedPlayerGenders = new();
+        private readonly HashSet<string> selectedPlayerJobs = new();
+        private readonly HashSet<string> selectedPlayerWorlds = new();
         private readonly Configuration config;
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
@@ -498,8 +502,28 @@ namespace MentorRouletteTracker
         }
         private bool MatchesPlayerFilters(PartyMemberSnapshot player)
         {
-            return selectedPlayerStatuses.Count == 0 ||
-                   selectedPlayerStatuses.Contains(player.Status);
+            bool matchesStatus =
+                selectedPlayerStatuses.Count == 0 ||
+                selectedPlayerStatuses.Contains(player.Status);
+
+            bool matchesRace =
+                selectedPlayerRaces.Count == 0 ||
+                selectedPlayerRaces.Contains(player.Race);
+
+            bool matchesGender =
+                selectedPlayerGenders.Count == 0 ||
+                selectedPlayerGenders.Contains(player.Gender);
+
+            bool matchesJob =
+                selectedPlayerJobs.Count == 0 ||
+                selectedPlayerJobs.Contains(player.Job);
+
+            bool matchesWorld =
+                selectedPlayerWorlds.Count == 0 ||
+                selectedPlayerWorlds.Contains(player.World);
+
+            return matchesStatus && matchesRace && matchesGender &&
+                   matchesJob && matchesWorld;
         }
         private void DrawStatisticsTab()
         {
@@ -509,10 +533,18 @@ namespace MentorRouletteTracker
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
-            var playerStatuses = config.Records
+            var playerStatuses = new[]
+            {
+    "Battle Mentor",
+    "Sprout",
+    "Party Member",
+    "Returner",
+    "Trade Mentor"
+};
+            var playerWorlds = config.Records
                 .SelectMany(x => x.Party)
-                .Select(x => x.Status)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.World)
+                .Where(x => !string.IsNullOrWhiteSpace(x) && x != "Unknown")
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
@@ -522,18 +554,7 @@ namespace MentorRouletteTracker
                 {
                     if (ImGui.BeginTabItem("Duty"))
                     {
-                        foreach (var dutyType in dutyTypes)
-                        {
-                            bool selected = selectedDutyTypes.Contains(dutyType);
-
-                            if (ImGui.Checkbox(dutyType, ref selected))
-                            {
-                                if (selected)
-                                    selectedDutyTypes.Add(dutyType);
-                                else
-                                    selectedDutyTypes.Remove(dutyType);
-                            }
-                        }
+                        DrawFilterCheckboxes(dutyTypes, selectedDutyTypes);
 
                         ImGui.EndTabItem();
                     }
@@ -547,19 +568,68 @@ namespace MentorRouletteTracker
 
                         ImGui.Separator();
 
-                        foreach (var status in playerStatuses)
+                        ImGui.Text("Status");
+                        DrawFilterCheckboxes(playerStatuses, selectedPlayerStatuses);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Text("Race");
+                        ImGui.Spacing();
+
+                        var races = new[]
                         {
-                            bool selected = selectedPlayerStatuses.Contains(status);
+                            "Hyur",
+                            "Elezen",
+                            "Lalafell",
+                            "Miqo'te",
+                            "Roegadyn",
+                            "Au Ra",
+                            "Hrothgar",
+                            "Viera"
+                        };
 
-                            if (ImGui.Checkbox(status, ref selected))
-                            {
-                                if (selected)
-                                    selectedPlayerStatuses.Add(status);
-                                else
-                                    selectedPlayerStatuses.Remove(status);
-                            }
-                        }
+                        DrawFilterCheckboxes(races, selectedPlayerRaces);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Text("Gender");
+                        ImGui.Spacing();
 
+                        var genders = new[]
+                        {
+                            "Male",
+                            "Female"
+                        };
+
+                        DrawFilterCheckboxes(genders, selectedPlayerGenders);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Text("Job");
+                        ImGui.Spacing();
+
+                        var jobs = new[]
+                        {
+                            // Tanks
+                            "PLD", "WAR", "DRK", "GNB",
+
+                            // Healers
+                            "WHM", "SCH", "AST", "SGE",
+
+                            // Melee DPS
+                            "MNK", "DRG", "NIN", "SAM", "RPR", "VPR",
+
+                            // Physical Ranged DPS
+                            "BRD", "MCH", "DNC",
+
+                            // Magical Ranged DPS
+                            "BLM", "SMN", "RDM", "PCT", "BLU"
+                        };
+
+                        DrawFilterCheckboxes(jobs, selectedPlayerJobs);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Text("World");
+                        ImGui.Spacing();
+
+                        DrawFilterCheckboxes(playerWorlds, selectedPlayerWorlds);
                         ImGui.EndTabItem();
                     }
 
@@ -650,6 +720,49 @@ namespace MentorRouletteTracker
             }
 
             ImGui.EndChild();
+        }
+
+        private void DrawFilterCheckboxes(
+            IEnumerable<string> options,
+            HashSet<string> selected)
+        {
+            var items = options.ToList();
+
+            if (items.Count == 0)
+                return;
+
+            float maxWidth = items.Max(x => ImGui.CalcTextSize(x).X)
+                + ImGui.GetFrameHeight()
+                + ImGui.GetStyle().ItemInnerSpacing.X
+                + 16f;
+
+            float availableWidth = ImGui.GetContentRegionAvail().X;
+
+            int columns = Math.Max(1, (int)(availableWidth / maxWidth));
+            columns = Math.Min(columns, items.Count);
+
+            if (ImGui.BeginTable(
+                $"FilterTable##{selected.GetHashCode()}",
+                columns,
+                ImGuiTableFlags.SizingStretchSame))
+            {
+                foreach (var option in items)
+                {
+                    ImGui.TableNextColumn();
+
+                    bool isSelected = selected.Contains(option);
+
+                    if (ImGui.Checkbox(option, ref isSelected))
+                    {
+                        if (isSelected)
+                            selected.Add(option);
+                        else
+                            selected.Remove(option);
+                    }
+                }
+
+                ImGui.EndTable();
+            }
         }
 
         private void DrawOverallStatistics(List<DutyRecord> records)
@@ -1056,6 +1169,7 @@ namespace MentorRouletteTracker
             var characters = records
                 .SelectMany(x => x.Party)
                 .Where(x =>
+                    MatchesPlayerFilters(x) &&
                     (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Race) &&
                     x.Race != "Unknown")
@@ -1342,10 +1456,11 @@ namespace MentorRouletteTracker
 
             var jobStats = records
                 .SelectMany(x => x.Party)
-                .Where(x =>
-                    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
-                    !string.IsNullOrWhiteSpace(x.Job) &&
-                    x.Job != "Unknown")
+.Where(x =>
+    MatchesPlayerFilters(x) &&
+    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
+    !string.IsNullOrWhiteSpace(x.Job) &&
+    x.Job != "Unknown")
                 .GroupBy(x => x.Job)
                 .OrderBy(x => x.Key)
                 .ToList();
