@@ -602,34 +602,6 @@ namespace MentorRouletteTracker
                         DrawFilterCheckboxes(genders, selectedPlayerGenders);
                         ImGui.Spacing();
                         ImGui.Separator();
-                        ImGui.Text("Job");
-                        ImGui.Spacing();
-
-                        var jobs = new[]
-                        {
-                            // Tanks
-                            "PLD", "WAR", "DRK", "GNB",
-
-                            // Healers
-                            "WHM", "SCH", "AST", "SGE",
-
-                            // Melee DPS
-                            "MNK", "DRG", "NIN", "SAM", "RPR", "VPR",
-
-                            // Physical Ranged DPS
-                            "BRD", "MCH", "DNC",
-
-                            // Magical Ranged DPS
-                            "BLM", "SMN", "RDM", "PCT", "BLU"
-                        };
-
-                        DrawFilterCheckboxes(jobs, selectedPlayerJobs);
-                        ImGui.Spacing();
-                        ImGui.Separator();
-                        ImGui.Text("World");
-                        ImGui.Spacing();
-
-                        DrawFilterCheckboxes(playerWorlds, selectedPlayerWorlds);
                         ImGui.EndTabItem();
                     }
 
