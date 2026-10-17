@@ -42,7 +42,8 @@ namespace MentorRouletteTracker
         private bool showNoteWindow = false;
         private string noteDraft = string.Empty;
         private DutyRecord? noteRecord = null;
-
+        private string peopleSearchText = string.Empty;
+        private int selectedPeopleRace = 0;
         public MainWindow(
             Configuration config,
             DutyTrackerService tracker,
@@ -1683,8 +1684,35 @@ namespace MentorRouletteTracker
         }
         private void DrawPeopleTab()
         {
-            ImGui.Text("People Seen");
+            ImGui.SetNextItemWidth(250);
 
+            ImGui.InputText(
+                "Search Players",
+                ref peopleSearchText,
+                100);
+            ImGui.Text("People Seen");
+            ImGui.SameLine();
+
+            ImGui.SetNextItemWidth(150);
+
+            var raceOptions = new[]
+            {
+                "All Races",
+                "Hyur",
+                "Elezen",
+                "Lalafell",
+                "Miqo'te",
+                "Roegadyn",
+                "Au Ra",
+                "Hrothgar",
+                "Viera"
+            };
+
+            ImGui.Combo(
+                "Race##People",
+                ref selectedPeopleRace,
+                raceOptions,
+                raceOptions.Length);
             if (ImGui.Button("Rebuild people history"))
             {
                 RebuildSeenPlayers();
@@ -1694,8 +1722,17 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
+            var search = peopleSearchText.Trim();
+
             var people = config.SeenPlayers
                 .Where(x => config.IncludeSelfInStatistics || x.Name != localPlayerName)
+                .Where(x =>
+                    string.IsNullOrEmpty(search) ||
+                    (x.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (x.World?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    $"{x.Name}@{x.World}".Contains(search, StringComparison.OrdinalIgnoreCase)).Where(x =>
+    selectedPeopleRace == 0 ||
+    x.Race == raceOptions[selectedPeopleRace])
                 .ToList();
 
             var uniquePeople = people.Count;
@@ -1720,7 +1757,9 @@ namespace MentorRouletteTracker
             if (people.Count == 0)
             {
                 ImGui.TextDisabled(
-                    "No players have been recorded yet.");
+                    string.IsNullOrWhiteSpace(search)
+                        ? "No players have been recorded yet."
+                        : "No players match your search.");
 
                 return;
             }
