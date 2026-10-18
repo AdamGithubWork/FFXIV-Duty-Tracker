@@ -44,6 +44,7 @@ namespace MentorRouletteTracker
         private DutyRecord? noteRecord = null;
         private string peopleSearchText = string.Empty;
         private int selectedPeopleRace = 0;
+        private int selectedHeatmapMetric = 0;
         public MainWindow(
             Configuration config,
             DutyTrackerService tracker,
@@ -697,7 +698,8 @@ namespace MentorRouletteTracker
                 {
                     group.Key.Day,
                     group.Key.TimePeriod,
-                    Count = group.Count()
+                    Count = group.Count(),
+                    AverageDuration = group.Average(x => x.TimeInDuty.TotalMinutes)
                 })
                 .ToList();
             if (ImGui.BeginChild(
@@ -772,7 +774,21 @@ namespace MentorRouletteTracker
 
                 ImGui.Text("Duties by Day and Time");
                 ImGui.Separator();
+                var heatmapMetrics = new[]
+                {
+                    "Duty Count",
+                    "Average Duration"
+                };
 
+                ImGui.SetNextItemWidth(200);
+
+                ImGui.Combo(
+                    "Metric##Heatmap",
+                    ref selectedHeatmapMetric,
+                    heatmapMetrics,
+                    heatmapMetrics.Length);
+
+                ImGui.Spacing();
                 var timePeriods = new[]
                 {
                     "Late Night",
@@ -821,23 +837,46 @@ namespace MentorRouletteTracker
                         {
                             var period = timePeriods[i];
 
-                            var count = dutiesByDayAndTime
-                                .Where(x => x.Day == day && x.TimePeriod == period)
-                                .Sum(x => x.Count);
+                            var group = dutiesByDayAndTime
+                                .FirstOrDefault(x => x.Day == day && x.TimePeriod == period);
+
+                            var count = group?.Count ?? 0;
+
+                            var value = selectedHeatmapMetric == 0
+                                ? count
+                                : group?.AverageDuration ?? 0;
 
                             ImGui.TableSetColumnIndex(i + 1);
 
-                            var maxCount = Math.Max(
-                                1,
-                                dutiesByDayAndTime.Max(x => x.Count));
+                            var maxValue = Math.Max(
+                                1.0,
+                                dutiesByDayAndTime.Max(x =>
+                                    selectedHeatmapMetric == 0
+                                        ? x.Count
+                                        : x.AverageDuration));
 
-                            var intensity = (float)count / maxCount;
+                            var intensity = (float)(value / maxValue);
 
-                            var cellColor = new Vector4(
-                                0.08f,
-                                0.25f + intensity * 0.45f,
-                                0.12f + intensity * 0.20f,
-                                1.0f);
+                            Vector4 cellColor;
+
+                            if (selectedHeatmapMetric == 0)
+                            {
+                                // Duty Count: darker green -> brighter green
+                                cellColor = new Vector4(
+                                    0.08f,
+                                    0.25f + intensity * 0.45f,
+                                    0.12f + intensity * 0.20f,
+                                    1.0f);
+                            }
+                            else
+                            {
+                                // Average Duration: green -> yellow -> red
+                                cellColor = new Vector4(
+                                    0.15f + intensity * 0.65f,
+                                    0.65f - intensity * 0.45f,
+                                    0.12f,
+                                    1.0f);
+                            }
 
                             if (count > 0)
                             {
@@ -846,7 +885,29 @@ namespace MentorRouletteTracker
                                     ImGui.ColorConvertFloat4ToU32(cellColor));
                             }
 
-                            ImGui.TextUnformatted(count.ToString());
+                            ImGui.TextUnformatted(
+                                selectedHeatmapMetric == 0
+                                    ? count.ToString()
+                                    : count > 0
+                                        ? $"{value:F1}m"
+                                        : "—");
+                            if (ImGui.IsItemHovered() && count > 0)
+                            {
+                                ImGui.BeginTooltip();
+
+                                ImGui.TextUnformatted($"{day} - {period}");
+                                ImGui.Separator();
+
+                                ImGui.TextUnformatted($"Duties: {count}");
+
+                                if (selectedHeatmapMetric == 1)
+                                {
+                                    ImGui.TextUnformatted(
+                                        $"Average Duration: {value:F1} minutes");
+                                }
+
+                                ImGui.EndTooltip();
+                            }
                         }
                     }
 
