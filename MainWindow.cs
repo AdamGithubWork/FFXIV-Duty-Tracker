@@ -687,7 +687,19 @@ namespace MentorRouletteTracker
                 })
                 .OrderBy(x => x.Timestamp)
                 .ToList();
-
+            var dutiesByDayAndTime = records
+                .GroupBy(record => new
+                {
+                    Day = record.Timestamp.DayOfWeek,
+                    TimePeriod = GetTimePeriod(record.Timestamp)
+                })
+                .Select(group => new
+                {
+                    group.Key.Day,
+                    group.Key.TimePeriod,
+                    Count = group.Count()
+                })
+                .ToList();
             if (ImGui.BeginChild(
                     "StatisticsContent",
                     Vector2.Zero,
@@ -755,6 +767,91 @@ namespace MentorRouletteTracker
                 DrawDutySpecificDetails(records);
 
                 ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                ImGui.Text("Duties by Day and Time");
+                ImGui.Separator();
+
+                var timePeriods = new[]
+                {
+                    "Late Night",
+                    "Early Morning",
+                    "Morning",
+                    "Afternoon",
+                    "Evening",
+                    "Night"
+                };
+
+                var days = new[]
+                {
+                    DayOfWeek.Monday,
+                    DayOfWeek.Tuesday,
+                    DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday,
+                    DayOfWeek.Friday,
+                    DayOfWeek.Saturday,
+                    DayOfWeek.Sunday
+                };
+
+                if (ImGui.BeginTable(
+                    "dutiesHeatmap",
+                    7,
+                    ImGuiTableFlags.Borders |
+                    ImGuiTableFlags.RowBg |
+                    ImGuiTableFlags.SizingStretchProp))
+                {
+                    ImGui.TableSetupColumn("Day");
+
+                    foreach (var period in timePeriods)
+                    {
+                        ImGui.TableSetupColumn(period);
+                    }
+
+                    ImGui.TableHeadersRow();
+
+                    foreach (var day in days)
+                    {
+                        ImGui.TableNextRow();
+
+                        ImGui.TableSetColumnIndex(0);
+                        ImGui.TextUnformatted(day.ToString());
+
+                        for (int i = 0; i < timePeriods.Length; i++)
+                        {
+                            var period = timePeriods[i];
+
+                            var count = dutiesByDayAndTime
+                                .Where(x => x.Day == day && x.TimePeriod == period)
+                                .Sum(x => x.Count);
+
+                            ImGui.TableSetColumnIndex(i + 1);
+
+                            var maxCount = Math.Max(
+                                1,
+                                dutiesByDayAndTime.Max(x => x.Count));
+
+                            var intensity = (float)count / maxCount;
+
+                            var cellColor = new Vector4(
+                                0.08f,
+                                0.25f + intensity * 0.45f,
+                                0.12f + intensity * 0.20f,
+                                1.0f);
+
+                            if (count > 0)
+                            {
+                                ImGui.TableSetBgColor(
+                                    ImGuiTableBgTarget.CellBg,
+                                    ImGui.ColorConvertFloat4ToU32(cellColor));
+                            }
+
+                            ImGui.TextUnformatted(count.ToString());
+                        }
+                    }
+
+                    ImGui.EndTable();
+                }
             }
 
             ImGui.EndChild();
@@ -2151,6 +2248,18 @@ namespace MentorRouletteTracker
             return span.TotalHours >= 1
                 ? $"{(int)span.TotalHours}h {span.Minutes}m"
                 : $"{span.Minutes}m {span.Seconds}s";
+        }
+        private static string GetTimePeriod(DateTime timestamp)
+        {
+            return timestamp.Hour switch
+            {
+                < 4 => "Late Night",
+                < 8 => "Early Morning",
+                < 12 => "Morning",
+                < 16 => "Afternoon",
+                < 20 => "Evening",
+                _ => "Night"
+            };
         }
     }
 }
