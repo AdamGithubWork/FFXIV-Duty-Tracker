@@ -117,7 +117,7 @@ namespace MentorRouletteTracker
             {
                 dutyType = "Savage Raids";
             }
-            else if (dutyName.Contains("(Extreme)"))
+            else if (dutyName.Contains("(Extreme)") || dutyName.Contains("The Minstrel's Ballad:"))
             {
                 dutyType = "Extreme Trials";
             }
