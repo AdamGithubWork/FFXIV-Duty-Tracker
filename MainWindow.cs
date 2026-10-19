@@ -13,6 +13,7 @@ namespace MentorRouletteTracker
 {
     public class MainWindow : Window, IDisposable
     {
+        private readonly List<PlayerFilterGroup> playerFilterGroups = new();
         private readonly HashSet<string> selectedDutyTypes = new();
         private readonly HashSet<string> selectedPlayerStatuses = new();
         private readonly HashSet<string> selectedPlayerRaces = new();
@@ -45,6 +46,7 @@ namespace MentorRouletteTracker
         private string peopleSearchText = string.Empty;
         private int selectedPeopleRace = 0;
         private int selectedHeatmapMetric = 0;
+        private int selectedGlobalDutyType = 0;
         public MainWindow(
             Configuration config,
             DutyTrackerService tracker,
@@ -67,6 +69,203 @@ namespace MentorRouletteTracker
 
         public override void Draw()
         {
+            if (ImGui.CollapsingHeader("Global Filters"))
+            {
+                ImGui.Text("Show these duty types:");
+
+                var dutyTypes = config.Records
+                    .Select(record => record.DutyType)
+                    .Where(type => !string.IsNullOrWhiteSpace(type))
+                    .Distinct()
+                    .OrderBy(type => type);
+
+                foreach (var dutyType in dutyTypes)
+                {
+                    bool selected = selectedDutyTypes.Contains(dutyType);
+
+                    if (ImGui.Button(
+                        $"{(selected ? "[X]" : "[ ]")} {dutyType}"))
+                    {
+                        if (selected)
+                            selectedDutyTypes.Remove(dutyType);
+                        else
+                            selectedDutyTypes.Add(dutyType);
+                    }
+
+                    ImGui.SameLine();
+                }
+
+                ImGui.NewLine();
+
+                ImGui.TextDisabled(
+                    selectedDutyTypes.Count == 0
+                        ? "All duty types selected."
+                        : $"Selected: {string.Join(", ", selectedDutyTypes)}");
+                ImGui.Separator();
+
+                ImGui.Text("Player Requirements");
+
+                if (ImGui.Button("+ Add Player Requirement"))
+                {
+                    playerFilterGroups.Add(new PlayerFilterGroup());
+                }
+
+                for (int i = 0; i < playerFilterGroups.Count; i++)
+                {
+                    ImGui.PushID(i);
+                    ImGui.Separator();
+                    ImGui.Text($"Player Requirement {i + 1}");
+                    ImGui.SameLine();
+
+                    if (ImGui.SmallButton("Remove"))
+                    {
+                        playerFilterGroups.RemoveAt(i);
+                        ImGui.PopID();
+                        break;
+                    }
+
+                    var group = playerFilterGroups[i];
+
+                    string[] races =
+                    {
+                        "Any",
+                        "Hyur",
+                        "Elezen",
+                        "Lalafell",
+                        "Miqo'te",
+                        "Roegadyn",
+                        "Au Ra",
+                        "Hrothgar",
+                        "Viera"
+                    };
+
+                    ImGui.SetNextItemWidth(180);
+
+                    if (ImGui.BeginCombo("Race", group.Race))
+                    {
+                        foreach (var race in races)
+                        {
+                            bool selected = group.Race == race;
+
+                            if (ImGui.Selectable(race, selected))
+                            {
+                                group.Race = race;
+                            }
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
+                        }
+
+                        ImGui.EndCombo();
+                    }
+                    // Gender
+                    string[] genders = { "Any", "Male", "Female" };
+
+                    ImGui.SetNextItemWidth(180);
+
+                    if (ImGui.BeginCombo("Gender", group.Gender))
+                    {
+                        foreach (var gender in genders)
+                        {
+                            bool selected = group.Gender == gender;
+
+                            if (ImGui.Selectable(gender, selected))
+                                group.Gender = gender;
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
+                        }
+
+                        ImGui.EndCombo();
+                    }
+
+                    // Status
+                    var statuses = config.Records
+                        .SelectMany(record => record.Party)
+                        .Select(player => player.Status)
+                        .Where(status => !string.IsNullOrWhiteSpace(status))
+                        .Distinct()
+                        .OrderBy(status => status)
+                        .Prepend("Any");
+
+                    ImGui.SetNextItemWidth(180);
+
+                    if (ImGui.BeginCombo("Status", group.Status))
+                    {
+                        foreach (var status in statuses)
+                        {
+                            bool selected = group.Status == status;
+
+                            if (ImGui.Selectable(status, selected))
+                                group.Status = status;
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
+                        }
+
+                        ImGui.EndCombo();
+                    }
+
+                    // Job
+                    var jobs = config.Records
+                        .SelectMany(record => record.Party)
+                        .Select(player => player.Job)
+                        .Where(job => !string.IsNullOrWhiteSpace(job))
+                        .Distinct()
+                        .OrderBy(job => job)
+                        .Prepend("Any");
+
+                    ImGui.SetNextItemWidth(180);
+
+                    if (ImGui.BeginCombo("Job", group.Job))
+                    {
+                        foreach (var job in jobs)
+                        {
+                            bool selected = group.Job == job;
+
+                            if (ImGui.Selectable(job, selected))
+                                group.Job = job;
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
+                        }
+
+                        ImGui.EndCombo();
+                    }
+
+                    // World
+                    var worlds = config.Records
+                        .SelectMany(record => record.Party)
+                        .Select(player => player.World)
+                        .Where(world => !string.IsNullOrWhiteSpace(world))
+                        .Distinct()
+                        .OrderBy(world => world)
+                        .Prepend("Any");
+
+                    ImGui.SetNextItemWidth(180);
+
+                    if (ImGui.BeginCombo("World", group.World))
+                    {
+                        foreach (var world in worlds)
+                        {
+                            bool selected = group.World == world;
+
+                            if (ImGui.Selectable(world, selected))
+                                group.World = world;
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
+                        }
+
+                        ImGui.EndCombo();
+                    }
+
+                    ImGui.PopID();
+                }
+            }
+
+            ImGui.Spacing();
+
             if (ImGui.BeginTabBar("MainTabs"))
             {
                 if (ImGui.BeginTabItem("Records"))
@@ -108,10 +307,41 @@ namespace MentorRouletteTracker
                 openDeleteConfirmation = false;
             }
             DrawDeleteConfirmation();
-            
-            
-        }
 
+
+        }
+        private bool MatchesPlayerRequirement(PartyMemberSnapshot player, PlayerFilterGroup filter)
+        {
+            return (filter.Race == "Any" || player.Race == filter.Race)
+                && (filter.Gender == "Any" || player.Gender == filter.Gender)
+                && (filter.Status == "Any" || player.Status == filter.Status)
+                && (filter.Job == "Any" || player.Job == filter.Job)
+                && (filter.World == "Any" || player.World == filter.World);
+        }
+        private bool MatchesDutyPlayerFilters(DutyRecord record)
+        {
+            foreach (var filter in playerFilterGroups)
+            {
+                // Ignore requirements where everything is "Any".
+                if (filter.Race == "Any" &&
+                    filter.Gender == "Any" &&
+                    filter.Status == "Any" &&
+                    filter.Job == "Any" &&
+                    filter.World == "Any")
+                {
+                    continue;
+                }
+
+                // This duty must contain at least one matching player.
+                if (!record.Party.Any(player =>
+                    MatchesPlayerRequirement(player, filter)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
         private void DrawRecordsTab()
         {
             var armed = tracker.Armed;
@@ -228,6 +458,10 @@ namespace MentorRouletteTracker
                         Record = record,
                         Index = index
                     })
+                    .Where(x =>
+                        selectedDutyTypes.Count == 0 ||
+                        selectedDutyTypes.Contains(x.Record.DutyType))
+                    .Where(x => MatchesDutyPlayerFilters(x.Record))
                     .ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
@@ -539,12 +773,6 @@ namespace MentorRouletteTracker
         }
         private void DrawStatisticsTab()
         {
-            var dutyTypes = config.Records
-                .Select(x => x.DutyType)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct()
-                .OrderBy(x => x)
-                .ToList();
             var playerStatuses = new[]
                         {
                 "Battle Mentor",
@@ -573,12 +801,6 @@ namespace MentorRouletteTracker
                 }
                 if (ImGui.BeginTabBar("StatisticsFilterTabs"))
                 {
-                    if (ImGui.BeginTabItem("Duty"))
-                    {
-                        DrawFilterCheckboxes(dutyTypes, selectedDutyTypes);
-
-                        ImGui.EndTabItem();
-                    }
 
                     if (ImGui.BeginTabItem("Players"))
                     {
@@ -686,6 +908,7 @@ namespace MentorRouletteTracker
                     4 => x.Timestamp >= customStartDate.Date && x.Timestamp < customEndDate.Date.AddDays(1),
                     _ => true
                 })
+                .Where(x => MatchesDutyPlayerFilters(x))
                 .OrderBy(x => x.Timestamp)
                 .ToList();
             var dutiesByDayAndTime = records
