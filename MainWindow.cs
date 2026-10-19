@@ -262,6 +262,52 @@ namespace MentorRouletteTracker
 
                     ImGui.PopID();
                 }
+                ImGui.Separator();
+                ImGui.Text("Time Range");
+
+                var timeRanges = new[]
+                {
+                    "All Time",
+                    "Last 7 Days",
+                    "Last 30 Days",
+                    "Last 90 Days",
+                    "Custom Range"
+                };
+
+                ImGui.SetNextItemWidth(200);
+
+                ImGui.Combo(
+                    "Time Range##Global",
+                    ref selectedTimeRange,
+                    timeRanges,
+                    timeRanges.Length);
+
+                if (selectedTimeRange == 4)
+                {
+                    int startYear = customStartDate.Year;
+                    int startMonth = customStartDate.Month;
+                    int startDay = customStartDate.Day;
+
+                    int endYear = customEndDate.Year;
+                    int endMonth = customEndDate.Month;
+                    int endDay = customEndDate.Day;
+
+                    ImGui.Text("Start Date");
+                    ImGui.InputInt("Year##GlobalStart", ref startYear);
+                    ImGui.InputInt("Month##GlobalStart", ref startMonth);
+                    ImGui.InputInt("Day##GlobalStart", ref startDay);
+
+                    ImGui.Text("End Date");
+                    ImGui.InputInt("Year##GlobalEnd", ref endYear);
+                    ImGui.InputInt("Month##GlobalEnd", ref endMonth);
+                    ImGui.InputInt("Day##GlobalEnd", ref endDay);
+
+                    if (IsValidDate(startYear, startMonth, startDay))
+                        customStartDate = new DateTime(startYear, startMonth, startDay);
+
+                    if (IsValidDate(endYear, endMonth, endDay))
+                        customEndDate = new DateTime(endYear, endMonth, endDay);
+                }
             }
 
             ImGui.Spacing();
@@ -452,6 +498,8 @@ namespace MentorRouletteTracker
 
                 ImGui.TableHeadersRow();
 
+                var now = DateTime.Now;
+
                 var records = config.Records
                     .Select((record, index) => new
                     {
@@ -462,6 +510,15 @@ namespace MentorRouletteTracker
                         selectedDutyTypes.Count == 0 ||
                         selectedDutyTypes.Contains(x.Record.DutyType))
                     .Where(x => MatchesDutyPlayerFilters(x.Record))
+                    .Where(x => selectedTimeRange switch
+                    {
+                        1 => x.Record.Timestamp >= now.AddDays(-7),
+                        2 => x.Record.Timestamp >= now.AddDays(-30),
+                        3 => x.Record.Timestamp >= now.AddDays(-90),
+                        4 => x.Record.Timestamp >= customStartDate.Date &&
+                             x.Record.Timestamp < customEndDate.Date.AddDays(1),
+                        _ => true
+                    })
                     .ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
@@ -773,126 +830,6 @@ namespace MentorRouletteTracker
         }
         private void DrawStatisticsTab()
         {
-            var playerStatuses = new[]
-                        {
-                "Battle Mentor",
-                "Sprout",
-                "Party Member",
-                "Returner",
-                "Trade Mentor"
-            };
-            var playerWorlds = config.Records
-                .SelectMany(x => x.Party)
-                .Select(x => x.World)
-                .Where(x => !string.IsNullOrWhiteSpace(x) && x != "Unknown")
-                .Distinct()
-                .OrderBy(x => x)
-                .ToList();
-            if (ImGui.CollapsingHeader("Filters"))
-            {
-                if (ImGui.Button("Clear All Filters"))
-                {
-                    selectedDutyTypes.Clear();
-                    selectedPlayerStatuses.Clear();
-                    selectedPlayerRaces.Clear();
-                    selectedPlayerGenders.Clear();
-
-                    selectedTimeRange = 0;
-                }
-                if (ImGui.BeginTabBar("StatisticsFilterTabs"))
-                {
-
-                    if (ImGui.BeginTabItem("Players"))
-                    {
-                        ImGui.Separator();
-
-                        ImGui.Text("Status");
-                        DrawFilterCheckboxes(playerStatuses, selectedPlayerStatuses);
-                        ImGui.Spacing();
-                        ImGui.Separator();
-                        ImGui.Text("Race");
-                        ImGui.Spacing();
-
-                        var races = new[]
-                        {
-                            "Hyur",
-                            "Elezen",
-                            "Lalafell",
-                            "Miqo'te",
-                            "Roegadyn",
-                            "Au Ra",
-                            "Hrothgar",
-                            "Viera"
-                        };
-
-                        DrawFilterCheckboxes(races, selectedPlayerRaces);
-                        ImGui.Spacing();
-                        ImGui.Separator();
-                        ImGui.Text("Gender");
-                        ImGui.Spacing();
-
-                        var genders = new[]
-                        {
-                            "Male",
-                            "Female"
-                        };
-
-                        DrawFilterCheckboxes(genders, selectedPlayerGenders);
-                        ImGui.Spacing();
-                        ImGui.Separator();
-                        ImGui.EndTabItem();
-                    }
-
-                    if (ImGui.BeginTabItem("Time"))
-                    {
-                        var timeRanges = new[]
-                        {
-                            "All Time",
-                            "Last 7 Days",
-                            "Last 30 Days",
-                            "Last 90 Days",
-                            "Custom Range"
-                        };
-
-                        ImGui.Combo(
-                            "Time Range",
-                            ref selectedTimeRange,
-                            timeRanges,
-                            timeRanges.Length);
-                        if (selectedTimeRange == 4)
-                        {
-                            int startYear = customStartDate.Year;
-                            int startMonth = customStartDate.Month;
-                            int startDay = customStartDate.Day;
-
-                            int endYear = customEndDate.Year;
-                            int endMonth = customEndDate.Month;
-                            int endDay = customEndDate.Day;
-
-                            ImGui.Text("Start Date");
-                            ImGui.InputInt("Year##Start", ref startYear);
-                            ImGui.InputInt("Month##Start", ref startMonth);
-                            ImGui.InputInt("Day##Start", ref startDay);
-
-                            ImGui.Spacing();
-
-                            ImGui.Text("End Date");
-                            ImGui.InputInt("Year##End", ref endYear);
-                            ImGui.InputInt("Month##End", ref endMonth);
-                            ImGui.InputInt("Day##End", ref endDay);
-
-                            if (IsValidDate(startYear, startMonth, startDay))
-                                customStartDate = new DateTime(startYear, startMonth, startDay);
-
-                            if (IsValidDate(endYear, endMonth, endDay))
-                                customEndDate = new DateTime(endYear, endMonth, endDay);
-                        }
-                        ImGui.EndTabItem();
-                    }
-
-                    ImGui.EndTabBar();
-                }
-            }
             var now = DateTime.Now;
 
             var records = config.Records
