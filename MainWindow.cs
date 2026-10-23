@@ -1517,6 +1517,12 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
+                DrawSummaryStatusStatistics(players);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
                 DrawSummaryWorldStatistics(players);
 
                 ImGui.Spacing();
@@ -1534,6 +1540,75 @@ namespace MentorRouletteTracker
             }
 
             ImGui.EndChild();
+        }
+
+        private void DrawSummaryStatusStatistics(
+            List<PartyMemberSnapshot> players)
+        {
+            ImGui.Text("Player Status Distribution");
+            ImGui.Spacing();
+
+            var stats = players
+                .GroupBy(player =>
+                    string.IsNullOrWhiteSpace(player.Status)
+                        ? "Unknown"
+                        : player.Status)
+                .Select(group => new
+                {
+                    Status = group.Key,
+                    Encounters = group.Count(),
+                    Deaths = group.Sum(player => player.DeathCount)
+                })
+                .OrderByDescending(stat => stat.Encounters)
+                .ToList();
+
+            if (stats.Count == 0)
+            {
+                ImGui.TextDisabled("No player status data available.");
+                return;
+            }
+
+            if (ImGui.BeginTable(
+                "summaryStatusStats",
+                4,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.Resizable |
+                ImGuiTableFlags.SizingStretchProp))
+            {
+                ImGui.TableSetupColumn("Status");
+                ImGui.TableSetupColumn("Encounters");
+                ImGui.TableSetupColumn("Percentage");
+                ImGui.TableSetupColumn("Deaths / Encounter");
+                ImGui.TableHeadersRow();
+
+                foreach (var stat in stats)
+                {
+                    double percentage = players.Count == 0
+                        ? 0
+                        : (double)stat.Encounters / players.Count * 100;
+
+                    double deathsPerEncounter = stat.Encounters == 0
+                        ? 0
+                        : (double)stat.Deaths / stat.Encounters;
+
+                    ImGui.TableNextRow();
+
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(stat.Status);
+
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(stat.Encounters.ToString());
+
+                    ImGui.TableSetColumnIndex(2);
+                    ImGui.TextUnformatted($"{percentage:F1}%");
+
+                    ImGui.TableSetColumnIndex(3);
+                    ImGui.TextUnformatted($"{deathsPerEncounter:F2}");
+                }
+
+                ImGui.EndTable();
+            }
         }
 
         private void DrawSummaryWorldStatistics(
