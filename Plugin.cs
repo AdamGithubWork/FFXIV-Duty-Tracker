@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using System.Linq;
+using MentorRouletteTracker.PvP;
 
 namespace MentorRouletteTracker
 {
@@ -20,6 +21,7 @@ namespace MentorRouletteTracker
         private readonly Configuration config;
         private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
         private readonly DutyTrackerService tracker;
+        private readonly FrontlineScoreboardService frontlineScoreboard;
         private readonly MainWindow mainWindow;
 
         public Plugin(
@@ -32,6 +34,8 @@ namespace MentorRouletteTracker
             IObjectTable objectTable,
             IDataManager dataManager,
             IFramework framework,
+            ISigScanner sigScanner,
+            IGameInteropProvider gameInteropProvider,
             IPluginLog log)
         {
             this.pluginInterface = pluginInterface;
@@ -61,6 +65,11 @@ namespace MentorRouletteTracker
                 framework,
                 log,
                 config);
+
+            frontlineScoreboard = new FrontlineScoreboardService(
+                log,
+                sigScanner,
+                gameInteropProvider);
 
             var exportDir = pluginInterface.GetPluginConfigDirectory();
             Directory.CreateDirectory(exportDir);
@@ -114,6 +123,7 @@ namespace MentorRouletteTracker
             commandManager.RemoveHandler(CommandName);
             windowSystem.RemoveAllWindows();
             mainWindow.Dispose();
+            frontlineScoreboard.Dispose();
             tracker.Dispose();
         }
     }

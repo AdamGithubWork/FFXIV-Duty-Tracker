@@ -13,5 +13,6 @@ namespace MentorRouletteTracker
         public string World { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public int DeathCount { get; set; }
+        public int? PvPScoreboardDeaths { get; set; }
     }
 }
