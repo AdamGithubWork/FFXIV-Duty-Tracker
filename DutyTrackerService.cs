@@ -233,8 +233,6 @@ namespace MentorRouletteTracker
                     if (character.OnlineStatus.IsValid)
                     {
                         status = character.OnlineStatus.Value.Name.ExtractText();
-
-                        log.Info($"Player: {name} | Status: {status} | ID: {character.OnlineStatus.RowId}");
                     }
                 }
 

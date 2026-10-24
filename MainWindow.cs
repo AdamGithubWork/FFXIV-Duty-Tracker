@@ -773,9 +773,9 @@ namespace MentorRouletteTracker
             {
                 recordToEdit = null;
                 editError = string.Empty;
-                ImGui.CloseCurrentPopup() ;
+                ImGui.CloseCurrentPopup();
             }
-            ImGui.EndPopup() ;
+            ImGui.EndPopup();
         }
         private void DrawDeleteConfirmation()
         {
@@ -2474,9 +2474,11 @@ namespace MentorRouletteTracker
                         .ThenBy(x => x.Name)
                         .ToList();
 
+                    bool hasOfficialDeaths = r.Party.Any(x => x.PvPScoreboardDeaths.HasValue);
+
                     if (ImGui.BeginTable(
                             "partyDetail",
-                            7,
+                            hasOfficialDeaths ? 8 : 7,
                             ImGuiTableFlags.Borders |
                             ImGuiTableFlags.RowBg |
                             ImGuiTableFlags.Resizable |
@@ -2490,6 +2492,8 @@ namespace MentorRouletteTracker
                         ImGui.TableSetupColumn("Gender");
                         ImGui.TableSetupColumn("Status");
                         ImGui.TableSetupColumn("Deaths");
+                        if (hasOfficialDeaths)
+                            ImGui.TableSetupColumn("Official PvP Deaths");
 
                         ImGui.TableHeadersRow();
                         var sortSpecs = ImGui.TableGetSortSpecs();
@@ -2528,6 +2532,10 @@ namespace MentorRouletteTracker
                                 6 => ascending
                                     ? sortedParty.OrderBy(x => x.DeathCount).ToList()
                                     : sortedParty.OrderByDescending(x => x.DeathCount).ToList(),
+
+                                7 when hasOfficialDeaths => ascending
+                                    ? sortedParty.OrderBy(x => x.PvPScoreboardDeaths).ToList()
+                                    : sortedParty.OrderByDescending(x => x.PvPScoreboardDeaths).ToList(),
 
                                 _ => sortedParty
                             };
@@ -2573,6 +2581,13 @@ namespace MentorRouletteTracker
                             else
                             {
                                 ImGui.TextUnformatted(member.DeathCount.ToString());
+                            }
+
+                            if (hasOfficialDeaths)
+                            {
+                                ImGui.TableSetColumnIndex(7);
+                                ImGui.TextUnformatted(
+                                    member.PvPScoreboardDeaths?.ToString() ?? "-");
                             }
                         }
 

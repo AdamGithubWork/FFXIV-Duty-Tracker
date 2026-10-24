@@ -1,0 +1,13 @@
+﻿
+using System;
+using System.Collections.Generic;
+
+namespace MentorRouletteTracker.PvP;
+
+public class PvpMatchResult
+{
+    public string MatchId { get; set; } = string.Empty;
+    public DateTime DutyStartTime { get; set; }
+
+    public Dictionary<string, int> PlayerDeaths { get; set; } = new();
+}

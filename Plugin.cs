@@ -1,4 +1,6 @@
 
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Dalamud.Game.ClientState.Conditions;
@@ -19,16 +21,19 @@ namespace MentorRouletteTracker
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
+        private readonly IFramework framework;
 
         private readonly Configuration config;
         private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
         private readonly DutyTrackerService tracker;
-
-        // Frontline hook disabled while testing PvP Tracker integration.
-        // private readonly FrontlineScoreboardService frontlineScoreboard;
+        private readonly MainWindow mainWindow;
 
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
-        private readonly MainWindow mainWindow;
+
+        private readonly Dictionary<string, DateTime> pendingPvpMatches = new();
+        private readonly HashSet<string> processedPvpMatches = new();
+
+        private DateTime nextPvpCheck = DateTime.MinValue;
 
         public Plugin(
             IDalamudPluginInterface pluginInterface,
@@ -46,6 +51,7 @@ namespace MentorRouletteTracker
         {
             this.pluginInterface = pluginInterface;
             this.commandManager = commandManager;
+            this.framework = framework;
             this.log = log;
 
             var savedConfig =
@@ -77,24 +83,15 @@ namespace MentorRouletteTracker
                 log,
                 config);
 
-            // Frontline hook disabled for now.
-            // frontlineScoreboard = new FrontlineScoreboardService(
-            //     log,
-            //     sigScanner,
-            //     gameInteropProvider);
-
-            // Test read-only access to PvP Tracker's database.
-            PvpTrackerDatabaseTest.Run(log);
-
-            // Listen for PvP Tracker saving a completed match.
+            // PvP Tracker IPC
             pvpMatchSaved =
                 pluginInterface.GetIpcSubscriber<string, bool>(
                     "PvpStats.OnMatchSaved");
 
             pvpMatchSaved.Subscribe(OnPvpMatchSaved);
 
-            log.Information(
-                "Subscribed to PvP Tracker match saved IPC.");
+            // Check pending PvP scoreboards every 5 seconds.
+            framework.Update += OnFrameworkUpdate;
 
             var exportDir =
                 pluginInterface.GetPluginConfigDirectory();
@@ -125,8 +122,87 @@ namespace MentorRouletteTracker
 
         private void OnPvpMatchSaved(string matchId)
         {
-            log.Information(
-                $"PvP Tracker saved match: {matchId}");
+            if (string.IsNullOrWhiteSpace(matchId))
+                return;
+
+            if (processedPvpMatches.Contains(matchId))
+                return;
+
+            pendingPvpMatches[matchId] = DateTime.UtcNow;
+
+            log.Information($"PvP Tracker match queued: {matchId}");
+        }
+
+        private void OnFrameworkUpdate(IFramework framework)
+        {
+            if (DateTime.UtcNow < nextPvpCheck)
+                return;
+
+            nextPvpCheck = DateTime.UtcNow.AddSeconds(5);
+
+            foreach (var matchId in pendingPvpMatches.Keys.ToList())
+            {
+                try
+                {
+                    var result = PvpTrackerDatabaseTest.GetMatch(matchId, log);
+
+                    // Scoreboard not ready yet.
+                    if (result == null)
+                        continue;
+
+                    var matchingRecord = config.Records
+                        .Where(r =>
+                            Math.Abs(
+                                (r.Timestamp.ToUniversalTime() -
+                                 result.DutyStartTime.ToUniversalTime())
+                                .TotalSeconds) < 30)
+                        .OrderBy(r =>
+                            Math.Abs(
+                                (r.Timestamp.ToUniversalTime() -
+                                 result.DutyStartTime.ToUniversalTime())
+                                .TotalSeconds))
+                        .FirstOrDefault();
+
+                    // Duty record might not have been finalized yet.
+                    if (matchingRecord == null)
+                        continue;
+
+                    int updatedPlayers = 0;
+
+                    foreach (var player in matchingRecord.Party)
+                    {
+                        var playerKey = $"{player.Name}@{player.World}";
+
+                        if (result.PlayerDeaths.TryGetValue(
+                                playerKey, out int deaths))
+                        {
+                            player.PvPScoreboardDeaths = deaths;
+                            updatedPlayers++;
+                        }
+                    }
+
+                    if (updatedPlayers == 0)
+                    {
+                        log.Warning(
+                            $"PvP scoreboard {matchId}: no players matched.");
+                        continue;
+                    }
+
+                    config.Save();
+
+                    log.Information(
+                        $"PvP scoreboard applied: {matchingRecord.DutyName} | " +
+                        $"Matched {updatedPlayers}/{matchingRecord.Party.Count} players.");
+
+                    processedPvpMatches.Add(matchId);
+                    pendingPvpMatches.Remove(matchId);
+                }
+                catch (Exception ex)
+                {
+                    log.Error(
+                        $"Failed to process PvP match {matchId}: {ex}");
+                }
+            }
         }
 
         private void OnCommand(string command, string args)
@@ -153,6 +229,8 @@ namespace MentorRouletteTracker
 
         public void Dispose()
         {
+            framework.Update -= OnFrameworkUpdate;
+
             pvpMatchSaved.Unsubscribe(OnPvpMatchSaved);
 
             pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
@@ -162,9 +240,6 @@ namespace MentorRouletteTracker
             windowSystem.RemoveAllWindows();
 
             mainWindow.Dispose();
-
-            // frontlineScoreboard.Dispose();
-
             tracker.Dispose();
         }
     }
