@@ -1,9 +1,11 @@
+
 using System.IO;
+using System.Linq;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
-using System.Linq;
 using MentorRouletteTracker.PvP;
 
 namespace MentorRouletteTracker
@@ -21,7 +23,11 @@ namespace MentorRouletteTracker
         private readonly Configuration config;
         private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
         private readonly DutyTrackerService tracker;
-        private readonly FrontlineScoreboardService frontlineScoreboard;
+
+        // Frontline hook disabled while testing PvP Tracker integration.
+        // private readonly FrontlineScoreboardService frontlineScoreboard;
+
+        private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
         private readonly MainWindow mainWindow;
 
         public Plugin(
@@ -42,7 +48,8 @@ namespace MentorRouletteTracker
             this.commandManager = commandManager;
             this.log = log;
 
-            var savedConfig = pluginInterface.GetPluginConfig() as Configuration;
+            var savedConfig =
+                pluginInterface.GetPluginConfig() as Configuration;
 
             config = savedConfig ?? new Configuration();
 
@@ -51,10 +58,14 @@ namespace MentorRouletteTracker
                 config.TrackedContentTypeIds.AddRange(
                     new uint[] { 2, 3, 4, 5, 6, 21, 28, 30, 37 });
             }
+
             config.Initialize(pluginInterface);
-            config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
+
+            config.TrackedContentTypeIds =
+                config.TrackedContentTypeIds.Distinct().ToList();
 
             config.Save();
+
             tracker = new DutyTrackerService(
                 clientState,
                 dutyState,
@@ -66,12 +77,28 @@ namespace MentorRouletteTracker
                 log,
                 config);
 
-            frontlineScoreboard = new FrontlineScoreboardService(
-                log,
-                sigScanner,
-                gameInteropProvider);
+            // Frontline hook disabled for now.
+            // frontlineScoreboard = new FrontlineScoreboardService(
+            //     log,
+            //     sigScanner,
+            //     gameInteropProvider);
 
-            var exportDir = pluginInterface.GetPluginConfigDirectory();
+            // Test read-only access to PvP Tracker's database.
+            PvpTrackerDatabaseTest.Run(log);
+
+            // Listen for PvP Tracker saving a completed match.
+            pvpMatchSaved =
+                pluginInterface.GetIpcSubscriber<string, bool>(
+                    "PvpStats.OnMatchSaved");
+
+            pvpMatchSaved.Subscribe(OnPvpMatchSaved);
+
+            log.Information(
+                "Subscribed to PvP Tracker match saved IPC.");
+
+            var exportDir =
+                pluginInterface.GetPluginConfigDirectory();
+
             Directory.CreateDirectory(exportDir);
 
             mainWindow = new MainWindow(
@@ -91,8 +118,15 @@ namespace MentorRouletteTracker
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
+
             pluginInterface.UiBuilder.OpenMainUi += () =>
                 mainWindow.IsOpen = true;
+        }
+
+        private void OnPvpMatchSaved(string matchId)
+        {
+            log.Information(
+                $"PvP Tracker saved match: {matchId}");
         }
 
         private void OnCommand(string command, string args)
@@ -119,11 +153,18 @@ namespace MentorRouletteTracker
 
         public void Dispose()
         {
+            pvpMatchSaved.Unsubscribe(OnPvpMatchSaved);
+
             pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
+
             commandManager.RemoveHandler(CommandName);
+
             windowSystem.RemoveAllWindows();
+
             mainWindow.Dispose();
-            frontlineScoreboard.Dispose();
+
+            // frontlineScoreboard.Dispose();
+
             tracker.Dispose();
         }
     }

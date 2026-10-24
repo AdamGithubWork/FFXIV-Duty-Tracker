@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -13,6 +13,7 @@
     <Company>You</Company>
     <Authors>You</Authors>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <!--
@@ -48,8 +49,8 @@
     </Reference>
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.13" />
-  </ItemGroup>
-
+	<ItemGroup>
+		<PackageReference Include="DalamudPackager" Version="2.1.13" />
+		<PackageReference Include="LiteDB" Version="5.0.21" />
+	</ItemGroup>
 </Project>
