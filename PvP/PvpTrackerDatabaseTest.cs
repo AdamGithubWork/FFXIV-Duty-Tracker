@@ -181,7 +181,8 @@ public static class PvpTrackerDatabaseTest
                 var result = new PvpMatchResult
                 {
                     MatchId = matchId,
-                    DutyStartTime = match["DutyStartTime"].AsDateTime
+                    DutyStartTime = match["DutyStartTime"].AsDateTime,
+                    IsFrontline = collectionName == "flmatch"
                 };
 
                 if (collectionName == "flmatch")

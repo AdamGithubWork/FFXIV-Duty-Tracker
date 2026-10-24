@@ -226,14 +226,50 @@ namespace MentorRouletteTracker
                 }
             }
 
+
             if (updatedPlayers == 0)
             {
                 log.Warning(
-                    $"PvP scoreboard {matchId}: " +
-                    $"no players matched in " +
-                    $"{matchingRecord.DutyName}.");
+                    $"PvP scoreboard {matchId}: no players matched " +
+                    $"in {matchingRecord.DutyName}.");
 
                 return false;
+            }
+
+            // Remove players absent from the final Frontline scoreboard.
+            // Never perform this cleanup for CC or PvE.
+            if (result.IsFrontline)
+            {
+                var unmatchedPlayers = matchingRecord.Party
+                    .Where(player =>
+                        !result.PlayerDeaths.ContainsKey(
+                            $"{player.Name}@{player.World}"))
+                    .ToList();
+
+                // Only clean up when nearly all tracked players matched.
+                // This protects against an incomplete or incompatible scoreboard.
+                if (unmatchedPlayers.Count > 0 &&
+                    updatedPlayers >= matchingRecord.Party.Count * 0.8)
+                {
+                    foreach (var player in unmatchedPlayers)
+                    {
+                        log.Information(
+                            $"Frontline cleanup: removing {player.Name}@{player.World}");
+                    }
+
+                    matchingRecord.Party.RemoveAll(player =>
+                        unmatchedPlayers.Contains(player));
+
+                    log.Information(
+                        $"Frontline cleanup: removed {unmatchedPlayers.Count} " +
+                        $"players absent from the final scoreboard.");
+                }
+                else if (unmatchedPlayers.Count > 0)
+                {
+                    log.Warning(
+                        $"Frontline cleanup skipped: only {updatedPlayers}/" +
+                        $"{matchingRecord.Party.Count} players matched.");
+                }
             }
 
             config.Save();
