@@ -136,6 +136,7 @@ public static class PvpTrackerDatabaseTest
     }
 
 
+
     public static PvpMatchResult? GetMatch(string matchId, IPluginLog log)
     {
         var path = Path.Combine(
@@ -154,20 +155,18 @@ public static class PvpTrackerDatabaseTest
 
         try
         {
-            var connection = new ConnectionString
+            using var db = new LiteDatabase(new ConnectionString
             {
                 Filename = path,
                 ReadOnly = true
-            };
+            });
 
-            using var db = new LiteDatabase(connection);
+            var id = new ObjectId(matchId);
 
             foreach (var collectionName in new[] { "ccmatch", "flmatch" })
             {
-                var collection =
-                    db.GetCollection<BsonDocument>(collectionName);
-
-                var match = collection.FindById(new ObjectId(matchId));
+                var collection = db.GetCollection<BsonDocument>(collectionName);
+                var match = collection.FindById(id);
 
                 if (match == null)
                     continue;
@@ -176,21 +175,8 @@ public static class PvpTrackerDatabaseTest
                     !match["IsCompleted"].IsBoolean ||
                     !match["IsCompleted"].AsBoolean ||
                     !match.ContainsKey("DutyStartTime") ||
-                    !match["DutyStartTime"].IsDateTime ||
-                    !match.ContainsKey("PostMatch") ||
-                    !match["PostMatch"].IsDocument)
+                    !match["DutyStartTime"].IsDateTime)
                     return null;
-
-                var postMatch = match["PostMatch"].AsDocument;
-
-                if (!postMatch.ContainsKey("Teams") ||
-                    !postMatch["Teams"].IsDocument)
-                {
-                    log.Warning(
-                        $"{collectionName}: unexpected PostMatch structure. " +
-                        $"Fields: {string.Join(", ", postMatch.Keys)}");
-                    return null;
-                }
 
                 var result = new PvpMatchResult
                 {
@@ -198,60 +184,116 @@ public static class PvpTrackerDatabaseTest
                     DutyStartTime = match["DutyStartTime"].AsDateTime
                 };
 
-                foreach (var team in postMatch["Teams"].AsDocument)
+                if (collectionName == "flmatch")
                 {
-                    if (!team.Value.IsDocument)
-                        continue;
+                    if (!match.ContainsKey("PlayerScoreboards") ||
+                        !match["PlayerScoreboards"].IsDocument)
+                        return null;
 
-                    var teamData = team.Value.AsDocument;
+                    var scoreboards = match["PlayerScoreboards"].AsDocument;
 
-                    if (!teamData.ContainsKey("PlayerStats") ||
-                        !teamData["PlayerStats"].IsArray)
-                        continue;
-
-                    foreach (var player in teamData["PlayerStats"].AsArray)
+                    foreach (var entry in scoreboards)
                     {
-                        if (!player.IsDocument)
+                        if (!entry.Value.IsDocument)
                             continue;
 
-                        var playerData = player.AsDocument;
+                        var player = entry.Value.AsDocument;
 
-                        if (!playerData.ContainsKey("Player") ||
-                            !playerData["Player"].IsDocument ||
-                            !playerData.ContainsKey("Deaths"))
+                        if (!player.ContainsKey("Deaths"))
                             continue;
 
-                        var alias = playerData["Player"].AsDocument;
+                        var deathValue = player["Deaths"];
 
-                        if (!alias.ContainsKey("Name") ||
-                            !alias["Name"].IsString ||
-                            !alias.ContainsKey("HomeWorld") ||
-                            !alias["HomeWorld"].IsString ||
-                            !playerData["Deaths"].IsInt32)
+                        if (!deathValue.IsInt32 && !deathValue.IsInt64)
                             continue;
 
-                        var name = alias["Name"].AsString;
-                        var world = alias["HomeWorld"].AsString;
-                        var deaths = playerData["Deaths"].AsInt32;
+                        var deaths = checked((int)deathValue.AsInt64);
+
+                        // Frontline keys use "First Last World".
+                        // Convert to the "First Last@World" format
+                        // expected by our existing integration.
+                        var key = entry.Key;
+                        var lastSpace = key.LastIndexOf(' ');
+
+                        if (lastSpace <= 0 || lastSpace >= key.Length - 1)
+                            continue;
+
+                        var name = key.Substring(0, lastSpace);
+                        var world = key.Substring(lastSpace + 1);
 
                         result.PlayerDeaths[$"{name}@{world}"] = deaths;
                     }
                 }
-
-                if (result.PlayerDeaths.Count > 0)
+                else
                 {
-                    log.Information(
-                        $"{collectionName} scoreboard loaded: " +
-                        $"{result.PlayerDeaths.Count} players.");
+                    // Existing Crystalline Conflict handling.
+                    if (!match.ContainsKey("PostMatch") ||
+                        !match["PostMatch"].IsDocument)
+                        return null;
 
-                    return result;
+                    var postMatch = match["PostMatch"].AsDocument;
+
+                    if (!postMatch.ContainsKey("Teams") ||
+                        !postMatch["Teams"].IsDocument)
+                        return null;
+
+                    foreach (var team in postMatch["Teams"].AsDocument)
+                    {
+                        if (!team.Value.IsDocument)
+                            continue;
+
+                        var teamData = team.Value.AsDocument;
+
+                        if (!teamData.ContainsKey("PlayerStats") ||
+                            !teamData["PlayerStats"].IsArray)
+                            continue;
+
+                        foreach (var playerValue in teamData["PlayerStats"].AsArray)
+                        {
+                            if (!playerValue.IsDocument)
+                                continue;
+
+                            var player = playerValue.AsDocument;
+
+                            if (!player.ContainsKey("Player") ||
+                                !player["Player"].IsDocument ||
+                                !player.ContainsKey("Deaths"))
+                                continue;
+
+                            var alias = player["Player"].AsDocument;
+
+                            if (!alias.ContainsKey("Name") ||
+                                !alias["Name"].IsString ||
+                                !alias.ContainsKey("HomeWorld") ||
+                                !alias["HomeWorld"].IsString)
+                                continue;
+
+                            var deathValue = player["Deaths"];
+
+                            if (!deathValue.IsInt32 && !deathValue.IsInt64)
+                                continue;
+
+                            var name = alias["Name"].AsString;
+                            var world = alias["HomeWorld"].AsString;
+                            var deaths = checked((int)deathValue.AsInt64);
+
+                            result.PlayerDeaths[$"{name}@{world}"] = deaths;
+                        }
+                    }
                 }
 
-                log.Warning(
-                    $"{collectionName}: match found, but no player deaths " +
-                    "could be extracted.");
+                if (result.PlayerDeaths.Count == 0)
+                {
+                    log.Warning(
+                        $"{collectionName}: no player deaths extracted.");
+                    return null;
+                }
 
-                return null;
+                log.Information(
+                    $"{collectionName} scoreboard loaded: " +
+                    $"{result.PlayerDeaths.Count} players.");
+
+                return result;
             }
 
             return null;
@@ -262,6 +304,7 @@ public static class PvpTrackerDatabaseTest
             return null;
         }
     }
+
 
 
     public static void InspectFrontline(IPluginLog log)
@@ -277,6 +320,69 @@ public static class PvpTrackerDatabaseTest
         foreach (var name in db.GetCollectionNames())
         {
             log.Information($"PvP collection: {name}");
+        }
+    }
+    public static void InspectFrontlineMatch(IPluginLog log)
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
+
+        using var db = new LiteDatabase(new ConnectionString
+        {
+            Filename = path,
+            ReadOnly = true
+        });
+
+        var match = db.GetCollection<BsonDocument>("flmatch")
+            .FindById(new ObjectId("6add2a2443aeaf0f5001dfc1"));
+
+        if (match == null)
+        {
+            log.Warning("Frontline match not found in database.");
+            return;
+        }
+
+        log.Information(
+            $"FL match fields: {string.Join(", ", match.Keys)}");
+
+        log.Information(
+            $"FL completed: {(match.ContainsKey("IsCompleted") ? match["IsCompleted"].ToString() : "Missing")}");
+
+        if (match.ContainsKey("PostMatch") &&
+            match["PostMatch"].IsDocument)
+        {
+            var postMatch = match["PostMatch"].AsDocument;
+
+            log.Information(
+                $"FL PostMatch fields: {string.Join(", ", postMatch.Keys)}");
+        }
+        else
+        {
+            log.Warning("FL PostMatch is missing.");
+        }
+        var scoreboards = match["PlayerScoreboards"].AsDocument;
+
+        foreach (var entry in scoreboards)
+        {
+            log.Information($"FL player key: {entry.Key}");
+            log.Information($"FL player value type: {entry.Value.Type}");
+
+            if (entry.Value.IsDocument)
+            {
+                var playerData = entry.Value.AsDocument;
+
+                log.Information(
+                    $"FL player scoreboard fields: {string.Join(", ", playerData.Keys)}");
+
+                if (playerData.ContainsKey("Deaths"))
+                {
+                    log.Information(
+                        $"FL example deaths: {playerData["Deaths"]}");
+                }
+            }
+
+            break; // Only inspect one player
         }
     }
 

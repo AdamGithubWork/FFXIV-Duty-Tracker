@@ -18,20 +18,30 @@ namespace MentorRouletteTracker
 
         private const string CommandName = "/mrt";
 
+        // Temporary import of the existing Seal Rock match.
+        // Remove this ID after confirming the deaths were saved.
+        private const string ExistingFrontlineMatchId =
+            "6add2a2443aeaf0f5001dfc1";
+
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
         private readonly IFramework framework;
 
         private readonly Configuration config;
-        private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
+        private readonly WindowSystem windowSystem =
+            new("MentorRouletteTracker");
+
         private readonly DutyTrackerService tracker;
         private readonly MainWindow mainWindow;
 
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
 
-        private readonly Dictionary<string, DateTime> pendingPvpMatches = new();
-        private readonly HashSet<string> processedPvpMatches = new();
+        private readonly Dictionary<string, DateTime>
+            pendingPvpMatches = new();
+
+        private readonly HashSet<string>
+            processedPvpMatches = new();
 
         private DateTime nextPvpCheck = DateTime.MinValue;
 
@@ -83,7 +93,7 @@ namespace MentorRouletteTracker
                 log,
                 config);
 
-            // PvP Tracker IPC
+            // PvP Tracker IPC.
             pvpMatchSaved =
                 pluginInterface.GetIpcSubscriber<string, bool>(
                     "PvpStats.OnMatchSaved");
@@ -111,13 +121,41 @@ namespace MentorRouletteTracker
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
                 {
                     HelpMessage =
-                        "Open the Mentor Roulette Tracker window. Use '/mrt arm' or '/mrt disarm' to toggle logging.",
+                        "Open the Mentor Roulette Tracker window. " +
+                        "Use '/mrt arm' or '/mrt disarm' " +
+                        "to toggle logging.",
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
 
             pluginInterface.UiBuilder.OpenMainUi += () =>
                 mainWindow.IsOpen = true;
+
+            // Import the previously completed Frontline match.
+            // Safe to retry: it only updates matched player deaths.
+            try
+            {
+                if (ApplyPvpMatch(ExistingFrontlineMatchId))
+                {
+                    processedPvpMatches.Add(
+                        ExistingFrontlineMatchId);
+
+                    log.Information(
+                        "Existing Frontline match imported successfully.");
+                }
+                else
+                {
+                    log.Warning(
+                        "Existing Frontline match was not imported. " +
+                        "Check the preceding PvP log messages.");
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(
+                    ex,
+                    "Failed to import existing Frontline match.");
+            }
         }
 
         private void OnPvpMatchSaved(string matchId)
@@ -130,7 +168,83 @@ namespace MentorRouletteTracker
 
             pendingPvpMatches[matchId] = DateTime.UtcNow;
 
-            log.Information($"PvP Tracker match queued: {matchId}");
+            log.Information(
+                $"PvP Tracker match queued: {matchId}");
+        }
+
+        private bool ApplyPvpMatch(string matchId)
+        {
+            var result =
+                PvpTrackerDatabaseTest.GetMatch(matchId, log);
+
+            if (result == null)
+            {
+                log.Warning(
+                    $"PvP scoreboard {matchId}: " +
+                    "match results not available.");
+
+                return false;
+            }
+
+            var matchingRecord = config.Records
+                .Where(r =>
+                    Math.Abs(
+                        (r.Timestamp.ToUniversalTime() -
+                         result.DutyStartTime.ToUniversalTime())
+                        .TotalSeconds) < 30)
+                .OrderBy(r =>
+                    Math.Abs(
+                        (r.Timestamp.ToUniversalTime() -
+                         result.DutyStartTime.ToUniversalTime())
+                        .TotalSeconds))
+                .FirstOrDefault();
+
+            if (matchingRecord == null)
+            {
+                log.Warning(
+                    $"PvP scoreboard {matchId}: " +
+                    "no matching duty record. " +
+                    $"PvP start: " +
+                    $"{result.DutyStartTime:yyyy-MM-dd HH:mm:ss}");
+
+                return false;
+            }
+
+            int updatedPlayers = 0;
+
+            foreach (var player in matchingRecord.Party)
+            {
+                var playerKey =
+                    $"{player.Name}@{player.World}";
+
+                if (result.PlayerDeaths.TryGetValue(
+                    playerKey,
+                    out int deaths))
+                {
+                    player.PvPScoreboardDeaths = deaths;
+                    updatedPlayers++;
+                }
+            }
+
+            if (updatedPlayers == 0)
+            {
+                log.Warning(
+                    $"PvP scoreboard {matchId}: " +
+                    $"no players matched in " +
+                    $"{matchingRecord.DutyName}.");
+
+                return false;
+            }
+
+            config.Save();
+
+            log.Information(
+                $"PvP scoreboard applied: " +
+                $"{matchingRecord.DutyName} | " +
+                $"Matched {updatedPlayers}/" +
+                $"{matchingRecord.Party.Count} players.");
+
+            return true;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
@@ -138,61 +252,17 @@ namespace MentorRouletteTracker
             if (DateTime.UtcNow < nextPvpCheck)
                 return;
 
-            nextPvpCheck = DateTime.UtcNow.AddSeconds(5);
+            nextPvpCheck =
+                DateTime.UtcNow.AddSeconds(5);
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
             {
                 try
                 {
-                    var result = PvpTrackerDatabaseTest.GetMatch(matchId, log);
-
-                    // Scoreboard not ready yet.
-                    if (result == null)
+                    // The match may not be complete yet,
+                    // or the duty record may not be saved yet.
+                    if (!ApplyPvpMatch(matchId))
                         continue;
-
-                    var matchingRecord = config.Records
-                        .Where(r =>
-                            Math.Abs(
-                                (r.Timestamp.ToUniversalTime() -
-                                 result.DutyStartTime.ToUniversalTime())
-                                .TotalSeconds) < 30)
-                        .OrderBy(r =>
-                            Math.Abs(
-                                (r.Timestamp.ToUniversalTime() -
-                                 result.DutyStartTime.ToUniversalTime())
-                                .TotalSeconds))
-                        .FirstOrDefault();
-
-                    // Duty record might not have been finalized yet.
-                    if (matchingRecord == null)
-                        continue;
-
-                    int updatedPlayers = 0;
-
-                    foreach (var player in matchingRecord.Party)
-                    {
-                        var playerKey = $"{player.Name}@{player.World}";
-
-                        if (result.PlayerDeaths.TryGetValue(
-                                playerKey, out int deaths))
-                        {
-                            player.PvPScoreboardDeaths = deaths;
-                            updatedPlayers++;
-                        }
-                    }
-
-                    if (updatedPlayers == 0)
-                    {
-                        log.Warning(
-                            $"PvP scoreboard {matchId}: no players matched.");
-                        continue;
-                    }
-
-                    config.Save();
-
-                    log.Information(
-                        $"PvP scoreboard applied: {matchingRecord.DutyName} | " +
-                        $"Matched {updatedPlayers}/{matchingRecord.Party.Count} players.");
 
                     processedPvpMatches.Add(matchId);
                     pendingPvpMatches.Remove(matchId);
@@ -200,7 +270,8 @@ namespace MentorRouletteTracker
                 catch (Exception ex)
                 {
                     log.Error(
-                        $"Failed to process PvP match {matchId}: {ex}");
+                        $"Failed to process PvP match " +
+                        $"{matchId}: {ex}");
                 }
             }
         }
@@ -213,12 +284,14 @@ namespace MentorRouletteTracker
             {
                 case "arm":
                     tracker.Armed = true;
-                    log.Info("Mentor Roulette Tracker: armed.");
+                    log.Info(
+                        "Mentor Roulette Tracker: armed.");
                     break;
 
                 case "disarm":
                     tracker.Armed = false;
-                    log.Info("Mentor Roulette Tracker: disarmed.");
+                    log.Info(
+                        "Mentor Roulette Tracker: disarmed.");
                     break;
 
                 default:
@@ -233,7 +306,8 @@ namespace MentorRouletteTracker
 
             pvpMatchSaved.Unsubscribe(OnPvpMatchSaved);
 
-            pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
+            pluginInterface.UiBuilder.Draw -=
+                windowSystem.Draw;
 
             commandManager.RemoveHandler(CommandName);
 
