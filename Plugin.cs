@@ -18,11 +18,6 @@ namespace MentorRouletteTracker
 
         private const string CommandName = "/mrt";
 
-        // Temporary import of the existing Seal Rock match.
-        // Remove this ID after confirming the deaths were saved.
-        private const string ExistingFrontlineMatchId =
-            "6add2a2443aeaf0f5001dfc1";
-
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
@@ -131,31 +126,7 @@ namespace MentorRouletteTracker
             pluginInterface.UiBuilder.OpenMainUi += () =>
                 mainWindow.IsOpen = true;
 
-            // Import the previously completed Frontline match.
-            // Safe to retry: it only updates matched player deaths.
-            try
-            {
-                if (ApplyPvpMatch(ExistingFrontlineMatchId))
-                {
-                    processedPvpMatches.Add(
-                        ExistingFrontlineMatchId);
 
-                    log.Information(
-                        "Existing Frontline match imported successfully.");
-                }
-                else
-                {
-                    log.Warning(
-                        "Existing Frontline match was not imported. " +
-                        "Check the preceding PvP log messages.");
-                }
-            }
-            catch (Exception ex)
-            {
-                log.Error(
-                    ex,
-                    "Failed to import existing Frontline match.");
-            }
         }
 
         private void OnPvpMatchSaved(string matchId)
@@ -289,7 +260,7 @@ namespace MentorRouletteTracker
                 return;
 
             nextPvpCheck =
-                DateTime.UtcNow.AddSeconds(5);
+                DateTime.UtcNow.AddSeconds(30);
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
             {
