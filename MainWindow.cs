@@ -1256,6 +1256,21 @@ namespace MentorRouletteTracker
             }
         }
 
+        private static int? EffectiveDeaths(DutyRecord record, PartyMemberSnapshot player)
+        {
+            return record.DutyType == "PvP"
+                ? player.PvPScoreboardDeaths
+                : player.DeathCount;
+        }
+
+        // Summary groupings contain player snapshots rather than their parent records.
+        private int? SummaryDeaths(PartyMemberSnapshot player)
+        {
+            var record = config.Records.FirstOrDefault(r =>
+                r.Party.Any(p => ReferenceEquals(p, player)));
+            return record == null ? null : EffectiveDeaths(record, player);
+        }
+
         private void DrawDutySpecificDetails(List<DutyRecord> records)
         {
             ImGui.Text("Duty Specific Details");
@@ -1309,7 +1324,7 @@ namespace MentorRouletteTracker
                                 .Where(p =>
                                     !string.IsNullOrWhiteSpace(p.Name) && (config.IncludeSelfInStatistics ||
                                     p.Name != objectTable.LocalPlayer?.Name.TextValue))
-                                .Sum(p => p.DeathCount)),
+                                .Sum(p => EffectiveDeaths(y, p) ?? 0)),
 
                         TotalWipes = x.Sum(y => y.WipeCount),
 
@@ -1557,7 +1572,7 @@ namespace MentorRouletteTracker
                 {
                     Status = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(player => player.DeathCount)
+                    Deaths = group.Sum(player => SummaryDeaths(player) ?? 0)
                 })
                 .OrderByDescending(stat => stat.Encounters)
                 .ToList();
@@ -1629,7 +1644,7 @@ namespace MentorRouletteTracker
                 {
                     World = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(player => player.DeathCount)
+                    Deaths = group.Sum(player => SummaryDeaths(player) ?? 0)
                 })
                 .OrderByDescending(stat => stat.Encounters)
                 .ToList();
@@ -1816,7 +1831,7 @@ namespace MentorRouletteTracker
                 {
                     Race = x.Key,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => y.DeathCount)
+                    Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
                 })
                 .OrderBy(x => x.Race)
                 .ToList();
@@ -1944,7 +1959,7 @@ namespace MentorRouletteTracker
                     Race = x.Key.Race,
                     Gender = x.Key.Gender,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => y.DeathCount)
+                    Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
                 })
                 .OrderBy(x => x.Race)
                 .ThenBy(x => x.Gender)
@@ -2123,7 +2138,7 @@ namespace MentorRouletteTracker
                     {
                         Job = x.Key,
                         Seen = x.Count(),
-                        Deaths = x.Sum(y => y.DeathCount)
+                        Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
                     })
                     .ToList();
 
@@ -2474,11 +2489,10 @@ namespace MentorRouletteTracker
                         .ThenBy(x => x.Name)
                         .ToList();
 
-                    bool hasOfficialDeaths = r.Party.Any(x => x.PvPScoreboardDeaths.HasValue);
 
                     if (ImGui.BeginTable(
                             "partyDetail",
-                            hasOfficialDeaths ? 8 : 7,
+                            7,
                             ImGuiTableFlags.Borders |
                             ImGuiTableFlags.RowBg |
                             ImGuiTableFlags.Resizable |
@@ -2492,8 +2506,6 @@ namespace MentorRouletteTracker
                         ImGui.TableSetupColumn("Gender");
                         ImGui.TableSetupColumn("Status");
                         ImGui.TableSetupColumn("Deaths");
-                        if (hasOfficialDeaths)
-                            ImGui.TableSetupColumn("Official PvP Deaths");
 
                         ImGui.TableHeadersRow();
                         var sortSpecs = ImGui.TableGetSortSpecs();
@@ -2530,12 +2542,8 @@ namespace MentorRouletteTracker
                                     : sortedParty.OrderByDescending(x => x.Status ?? "Unknown").ToList(),
 
                                 6 => ascending
-                                    ? sortedParty.OrderBy(x => x.DeathCount).ToList()
-                                    : sortedParty.OrderByDescending(x => x.DeathCount).ToList(),
-
-                                7 when hasOfficialDeaths => ascending
-                                    ? sortedParty.OrderBy(x => x.PvPScoreboardDeaths).ToList()
-                                    : sortedParty.OrderByDescending(x => x.PvPScoreboardDeaths).ToList(),
+                                    ? sortedParty.OrderBy(x => EffectiveDeaths(r, x)).ToList()
+                                    : sortedParty.OrderByDescending(x => EffectiveDeaths(r, x)).ToList(),
 
                                 _ => sortedParty
                             };
@@ -2580,15 +2588,10 @@ namespace MentorRouletteTracker
                             }
                             else
                             {
-                                ImGui.TextUnformatted(member.DeathCount.ToString());
+                                ImGui.TextUnformatted(
+                                    EffectiveDeaths(r, member)?.ToString() ?? "-");
                             }
 
-                            if (hasOfficialDeaths)
-                            {
-                                ImGui.TableSetColumnIndex(7);
-                                ImGui.TextUnformatted(
-                                    member.PvPScoreboardDeaths?.ToString() ?? "-");
-                            }
                         }
 
                         ImGui.EndTable();
