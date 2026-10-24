@@ -135,17 +135,21 @@ public static class PvpTrackerDatabaseTest
         }
     }
 
+
     public static PvpMatchResult? GetMatch(string matchId, IPluginLog log)
     {
         var path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.ApplicationData),
             "XIVLauncher",
             "pluginConfigs",
             "PvpStats",
-            "data.db"
-        );
+            "data.db");
 
-        if (!File.Exists(path))
+        if (!File.Exists(path) ||
+            string.IsNullOrWhiteSpace(matchId) ||
+            matchId.Length != 24 ||
+            !matchId.All(Uri.IsHexDigit))
             return null;
 
         try
@@ -157,78 +161,122 @@ public static class PvpTrackerDatabaseTest
             };
 
             using var db = new LiteDatabase(connection);
-            var collection = db.GetCollection<BsonDocument>("ccmatch");
 
-            if (matchId.Length != 24 ||
-                !matchId.All(Uri.IsHexDigit))
-                return null;
-
-            var match = collection.FindById(new ObjectId(matchId));
-
-            if (match == null ||
-                !match.ContainsKey("IsCompleted") ||
-                !match["IsCompleted"].AsBoolean ||
-                !match.ContainsKey("PostMatch") ||
-                !match["PostMatch"].IsDocument)
+            foreach (var collectionName in new[] { "ccmatch", "flmatch" })
             {
-                return null;
-            }
+                var collection =
+                    db.GetCollection<BsonDocument>(collectionName);
 
-            var postMatch = match["PostMatch"].AsDocument;
+                var match = collection.FindById(new ObjectId(matchId));
 
-            if (!postMatch.ContainsKey("Teams") ||
-                !postMatch["Teams"].IsDocument)
-                return null;
-
-            var result = new PvpMatchResult
-            {
-                MatchId = matchId,
-                DutyStartTime = match["DutyStartTime"].AsDateTime
-            };
-
-            foreach (var team in postMatch["Teams"].AsDocument)
-            {
-                if (!team.Value.IsDocument)
+                if (match == null)
                     continue;
 
-                var teamData = team.Value.AsDocument;
+                if (!match.ContainsKey("IsCompleted") ||
+                    !match["IsCompleted"].IsBoolean ||
+                    !match["IsCompleted"].AsBoolean ||
+                    !match.ContainsKey("DutyStartTime") ||
+                    !match["DutyStartTime"].IsDateTime ||
+                    !match.ContainsKey("PostMatch") ||
+                    !match["PostMatch"].IsDocument)
+                    return null;
 
-                if (!teamData.ContainsKey("PlayerStats") ||
-                    !teamData["PlayerStats"].IsArray)
-                    continue;
+                var postMatch = match["PostMatch"].AsDocument;
 
-                foreach (var player in teamData["PlayerStats"].AsArray)
+                if (!postMatch.ContainsKey("Teams") ||
+                    !postMatch["Teams"].IsDocument)
                 {
-                    if (!player.IsDocument)
-                        continue;
-
-                    var playerData = player.AsDocument;
-
-                    if (!playerData.ContainsKey("Player") ||
-                        !playerData["Player"].IsDocument ||
-                        !playerData.ContainsKey("Deaths"))
-                        continue;
-
-                    var alias = playerData["Player"].AsDocument;
-
-                    if (!alias.ContainsKey("Name") ||
-                        !alias.ContainsKey("HomeWorld"))
-                        continue;
-
-                    var name = alias["Name"].AsString;
-                    var world = alias["HomeWorld"].AsString;
-                    var deaths = playerData["Deaths"].AsInt32;
-
-                    result.PlayerDeaths[$"{name}@{world}"] = deaths;
+                    log.Warning(
+                        $"{collectionName}: unexpected PostMatch structure. " +
+                        $"Fields: {string.Join(", ", postMatch.Keys)}");
+                    return null;
                 }
+
+                var result = new PvpMatchResult
+                {
+                    MatchId = matchId,
+                    DutyStartTime = match["DutyStartTime"].AsDateTime
+                };
+
+                foreach (var team in postMatch["Teams"].AsDocument)
+                {
+                    if (!team.Value.IsDocument)
+                        continue;
+
+                    var teamData = team.Value.AsDocument;
+
+                    if (!teamData.ContainsKey("PlayerStats") ||
+                        !teamData["PlayerStats"].IsArray)
+                        continue;
+
+                    foreach (var player in teamData["PlayerStats"].AsArray)
+                    {
+                        if (!player.IsDocument)
+                            continue;
+
+                        var playerData = player.AsDocument;
+
+                        if (!playerData.ContainsKey("Player") ||
+                            !playerData["Player"].IsDocument ||
+                            !playerData.ContainsKey("Deaths"))
+                            continue;
+
+                        var alias = playerData["Player"].AsDocument;
+
+                        if (!alias.ContainsKey("Name") ||
+                            !alias["Name"].IsString ||
+                            !alias.ContainsKey("HomeWorld") ||
+                            !alias["HomeWorld"].IsString ||
+                            !playerData["Deaths"].IsInt32)
+                            continue;
+
+                        var name = alias["Name"].AsString;
+                        var world = alias["HomeWorld"].AsString;
+                        var deaths = playerData["Deaths"].AsInt32;
+
+                        result.PlayerDeaths[$"{name}@{world}"] = deaths;
+                    }
+                }
+
+                if (result.PlayerDeaths.Count > 0)
+                {
+                    log.Information(
+                        $"{collectionName} scoreboard loaded: " +
+                        $"{result.PlayerDeaths.Count} players.");
+
+                    return result;
+                }
+
+                log.Warning(
+                    $"{collectionName}: match found, but no player deaths " +
+                    "could be extracted.");
+
+                return null;
             }
 
-            return result.PlayerDeaths.Count > 0 ? result : null;
+            return null;
         }
         catch (Exception ex)
         {
             log.Error(ex, "Could not retrieve PvP match results.");
             return null;
+        }
+    }
+
+
+    public static void InspectFrontline(IPluginLog log)
+    {
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.ApplicationData),
+            "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
+
+        using var db = new LiteDatabase(
+            $"Filename={dbPath};Connection=shared;ReadOnly=true");
+
+        foreach (var name in db.GetCollectionNames())
+        {
+            log.Information($"PvP collection: {name}");
         }
     }
 
