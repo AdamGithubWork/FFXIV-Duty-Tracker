@@ -29,6 +29,11 @@ namespace MentorRouletteTracker
 
         private DutyRecord? current;
 
+        private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromMilliseconds(250);
+        private static readonly TimeSpan ConfigSaveInterval = TimeSpan.FromSeconds(5);
+        private DateTime nextPartyRefresh = DateTime.MinValue;
+        private DateTime nextConfigSave = DateTime.MinValue;
+
         private readonly HashSet<string> countedPlayersForCurrentRun = new();
 
         private readonly Dictionary<string, bool> previousDeathStates = new();
@@ -82,7 +87,7 @@ namespace MentorRouletteTracker
             this.dutyState.DutyCompleted -= OnDutyCompleted;
             this.framework.Update -= OnFrameworkUpdate;
         }
-        
+
         private void OnTerritoryChanged(uint territoryId)
         {
 
@@ -168,7 +173,86 @@ namespace MentorRouletteTracker
             if (objectTable.LocalPlayer == null)
                 return;
 
-            PopulatePartyDetails();
+            // Check death transitions every frame so brief deaths are less likely to be missed.
+            UpdateDeathStates();
+
+            var now = DateTime.UtcNow;
+            if (now >= nextPartyRefresh)
+            {
+                nextPartyRefresh = now + PartyRefreshInterval;
+                PopulatePartyDetails();
+            }
+
+            if (now >= nextConfigSave)
+            {
+                nextConfigSave = now + ConfigSaveInterval;
+                config.Save();
+            }
+        }
+
+        // Fast path: update death counts without re-reading all player metadata or saving.
+        private void UpdateDeathStates()
+        {
+            if (current == null)
+                return;
+
+            foreach (var member in partyList)
+            {
+                if (member.GameObject == null)
+                    continue;
+
+                var name = member.Name.TextValue;
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                var world = member.World.Value.Name.ExtractText();
+                UpdatePlayerDeath(name, world, member.GameObject.IsDead);
+            }
+
+            if (config.TrackAllianceMembers && partyList.IsAlliance)
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    var address = partyList.GetAllianceMemberAddress(i);
+                    if (address == nint.Zero)
+                        continue;
+
+                    var member = partyList.CreateAllianceMemberReference(address);
+                    if (member?.GameObject == null)
+                        continue;
+
+                    var name = member.Name.TextValue;
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+
+                    var world = member.World.Value.Name.ExtractText();
+                    UpdatePlayerDeath(name, world, member.GameObject.IsDead);
+                }
+            }
+
+            var localPlayer = objectTable.LocalPlayer;
+            if (localPlayer != null)
+            {
+                var name = localPlayer.Name.TextValue;
+                var world = localPlayer.HomeWorld.Value.Name.ExtractText();
+                UpdatePlayerDeath(name, world, localPlayer.IsDead);
+            }
+        }
+
+        private void UpdatePlayerDeath(string name, string world, bool isDead)
+        {
+            if (current == null)
+                return;
+
+            var key = $"{name}@{world}";
+            var snapshot = current.Party.FirstOrDefault(x => x.Name == name && x.World == world);
+            if (snapshot == null)
+                return; // Metadata refresh will register newly encountered players.
+
+            if (isDead && previousDeathStates.TryGetValue(key, out var wasDead) && !wasDead)
+                snapshot.DeathCount++;
+
+            previousDeathStates[key] = isDead;
         }
 
         private void FinalizeCurrent(bool completed)
@@ -218,7 +302,7 @@ namespace MentorRouletteTracker
                 var race = "Unknown";
                 var gender = "Unknown";
                 var status = "Unknown";
-                
+
                 if (member.GameObject is ICharacter character)
                 {
                     var raceId =
@@ -303,7 +387,7 @@ namespace MentorRouletteTracker
                 x.Name != localPlayerName);
             current.PlayerJob = localPlayerJob;
 
-            config.Save();
+            // Configuration is saved periodically in OnFrameworkUpdate and at duty end.
         }
         private static string NormalizePlayerStatus(string status)
         {
@@ -349,9 +433,9 @@ namespace MentorRouletteTracker
                 if ((string.IsNullOrWhiteSpace(snapshot.Gender) || snapshot.Gender == "Unknown") && gender != "Unknown")
                     snapshot.Gender = gender;
 
-                if (string.IsNullOrWhiteSpace(snapshot.World) &&!string.IsNullOrWhiteSpace(world))
+                if (string.IsNullOrWhiteSpace(snapshot.World) && !string.IsNullOrWhiteSpace(world))
                     snapshot.World = world;
-                if ((string.IsNullOrWhiteSpace(snapshot.Status) || snapshot.Status == "Unknown") && !string.IsNullOrWhiteSpace(status) &&status != "Unknown")
+                if ((string.IsNullOrWhiteSpace(snapshot.Status) || snapshot.Status == "Unknown") && !string.IsNullOrWhiteSpace(status) && status != "Unknown")
                 {
                     snapshot.Status = status;
                 }
@@ -360,8 +444,9 @@ namespace MentorRouletteTracker
             // Detect a transition from alive to dead.
             if (isDead.HasValue)
             {
-                if (isDead.Value && previousDeathStates.TryGetValue(playerKey, out var wasDead) && !wasDead) { 
-                    snapshot.DeathCount++; 
+                if (isDead.Value && previousDeathStates.TryGetValue(playerKey, out var wasDead) && !wasDead)
+                {
+                    snapshot.DeathCount++;
                 }
 
                 previousDeathStates[playerKey] = isDead.Value;
@@ -405,7 +490,7 @@ namespace MentorRouletteTracker
             // even if this player was already counted during this duty.
             if (seenPlayer != null)
             {
-                if (string.IsNullOrWhiteSpace(seenPlayer.World) &&!string.IsNullOrWhiteSpace(world))
+                if (string.IsNullOrWhiteSpace(seenPlayer.World) && !string.IsNullOrWhiteSpace(world))
                     seenPlayer.World = world;
                 if (seenPlayer.Race == "Unknown" && race != "Unknown")
                     seenPlayer.Race = race;
