@@ -9,6 +9,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.PvP;
+using LiteDB;
 
 namespace MentorRouletteTracker
 {
@@ -39,6 +40,9 @@ namespace MentorRouletteTracker
             processedPvpMatches = new();
 
         private DateTime nextPvpCheck = DateTime.MinValue;
+        private readonly Dictionary<string, DateTime> pvpQueuedAt = new();
+        private readonly HashSet<string> unknownPvpModes = new();
+        private static readonly TimeSpan PvpRetryInterval = TimeSpan.FromSeconds(30);
 
         public Plugin(
             IDalamudPluginInterface pluginInterface,
@@ -129,18 +133,67 @@ namespace MentorRouletteTracker
 
         }
 
+        // Returns true for Frontline, false for CC, or null if the match
+        // has not yet appeared in PvP Tracker's database.
+        private bool? IsFrontlineMatch(string matchId)
+        {
+            if (matchId.Length != 24 || !matchId.All(Uri.IsHexDigit))
+                return null;
+
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
+
+            if (!File.Exists(path))
+                return null;
+
+            try
+            {
+                using var db = new LiteDatabase(new ConnectionString
+                {
+                    Filename = path,
+                    ReadOnly = true
+                });
+
+                var id = new ObjectId(matchId);
+
+                if (db.GetCollection<BsonDocument>("flmatch").FindById(id) != null)
+                    return true;
+
+                if (db.GetCollection<BsonDocument>("ccmatch").FindById(id) != null)
+                    return false;
+            }
+            catch (Exception ex)
+            {
+                log.Warning($"Could not identify PvP match {matchId}: {ex.Message}");
+            }
+
+            return null;
+        }
+
         private void OnPvpMatchSaved(string matchId)
         {
-            if (string.IsNullOrWhiteSpace(matchId))
+            if (string.IsNullOrWhiteSpace(matchId) ||
+                processedPvpMatches.Contains(matchId) ||
+                pendingPvpMatches.ContainsKey(matchId))
                 return;
 
-            if (processedPvpMatches.Contains(matchId))
-                return;
+            var now = DateTime.UtcNow;
+            var isFrontline = IsFrontlineMatch(matchId);
+            var delay = isFrontline == true
+                ? TimeSpan.FromMinutes(5)
+                : TimeSpan.FromMinutes(1);
 
-            pendingPvpMatches[matchId] = DateTime.UtcNow;
+            pvpQueuedAt[matchId] = now;
+            pendingPvpMatches[matchId] = now.Add(delay);
+
+            if (isFrontline == null)
+                unknownPvpModes.Add(matchId);
 
             log.Information(
-                $"PvP Tracker match queued: {matchId}");
+                $"PvP Tracker match queued: {matchId} | " +
+                $"Mode: {(isFrontline == true ? "Frontline" : isFrontline == false ? "CC" : "Unknown")} | " +
+                $"First check in {delay.TotalMinutes:0} minute(s).");
         }
 
         private bool ApplyPvpMatch(string matchId)
@@ -256,29 +309,59 @@ namespace MentorRouletteTracker
 
         private void OnFrameworkUpdate(IFramework framework)
         {
-            if (DateTime.UtcNow < nextPvpCheck)
+            var now = DateTime.UtcNow;
+            if (now < nextPvpCheck || pendingPvpMatches.Count == 0)
                 return;
 
-            nextPvpCheck =
-                DateTime.UtcNow.AddSeconds(30);
+            // Check due times once per second, without opening the database.
+            nextPvpCheck = now.AddSeconds(1);
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
             {
+                if (now < pendingPvpMatches[matchId])
+                    continue;
+
                 try
                 {
-                    // The match may not be complete yet,
-                    // or the duty record may not be saved yet.
-                    if (!ApplyPvpMatch(matchId))
-                        continue;
+                    // If the mode wasn't available when the IPC arrived,
+                    // resolve it now so Frontline still gets its 5-minute delay.
+                    if (unknownPvpModes.Contains(matchId))
+                    {
+                        var isFrontline = IsFrontlineMatch(matchId);
+                        if (isFrontline == null)
+                        {
+                            pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                            continue;
+                        }
 
-                    processedPvpMatches.Add(matchId);
-                    pendingPvpMatches.Remove(matchId);
+                        unknownPvpModes.Remove(matchId);
+                        if (isFrontline.Value)
+                        {
+                            var firstCheck = pvpQueuedAt[matchId].AddMinutes(5);
+                            if (now < firstCheck)
+                            {
+                                pendingPvpMatches[matchId] = firstCheck;
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (ApplyPvpMatch(matchId))
+                    {
+                        processedPvpMatches.Add(matchId);
+                        pendingPvpMatches.Remove(matchId);
+                        pvpQueuedAt.Remove(matchId);
+                        unknownPvpModes.Remove(matchId);
+                    }
+                    else
+                    {
+                        pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    log.Error(
-                        $"Failed to process PvP match " +
-                        $"{matchId}: {ex}");
+                    log.Error($"Failed to process PvP match {matchId}: {ex}");
+                    pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
                 }
             }
         }
