@@ -3,11 +3,7 @@ using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
-using Dalamud.Utility;
 using Lumina.Excel.Sheets;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace MentorRouletteTracker
 {
@@ -47,7 +43,6 @@ namespace MentorRouletteTracker
             IDataManager dataManager,
             IFramework framework,
             IPluginLog log,
-
             Configuration config)
         {
             this.clientState = clientState;
@@ -143,7 +138,6 @@ namespace MentorRouletteTracker
             if (current != null && current.DutyName != string.Empty)
                 current.JoinedInProgress = false;
         }
-
 
         private void OnDutyWiped(IDutyStateEventArgs args)
         {
@@ -380,12 +374,14 @@ namespace MentorRouletteTracker
                 _ => status
             };
         }
+
         private void ProcessPlayer(
             string name, string job, string race, string gender,
             string world, string status, bool? isDead)
         {
             status = NormalizePlayerStatus(status);
             var playerKey = $"{name}@{world}";
+
             var snapshot = GetOrCreatePlayerSnapshot(name, job, race, gender, world, status);
             TrackDeath(snapshot, playerKey, isDead);
             UpdateSeenPlayer(name, race, gender, world, playerKey);
@@ -522,6 +518,5 @@ namespace MentorRouletteTracker
             return char.ToUpperInvariant(value[0]) +
                    value.Substring(1);
         }
-
     }
 }
