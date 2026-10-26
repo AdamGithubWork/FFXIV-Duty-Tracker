@@ -239,20 +239,46 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void UpdatePlayerDeath(string name, string world, bool isDead)
+
+        private void UpdatePlayerDeath(
+            string name,
+            string world,
+            bool isDead)
         {
             if (current == null)
                 return;
 
-            var key = $"{name}@{world}";
-            var snapshot = current.Party.FirstOrDefault(x => x.Name == name && x.World == world);
+            var snapshot = current.Party.FirstOrDefault(
+                x => x.Name == name && x.World == world);
+
             if (snapshot == null)
-                return; // Metadata refresh will register newly encountered players.
+                return;
 
-            if (isDead && previousDeathStates.TryGetValue(key, out var wasDead) && !wasDead)
+            var playerKey = $"{name}@{world}";
+
+            TrackDeath(snapshot, playerKey, isDead);
+        }
+
+
+        private void TrackDeath(
+            PartyMemberSnapshot snapshot,
+            string playerKey,
+            bool? isDead)
+        {
+            if (!isDead.HasValue)
+            {
+                previousDeathStates.Remove(playerKey);
+                return;
+            }
+
+            if (isDead.Value &&
+                previousDeathStates.TryGetValue(playerKey, out var wasDead) &&
+                !wasDead)
+            {
                 snapshot.DeathCount++;
+            }
 
-            previousDeathStates[key] = isDead;
+            previousDeathStates[playerKey] = isDead.Value;
         }
 
         private void FinalizeCurrent(bool completed)
@@ -454,19 +480,7 @@ namespace MentorRouletteTracker
             }
 
             // Detect a transition from alive to dead.
-            if (isDead.HasValue)
-            {
-                if (isDead.Value && previousDeathStates.TryGetValue(playerKey, out var wasDead) && !wasDead)
-                {
-                    snapshot.DeathCount++;
-                }
-
-                previousDeathStates[playerKey] = isDead.Value;
-            }
-            else
-            {
-                previousDeathStates.Remove(playerKey);
-            }
+            TrackDeath(snapshot, playerKey, isDead);
 
             // Find or create this player's long-term People Seen record.
             var seenPlayer = config.SeenPlayers.FirstOrDefault(x => x.Name == name && x.World == world);
