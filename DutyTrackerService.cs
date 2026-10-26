@@ -275,6 +275,7 @@ namespace MentorRouletteTracker
             previousDeathStates.Clear();
         }
 
+
         private void PopulatePartyDetails()
         {
             if (current == null)
@@ -286,48 +287,25 @@ namespace MentorRouletteTracker
                 return;
 
             var localPlayerName = localPlayer.Name.TextValue;
+
+            // Regular party members.
             foreach (var member in partyList)
             {
                 var name = member.Name.TextValue;
 
-                if (string.IsNullOrWhiteSpace(name))
+                if (string.IsNullOrWhiteSpace(name) ||
+                    name == localPlayerName ||
+                    member.GameObject == null)
                     continue;
 
-                // Don't process the local player again through the party list.
-                if (name == localPlayerName)
-                    continue;
-
-                var job = member.ClassJob.Value.Abbreviation.ExtractText();
-                var world = member.World.Value.Name.ExtractText();
-                var race = "Unknown";
-                var gender = "Unknown";
-                var status = "Unknown";
-
-                if (member.GameObject is ICharacter character)
-                {
-                    var raceId =
-                        character.Customize[(int)CustomizeIndex.Race];
-
-                    race = RaceIdToName(raceId);
-
-                    var genderId =
-                        character.Customize[(int)CustomizeIndex.Gender];
-
-                    gender = GenderIdToName(genderId);
-                    if (character.OnlineStatus.IsValid)
-                    {
-                        status = character.OnlineStatus.Value.Name.ExtractText();
-                    }
-                }
-
-                if (member.GameObject == null)
-                    continue;
-
-                var isDead = member.GameObject.IsDead;
-
-                ProcessPlayer(name, job, race, gender, world, status, isDead);
-
+                ProcessPartyMember(
+                    name,
+                    member.ClassJob.Value.Abbreviation.ExtractText(),
+                    member.World.Value.Name.ExtractText(),
+                    member.GameObject);
             }
+
+            // Alliance members, when enabled.
             if (config.TrackAllianceMembers && partyList.IsAlliance)
             {
                 for (int i = 0; i < 16; i++)
@@ -347,48 +325,82 @@ namespace MentorRouletteTracker
                     if (string.IsNullOrWhiteSpace(name))
                         continue;
 
-                    var job = member.ClassJob.Value.Abbreviation.ExtractText();
-                    var world = member.World.Value.Name.ExtractText();
-                    var race = "Unknown";
-                    var gender = "Unknown";
-                    var status = "Unknown";
-
-                    if (member.GameObject is ICharacter character)
-                    {
-                        race = RaceIdToName(
-                            character.Customize[(int)CustomizeIndex.Race]);
-
-                        gender = GenderIdToName(
-                            character.Customize[(int)CustomizeIndex.Gender]);
-                        if (character.OnlineStatus.IsValid)
-                        {
-                            status = character.OnlineStatus.Value.Name.ExtractText();
-                        }
-                    }
-
-                    ProcessPlayer(name, job, race, gender, world, status, member.GameObject?.IsDead);
+                    ProcessPartyMember(
+                        name,
+                        member.ClassJob.Value.Abbreviation.ExtractText(),
+                        member.World.Value.Name.ExtractText(),
+                        member.GameObject);
                 }
             }
-            var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
 
-            var localPlayerWorld = localPlayer.HomeWorld.Value.Name.ExtractText();
+            // Local player.
+            var localPlayerJob =
+                localPlayer.ClassJob.Value.Abbreviation.ExtractText();
 
-            var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
+            var localPlayerWorld =
+                localPlayer.HomeWorld.Value.Name.ExtractText();
 
-            var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
+            var localPlayerRace = RaceIdToName(
+                localPlayer.Customize[(int)CustomizeIndex.Race]);
 
-            var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
+            var localPlayerGender = GenderIdToName(
+                localPlayer.Customize[(int)CustomizeIndex.Gender]);
 
-            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayerStatus, localPlayer.IsDead);
+            var localPlayerStatus =
+                localPlayer.OnlineStatus.Value.Name.ExtractText();
 
-            // Count other Lalafells, excluding the local player.
+            ProcessPlayer(
+                localPlayerName,
+                localPlayerJob,
+                localPlayerRace,
+                localPlayerGender,
+                localPlayerWorld,
+                localPlayerStatus,
+                localPlayer.IsDead);
+
+            // Exclude the local player from Lalafell counts.
             current.LalafellCount = current.Party.Count(x =>
                 x.Race == "Lalafell" &&
                 x.Name != localPlayerName);
-            current.PlayerJob = localPlayerJob;
 
-            // Configuration is saved periodically in OnFrameworkUpdate and at duty end.
+            current.PlayerJob = localPlayerJob;
         }
+
+        private void ProcessPartyMember(
+            string name,
+            string job,
+            string world,
+            IGameObject? gameObject)
+        {
+            var race = "Unknown";
+            var gender = "Unknown";
+            var status = "Unknown";
+
+            if (gameObject is ICharacter character)
+            {
+                race = RaceIdToName(
+                    character.Customize[(int)CustomizeIndex.Race]);
+
+                gender = GenderIdToName(
+                    character.Customize[(int)CustomizeIndex.Gender]);
+
+                if (character.OnlineStatus.IsValid)
+                {
+                    status =
+                        character.OnlineStatus.Value.Name.ExtractText();
+                }
+            }
+
+            ProcessPlayer(
+                name,
+                job,
+                race,
+                gender,
+                world,
+                status,
+                gameObject?.IsDead);
+        }
+
         private static string NormalizePlayerStatus(string status)
         {
             return status switch
