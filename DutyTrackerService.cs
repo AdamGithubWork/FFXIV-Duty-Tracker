@@ -437,12 +437,38 @@ namespace MentorRouletteTracker
                 _ => status
             };
         }
-        private void ProcessPlayer(string name, string job, string race, string gender, string world, string status, bool? isDead)
+
+        private void ProcessPlayer(
+            string name,
+            string job,
+            string race,
+            string gender,
+            string world,
+            string status,
+            bool? isDead)
         {
             status = NormalizePlayerStatus(status);
+
             var playerKey = $"{name}@{world}";
-            // Find or create this player's snapshot for the current duty.
-            var snapshot = current!.Party.FirstOrDefault(x => x.Name == name && x.World == world);
+
+            var snapshot = GetOrCreatePlayerSnapshot(
+                name, job, race, gender, world, status);
+
+            TrackDeath(snapshot, playerKey, isDead);
+
+            UpdateSeenPlayer(name, race, gender, world, playerKey);
+        }
+
+        private PartyMemberSnapshot GetOrCreatePlayerSnapshot(
+            string name,
+            string job,
+            string race,
+            string gender,
+            string world,
+            string status)
+        {
+            var snapshot = current!.Party.FirstOrDefault(
+                x => x.Name == name && x.World == world);
 
             if (snapshot == null)
             {
@@ -461,29 +487,47 @@ namespace MentorRouletteTracker
             }
             else
             {
-                // Fill in information that was previously unavailable.
                 if (snapshot.Job == "Unknown" && job != "Unknown")
                     snapshot.Job = job;
 
                 if (snapshot.Race == "Unknown" && race != "Unknown")
                     snapshot.Race = race;
 
-                if ((string.IsNullOrWhiteSpace(snapshot.Gender) || snapshot.Gender == "Unknown") && gender != "Unknown")
+                if ((string.IsNullOrWhiteSpace(snapshot.Gender) ||
+                     snapshot.Gender == "Unknown") &&
+                    gender != "Unknown")
+                {
                     snapshot.Gender = gender;
+                }
 
-                if (string.IsNullOrWhiteSpace(snapshot.World) && !string.IsNullOrWhiteSpace(world))
+                if (string.IsNullOrWhiteSpace(snapshot.World) &&
+                    !string.IsNullOrWhiteSpace(world))
+                {
                     snapshot.World = world;
-                if ((string.IsNullOrWhiteSpace(snapshot.Status) || snapshot.Status == "Unknown") && !string.IsNullOrWhiteSpace(status) && status != "Unknown")
+                }
+
+                if ((string.IsNullOrWhiteSpace(snapshot.Status) ||
+                     snapshot.Status == "Unknown") &&
+                    !string.IsNullOrWhiteSpace(status) &&
+                    status != "Unknown")
                 {
                     snapshot.Status = status;
                 }
             }
 
-            // Detect a transition from alive to dead.
-            TrackDeath(snapshot, playerKey, isDead);
+            return snapshot;
+        }
 
-            // Find or create this player's long-term People Seen record.
-            var seenPlayer = config.SeenPlayers.FirstOrDefault(x => x.Name == name && x.World == world);
+
+        private void UpdateSeenPlayer(
+            string name,
+            string race,
+            string gender,
+            string world,
+            string playerKey)
+        {
+            var seenPlayer = config.SeenPlayers.FirstOrDefault(
+                x => x.Name == name && x.World == world);
 
             if (countedPlayersForCurrentRun.Add(playerKey))
             {
@@ -512,16 +556,24 @@ namespace MentorRouletteTracker
                 }
             }
 
-            // Update demographic information whenever it becomes available,
-            // even if this player was already counted during this duty.
+            // Fill in demographic information when available.
             if (seenPlayer != null)
             {
-                if (string.IsNullOrWhiteSpace(seenPlayer.World) && !string.IsNullOrWhiteSpace(world))
+                if (string.IsNullOrWhiteSpace(seenPlayer.World) &&
+                    !string.IsNullOrWhiteSpace(world))
+                {
                     seenPlayer.World = world;
+                }
+
                 if (seenPlayer.Race == "Unknown" && race != "Unknown")
                     seenPlayer.Race = race;
-                if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) || seenPlayer.Gender == "Unknown") && gender != "Unknown")
+
+                if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
+                     seenPlayer.Gender == "Unknown") &&
+                    gender != "Unknown")
+                {
                     seenPlayer.Gender = gender;
+                }
             }
         }
 
