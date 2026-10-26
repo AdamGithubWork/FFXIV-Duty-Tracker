@@ -2,16 +2,12 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.DutyState;
-using Dalamud.Game.Gui.PartyFinder.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using Lumina.Data.Files.Excel;
 using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 
 namespace MentorRouletteTracker
 {
@@ -69,14 +65,7 @@ namespace MentorRouletteTracker
             this.dutyState.DutyWiped += OnDutyWiped;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
-            if (config.PendingDuty != null)
-            {
-                current = config.PendingDuty;
-
-                countedPlayersForCurrentRun.UnionWith(current.Party.Select(x => $"{x.Name}@{x.World}"));
-
-                log.Info($"Restored pending duty: {current.DutyName}");
-            }
+            RestorePendingDuty();
         }
 
         public void Dispose()
@@ -88,10 +77,20 @@ namespace MentorRouletteTracker
             this.framework.Update -= OnFrameworkUpdate;
         }
 
+        private void RestorePendingDuty()
+        {
+            if (config.PendingDuty == null)
+                return;
+
+            current = config.PendingDuty;
+            countedPlayersForCurrentRun.UnionWith(
+                current.Party.Select(x => $"{x.Name}@{x.World}"));
+
+            log.Info($"Restored pending duty: {current.DutyName}");
+        }
+
         private void OnTerritoryChanged(uint territoryId)
         {
-
-
             var cfc = FindContentFinderCondition(territoryId);
 
             if (current != null)
@@ -106,40 +105,35 @@ namespace MentorRouletteTracker
                 FinalizeCurrent(completed: false);
             }
 
-            if (cfc == null)
+            if (cfc == null || !Armed ||
+                !config.TrackedContentTypeIds.Contains(cfc.Value.ContentType.RowId))
                 return;
 
-            if (!Armed)
-                return;
+            StartNewDuty(cfc.Value);
+        }
 
-            if (!config.TrackedContentTypeIds.Contains(cfc.Value.ContentType.RowId))
-                return;
-
-            var duty = cfc.Value;
+        private void StartNewDuty(ContentFinderCondition duty)
+        {
             var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
             var dutyType = duty.ContentType.Value.Name.ExtractText();
+
             if (dutyName.Contains("Savage"))
-            {
                 dutyType = "Savage Raids";
-            }
-            else if (dutyName.Contains("(Extreme)") || dutyName.Contains("The Minstrel's Ballad:"))
-            {
+            else if (dutyName.Contains("(Extreme)") ||
+                     dutyName.Contains("The Minstrel's Ballad:"))
                 dutyType = "Extreme Trials";
-            }
             else if (duty.AllianceRoulette)
-            {
                 dutyType = "Alliance Raids";
-            }
 
             current = new DutyRecord
             {
                 DutyName = dutyName,
                 DutyType = dutyType,
+                JoinedInProgress = dutyState.IsDutyStarted
             };
 
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
-            current.JoinedInProgress = dutyState.IsDutyStarted;
             config.PendingDuty = current;
             config.Save();
         }
@@ -239,11 +233,7 @@ namespace MentorRouletteTracker
             }
         }
 
-
-        private void UpdatePlayerDeath(
-            string name,
-            string world,
-            bool isDead)
+        private void UpdatePlayerDeath(string name, string world, bool isDead)
         {
             if (current == null)
                 return;
@@ -254,11 +244,8 @@ namespace MentorRouletteTracker
             if (snapshot == null)
                 return;
 
-            var playerKey = $"{name}@{world}";
-
-            TrackDeath(snapshot, playerKey, isDead);
+            TrackDeath(snapshot, $"{name}@{world}", isDead);
         }
-
 
         private void TrackDeath(
             PartyMemberSnapshot snapshot,
@@ -301,24 +288,20 @@ namespace MentorRouletteTracker
             previousDeathStates.Clear();
         }
 
-
         private void PopulatePartyDetails()
         {
             if (current == null)
                 return;
 
             var localPlayer = objectTable.LocalPlayer;
-
             if (localPlayer == null)
                 return;
 
             var localPlayerName = localPlayer.Name.TextValue;
 
-            // Regular party members.
             foreach (var member in partyList)
             {
                 var name = member.Name.TextValue;
-
                 if (string.IsNullOrWhiteSpace(name) ||
                     name == localPlayerName ||
                     member.GameObject == null)
@@ -331,23 +314,19 @@ namespace MentorRouletteTracker
                     member.GameObject);
             }
 
-            // Alliance members, when enabled.
             if (config.TrackAllianceMembers && partyList.IsAlliance)
             {
                 for (int i = 0; i < 16; i++)
                 {
                     var address = partyList.GetAllianceMemberAddress(i);
-
                     if (address == nint.Zero)
                         continue;
 
                     var member = partyList.CreateAllianceMemberReference(address);
-
                     if (member == null)
                         continue;
 
                     var name = member.Name.TextValue;
-
                     if (string.IsNullOrWhiteSpace(name))
                         continue;
 
@@ -359,44 +338,22 @@ namespace MentorRouletteTracker
                 }
             }
 
-            // Local player.
-            var localPlayerJob =
-                localPlayer.ClassJob.Value.Abbreviation.ExtractText();
+            var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
+            var localPlayerWorld = localPlayer.HomeWorld.Value.Name.ExtractText();
+            var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
+            var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
+            var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
 
-            var localPlayerWorld =
-                localPlayer.HomeWorld.Value.Name.ExtractText();
+            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace,
+                localPlayerGender, localPlayerWorld, localPlayerStatus, localPlayer.IsDead);
 
-            var localPlayerRace = RaceIdToName(
-                localPlayer.Customize[(int)CustomizeIndex.Race]);
-
-            var localPlayerGender = GenderIdToName(
-                localPlayer.Customize[(int)CustomizeIndex.Gender]);
-
-            var localPlayerStatus =
-                localPlayer.OnlineStatus.Value.Name.ExtractText();
-
-            ProcessPlayer(
-                localPlayerName,
-                localPlayerJob,
-                localPlayerRace,
-                localPlayerGender,
-                localPlayerWorld,
-                localPlayerStatus,
-                localPlayer.IsDead);
-
-            // Exclude the local player from Lalafell counts.
             current.LalafellCount = current.Party.Count(x =>
-                x.Race == "Lalafell" &&
-                x.Name != localPlayerName);
-
+                x.Race == "Lalafell" && x.Name != localPlayerName);
             current.PlayerJob = localPlayerJob;
         }
 
         private void ProcessPartyMember(
-            string name,
-            string job,
-            string world,
-            IGameObject? gameObject)
+            string name, string job, string world, IGameObject? gameObject)
         {
             var race = "Unknown";
             var gender = "Unknown";
@@ -404,27 +361,13 @@ namespace MentorRouletteTracker
 
             if (gameObject is ICharacter character)
             {
-                race = RaceIdToName(
-                    character.Customize[(int)CustomizeIndex.Race]);
-
-                gender = GenderIdToName(
-                    character.Customize[(int)CustomizeIndex.Gender]);
-
+                race = RaceIdToName(character.Customize[(int)CustomizeIndex.Race]);
+                gender = GenderIdToName(character.Customize[(int)CustomizeIndex.Gender]);
                 if (character.OnlineStatus.IsValid)
-                {
-                    status =
-                        character.OnlineStatus.Value.Name.ExtractText();
-                }
+                    status = character.OnlineStatus.Value.Name.ExtractText();
             }
 
-            ProcessPlayer(
-                name,
-                job,
-                race,
-                gender,
-                world,
-                status,
-                gameObject?.IsDead);
+            ProcessPlayer(name, job, race, gender, world, status, gameObject?.IsDead);
         }
 
         private static string NormalizePlayerStatus(string status)
@@ -437,35 +380,20 @@ namespace MentorRouletteTracker
                 _ => status
             };
         }
-
         private void ProcessPlayer(
-            string name,
-            string job,
-            string race,
-            string gender,
-            string world,
-            string status,
-            bool? isDead)
+            string name, string job, string race, string gender,
+            string world, string status, bool? isDead)
         {
             status = NormalizePlayerStatus(status);
-
             var playerKey = $"{name}@{world}";
-
-            var snapshot = GetOrCreatePlayerSnapshot(
-                name, job, race, gender, world, status);
-
+            var snapshot = GetOrCreatePlayerSnapshot(name, job, race, gender, world, status);
             TrackDeath(snapshot, playerKey, isDead);
-
             UpdateSeenPlayer(name, race, gender, world, playerKey);
         }
 
         private PartyMemberSnapshot GetOrCreatePlayerSnapshot(
-            string name,
-            string job,
-            string race,
-            string gender,
-            string world,
-            string status)
+            string name, string job, string race, string gender,
+            string world, string status)
         {
             var snapshot = current!.Party.FirstOrDefault(
                 x => x.Name == name && x.World == world);
@@ -482,49 +410,31 @@ namespace MentorRouletteTracker
                     Status = status,
                     DeathCount = 0
                 };
-
                 current.Party.Add(snapshot);
             }
             else
             {
                 if (snapshot.Job == "Unknown" && job != "Unknown")
                     snapshot.Job = job;
-
                 if (snapshot.Race == "Unknown" && race != "Unknown")
                     snapshot.Race = race;
-
                 if ((string.IsNullOrWhiteSpace(snapshot.Gender) ||
-                     snapshot.Gender == "Unknown") &&
-                    gender != "Unknown")
-                {
+                     snapshot.Gender == "Unknown") && gender != "Unknown")
                     snapshot.Gender = gender;
-                }
-
                 if (string.IsNullOrWhiteSpace(snapshot.World) &&
                     !string.IsNullOrWhiteSpace(world))
-                {
                     snapshot.World = world;
-                }
-
                 if ((string.IsNullOrWhiteSpace(snapshot.Status) ||
                      snapshot.Status == "Unknown") &&
-                    !string.IsNullOrWhiteSpace(status) &&
-                    status != "Unknown")
-                {
+                    !string.IsNullOrWhiteSpace(status) && status != "Unknown")
                     snapshot.Status = status;
-                }
             }
 
             return snapshot;
         }
 
-
         private void UpdateSeenPlayer(
-            string name,
-            string race,
-            string gender,
-            string world,
-            string playerKey)
+            string name, string race, string gender, string world, string playerKey)
         {
             var seenPlayer = config.SeenPlayers.FirstOrDefault(
                 x => x.Name == name && x.World == world);
@@ -541,39 +451,27 @@ namespace MentorRouletteTracker
                         World = world,
                         TimesSeen = 1
                     };
-
                     config.SeenPlayers.Add(seenPlayer);
-
                     log.Info($"New player seen: {name}");
                 }
                 else
                 {
                     seenPlayer.TimesSeen++;
-
-                    log.Info(
-                        $"Player seen again: {playerKey} | " +
-                        $"Times Seen: {seenPlayer.TimesSeen}");
+                    log.Info($"Player seen again: {playerKey} | " +
+                             $"Times Seen: {seenPlayer.TimesSeen}");
                 }
             }
 
-            // Fill in demographic information when available.
             if (seenPlayer != null)
             {
                 if (string.IsNullOrWhiteSpace(seenPlayer.World) &&
                     !string.IsNullOrWhiteSpace(world))
-                {
                     seenPlayer.World = world;
-                }
-
                 if (seenPlayer.Race == "Unknown" && race != "Unknown")
                     seenPlayer.Race = race;
-
                 if ((string.IsNullOrWhiteSpace(seenPlayer.Gender) ||
-                     seenPlayer.Gender == "Unknown") &&
-                    gender != "Unknown")
-                {
+                     seenPlayer.Gender == "Unknown") && gender != "Unknown")
                     seenPlayer.Gender = gender;
-                }
             }
         }
 
