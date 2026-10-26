@@ -25,6 +25,9 @@
     <DalamudLibPath>$(DALAMUD_HOME)\</DalamudLibPath>
     <DalamudLibPath Condition="'$(DALAMUD_HOME)' == ''">$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="MainWindow.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Dalamud">
