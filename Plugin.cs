@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,7 +8,6 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.PvP;
-using LiteDB;
 
 namespace MentorRouletteTracker
 {
@@ -135,41 +133,6 @@ namespace MentorRouletteTracker
 
         // Returns true for Frontline, false for CC, or null if the match
         // has not yet appeared in PvP Tracker's database.
-        private bool? IsFrontlineMatch(string matchId)
-        {
-            if (matchId.Length != 24 || !matchId.All(Uri.IsHexDigit))
-                return null;
-
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
-
-            if (!File.Exists(path))
-                return null;
-
-            try
-            {
-                using var db = new LiteDatabase(new ConnectionString
-                {
-                    Filename = path,
-                    ReadOnly = true
-                });
-
-                var id = new ObjectId(matchId);
-
-                if (db.GetCollection<BsonDocument>("flmatch").FindById(id) != null)
-                    return true;
-
-                if (db.GetCollection<BsonDocument>("ccmatch").FindById(id) != null)
-                    return false;
-            }
-            catch (Exception ex)
-            {
-                log.Warning($"Could not identify PvP match {matchId}: {ex.Message}");
-            }
-
-            return null;
-        }
 
         private void OnPvpMatchSaved(string matchId)
         {
@@ -179,7 +142,7 @@ namespace MentorRouletteTracker
                 return;
 
             var now = DateTime.UtcNow;
-            var isFrontline = IsFrontlineMatch(matchId);
+            var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
             var delay = isFrontline == true
                 ? TimeSpan.FromMinutes(5)
                 : TimeSpan.FromMinutes(1);
@@ -199,7 +162,7 @@ namespace MentorRouletteTracker
         private bool ApplyPvpMatch(string matchId)
         {
             var result =
-                PvpTrackerDatabaseTest.GetMatch(matchId, log);
+                PvpTrackerDatabase.GetMatch(matchId, log);
 
             if (result == null)
             {
@@ -327,7 +290,7 @@ namespace MentorRouletteTracker
                     // resolve it now so Frontline still gets its 5-minute delay.
                     if (unknownPvpModes.Contains(matchId))
                     {
-                        var isFrontline = IsFrontlineMatch(matchId);
+                        var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
                         if (isFrontline == null)
                         {
                             pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
