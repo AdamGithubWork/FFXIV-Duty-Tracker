@@ -32,6 +32,7 @@ namespace MentorRouletteTracker
 
         public bool Armed { get; set; } = true;
 
+        public DutyRecord? ActiveDuty => current;
         public event Action<DutyRecord>? RecordFinalized;
 
         public DutyTrackerService(

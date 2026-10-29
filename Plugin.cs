@@ -28,7 +28,7 @@ namespace MentorRouletteTracker
 
         private readonly DutyTrackerService tracker;
         private readonly MainWindow mainWindow;
-
+        private readonly DutyTimerWindow dutyTimerWindow;
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
 
         private readonly Dictionary<string, DateTime>
@@ -112,7 +112,8 @@ namespace MentorRouletteTracker
                 objectTable);
 
             windowSystem.AddWindow(mainWindow);
-
+            dutyTimerWindow = new DutyTimerWindow(tracker, mainWindow, config);
+            windowSystem.AddWindow(dutyTimerWindow);
             commandManager.AddHandler(
                 CommandName,
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
@@ -272,6 +273,7 @@ namespace MentorRouletteTracker
 
         private void OnFrameworkUpdate(IFramework framework)
         {
+            dutyTimerWindow.IsOpen = tracker.ActiveDuty != null;
             var now = DateTime.UtcNow;
             if (now < nextPvpCheck || pendingPvpMatches.Count == 0)
                 return;
