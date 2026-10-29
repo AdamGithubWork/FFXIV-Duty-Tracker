@@ -46,7 +46,6 @@ namespace MentorRouletteTracker
         private DutyRecord? noteRecord = null;
 
         private string globalPlayerSearchText = string.Empty;
-        private int selectedPeopleRace = 0;
         private int selectedHeatmapMetric = 0;
 
         public MainWindow(

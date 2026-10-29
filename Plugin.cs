@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,14 +22,17 @@ namespace MentorRouletteTracker
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
         private readonly IFramework framework;
+        private readonly IClientState clientState;
 
         private readonly Configuration config;
+
         private readonly WindowSystem windowSystem =
             new("MentorRouletteTracker");
 
         private readonly DutyTrackerService tracker;
         private readonly MainWindow mainWindow;
         private readonly DutyTimerWindow dutyTimerWindow;
+
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
 
         private readonly Dictionary<string, DateTime>
@@ -38,9 +42,12 @@ namespace MentorRouletteTracker
             processedPvpMatches = new();
 
         private DateTime nextPvpCheck = DateTime.MinValue;
+
         private readonly Dictionary<string, DateTime> pvpQueuedAt = new();
         private readonly HashSet<string> unknownPvpModes = new();
-        private static readonly TimeSpan PvpRetryInterval = TimeSpan.FromSeconds(30);
+
+        private static readonly TimeSpan PvpRetryInterval =
+            TimeSpan.FromSeconds(30);
 
         public Plugin(
             IDalamudPluginInterface pluginInterface,
@@ -60,6 +67,7 @@ namespace MentorRouletteTracker
             this.commandManager = commandManager;
             this.framework = framework;
             this.log = log;
+            this.clientState = clientState;
 
             var savedConfig =
                 pluginInterface.GetPluginConfig() as Configuration;
@@ -112,8 +120,14 @@ namespace MentorRouletteTracker
                 objectTable);
 
             windowSystem.AddWindow(mainWindow);
-            dutyTimerWindow = new DutyTimerWindow(tracker, mainWindow, config);
+
+            dutyTimerWindow = new DutyTimerWindow(
+                tracker,
+                mainWindow,
+                config);
+
             windowSystem.AddWindow(dutyTimerWindow);
+
             commandManager.AddHandler(
                 CommandName,
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
@@ -128,13 +142,10 @@ namespace MentorRouletteTracker
 
             pluginInterface.UiBuilder.OpenMainUi += () =>
                 mainWindow.IsOpen = true;
-
-
         }
 
         // Returns true for Frontline, false for CC, or null if the match
         // has not yet appeared in PvP Tracker's database.
-
         private void OnPvpMatchSaved(string matchId)
         {
             if (string.IsNullOrWhiteSpace(matchId) ||
@@ -143,7 +154,10 @@ namespace MentorRouletteTracker
                 return;
 
             var now = DateTime.UtcNow;
-            var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+
+            var isFrontline =
+                PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+
             var delay = isFrontline == true
                 ? TimeSpan.FromMinutes(5)
                 : TimeSpan.FromMinutes(1);
@@ -214,7 +228,6 @@ namespace MentorRouletteTracker
                 }
             }
 
-
             if (updatedPlayers == 0)
             {
                 log.Warning(
@@ -273,8 +286,14 @@ namespace MentorRouletteTracker
 
         private void OnFrameworkUpdate(IFramework framework)
         {
-            dutyTimerWindow.IsOpen = tracker.ActiveDuty != null;
+            // Only show the floating window during non-PvP duties.
+            // Setting IsOpen to false prevents the empty black box.
+            dutyTimerWindow.IsOpen =
+                tracker.ActiveDuty != null &&
+                !clientState.IsPvP;
+
             var now = DateTime.UtcNow;
+
             if (now < nextPvpCheck || pendingPvpMatches.Count == 0)
                 return;
 
@@ -292,17 +311,24 @@ namespace MentorRouletteTracker
                     // resolve it now so Frontline still gets its 5-minute delay.
                     if (unknownPvpModes.Contains(matchId))
                     {
-                        var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+                        var isFrontline =
+                            PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+
                         if (isFrontline == null)
                         {
-                            pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                            pendingPvpMatches[matchId] =
+                                now.Add(PvpRetryInterval);
+
                             continue;
                         }
 
                         unknownPvpModes.Remove(matchId);
+
                         if (isFrontline.Value)
                         {
-                            var firstCheck = pvpQueuedAt[matchId].AddMinutes(5);
+                            var firstCheck =
+                                pvpQueuedAt[matchId].AddMinutes(5);
+
                             if (now < firstCheck)
                             {
                                 pendingPvpMatches[matchId] = firstCheck;
@@ -320,13 +346,17 @@ namespace MentorRouletteTracker
                     }
                     else
                     {
-                        pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                        pendingPvpMatches[matchId] =
+                            now.Add(PvpRetryInterval);
                     }
                 }
                 catch (Exception ex)
                 {
-                    log.Error($"Failed to process PvP match {matchId}: {ex}");
-                    pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                    log.Error(
+                        $"Failed to process PvP match {matchId}: {ex}");
+
+                    pendingPvpMatches[matchId] =
+                        now.Add(PvpRetryInterval);
                 }
             }
         }
@@ -339,14 +369,18 @@ namespace MentorRouletteTracker
             {
                 case "arm":
                     tracker.Armed = true;
+
                     log.Info(
                         "Mentor Roulette Tracker: armed.");
+
                     break;
 
                 case "disarm":
                     tracker.Armed = false;
+
                     log.Info(
                         "Mentor Roulette Tracker: disarmed.");
+
                     break;
 
                 default:
