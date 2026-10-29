@@ -1,6 +1,10 @@
-﻿using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
+﻿
+using System;
+using System.IO;
+using System.Linq;
 using System.Numerics;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 
 namespace MentorRouletteTracker
 {
@@ -8,6 +12,23 @@ namespace MentorRouletteTracker
     {
         private void DrawRecordsTab()
         {
+            // Duty history filter, set by DutyTimerWindow.
+            if (!string.IsNullOrWhiteSpace(dutyHistoryFilter))
+            {
+                ImGui.TextUnformatted(
+                    $"Showing history for: {dutyHistoryFilter}");
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Show All Duties"))
+                {
+                    dutyHistoryFilter = null;
+                }
+
+                ImGui.Separator();
+                ImGui.Spacing();
+            }
+
             var armed = tracker.Armed;
 
             if (ImGui.Checkbox("Tracking armed", ref armed))
@@ -124,6 +145,14 @@ namespace MentorRouletteTracker
                         Record = record,
                         Index = index
                     })
+                    // Show only this duty when opened
+                    // through the floating timer window.
+                    .Where(x =>
+                        dutyHistoryFilter == null ||
+                        string.Equals(
+                            x.Record.DutyName,
+                            dutyHistoryFilter,
+                            StringComparison.OrdinalIgnoreCase))
                     .Where(x =>
                         selectedDutyTypes.Count == 0 ||
                         selectedDutyTypes.Contains(x.Record.DutyType))
@@ -218,15 +247,18 @@ namespace MentorRouletteTracker
                         ImGui.TextUnformatted(r.DutyName);
 
                         ImGui.Separator();
+
                         if (ImGui.MenuItem("Edit record"))
                         {
                             StartEditingRecord(r);
                         }
+
                         if (ImGui.MenuItem("Delete record"))
                         {
                             recordPendingDeletion = r;
                             openDeleteConfirmation = true;
                         }
+
                         ImGui.EndPopup();
                     }
 
@@ -265,7 +297,6 @@ namespace MentorRouletteTracker
             }
         }
 
-
         private void StartEditingRecord(DutyRecord record)
         {
             recordToEdit = record;
@@ -275,28 +306,37 @@ namespace MentorRouletteTracker
             openEditRecord = true;
         }
 
-
         private void DrawEditRecordWindow()
         {
-            if (!ImGui.BeginPopupModal("EditDutyRecord", ImGuiWindowFlags.AlwaysAutoResize))
+            if (!ImGui.BeginPopupModal(
+                    "EditDutyRecord",
+                    ImGuiWindowFlags.AlwaysAutoResize))
             {
                 return;
             }
+
             if (recordToEdit == null)
             {
                 ImGui.CloseCurrentPopup();
                 ImGui.EndPopup();
                 return;
             }
+
             ImGui.Text("Edit duty record");
             ImGui.Separator();
+
             ImGui.InputInt("Wipes", ref editWipeCount);
             ImGui.Checkbox("Joined in progress", ref editJoinedInProgress);
+
             if (!string.IsNullOrEmpty(editError))
             {
-                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), editError);
+                ImGui.TextColored(
+                    new Vector4(1f, 0.3f, 0.3f, 1f),
+                    editError);
             }
+
             ImGui.Separator();
+
             if (ImGui.Button("Save"))
             {
                 if (editWipeCount < 0)
@@ -311,21 +351,25 @@ namespace MentorRouletteTracker
                 {
                     recordToEdit.WipeCount = editWipeCount;
                     recordToEdit.JoinedInProgress = editJoinedInProgress;
+
                     config.Save();
+
                     recordToEdit = null;
                     ImGui.CloseCurrentPopup();
                 }
             }
+
             ImGui.SameLine();
+
             if (ImGui.Button("Cancel"))
             {
                 recordToEdit = null;
                 editError = string.Empty;
                 ImGui.CloseCurrentPopup();
             }
+
             ImGui.EndPopup();
         }
-
 
         private void DrawDeleteConfirmation()
         {
@@ -390,12 +434,13 @@ namespace MentorRouletteTracker
             ImGui.EndPopup();
         }
 
-
         private void RebuildSeenPlayers()
         {
             config.SeenPlayers.Clear();
 
-            var people = config.Records.SelectMany(x => x.Party).GroupBy(x => new { x.Name, x.World });
+            var people = config.Records
+                .SelectMany(x => x.Party)
+                .GroupBy(x => new { x.Name, x.World });
 
             foreach (var group in people)
             {
@@ -419,7 +464,6 @@ namespace MentorRouletteTracker
                 });
             }
         }
-
 
         private void DrawDetailWindow()
         {
@@ -480,7 +524,6 @@ namespace MentorRouletteTracker
                         .ThenBy(x => x.Name)
                         .ToList();
 
-
                     if (ImGui.BeginTable(
                             "partyDetail",
                             7,
@@ -499,12 +542,14 @@ namespace MentorRouletteTracker
                         ImGui.TableSetupColumn("Deaths");
 
                         ImGui.TableHeadersRow();
+
                         var sortSpecs = ImGui.TableGetSortSpecs();
 
                         if (sortSpecs.SpecsCount > 0)
                         {
                             var spec = sortSpecs.Specs;
-                            bool ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
+                            bool ascending =
+                                spec.SortDirection == ImGuiSortDirection.Ascending;
 
                             sortedParty = spec.ColumnIndex switch
                             {
@@ -557,8 +602,10 @@ namespace MentorRouletteTracker
                             {
                                 ImGui.TextUnformatted(member.Name);
                             }
+
                             ImGui.TableSetColumnIndex(1);
                             ImGui.TextUnformatted(member.World);
+
                             ImGui.TableSetColumnIndex(2);
                             ImGui.TextUnformatted(member.Job);
 
@@ -568,12 +615,13 @@ namespace MentorRouletteTracker
                             ImGui.TableSetColumnIndex(4);
                             ImGui.TextUnformatted(member.Gender);
 
-                            ImGui.TableSetColumnIndex(5); ;
+                            ImGui.TableSetColumnIndex(5);
                             ImGui.TextUnformatted(member.Status);
 
                             ImGui.TableSetColumnIndex(6);
 
-                            if (member.Name == localPlayerName && !config.IncludeSelfInStatistics)
+                            if (member.Name == localPlayerName &&
+                                !config.IncludeSelfInStatistics)
                             {
                                 ImGui.TextUnformatted("-");
                             }
@@ -582,7 +630,6 @@ namespace MentorRouletteTracker
                                 ImGui.TextUnformatted(
                                     EffectiveDeaths(r, member)?.ToString() ?? "-");
                             }
-
                         }
 
                         ImGui.EndTable();
@@ -593,9 +640,11 @@ namespace MentorRouletteTracker
                     ImGui.TextDisabled(
                         "No party details were captured for this run.");
                 }
+
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
+
                 ImGui.PushFont(UiBuilder.IconFont);
 
                 if (ImGui.Button(FontAwesomeIcon.Edit.ToIconString()))
@@ -606,6 +655,7 @@ namespace MentorRouletteTracker
                 }
 
                 ImGui.PopFont();
+
                 ImGui.SameLine();
                 ImGui.TextWrapped($"Notes: {r.Note}");
             }
@@ -620,7 +670,6 @@ namespace MentorRouletteTracker
             }
         }
 
-
         private void DrawNoteWindow()
         {
             if (!showNoteWindow || noteRecord == null)
@@ -633,8 +682,8 @@ namespace MentorRouletteTracker
             var isOpen = showNoteWindow;
 
             if (ImGui.Begin(
-                $"Duty Notes - {noteRecord.DutyName}###DutyNotes",
-                ref isOpen))
+                    $"Duty Notes - {noteRecord.DutyName}###DutyNotes",
+                    ref isOpen))
             {
                 ImGui.Separator();
                 ImGui.Spacing();
@@ -673,7 +722,6 @@ namespace MentorRouletteTracker
             }
         }
 
-
         private static int GetJobRoleOrder(string job)
         {
             return job switch
@@ -710,11 +758,9 @@ namespace MentorRouletteTracker
                 "PCT" => 4,
                 "BLU" => 4,
 
-                // Unknown / future jobs go at the end.
                 _ => 5
             };
         }
-
 
         private static string FormatDuration(TimeSpan span)
         {
@@ -722,6 +768,5 @@ namespace MentorRouletteTracker
                 ? $"{(int)span.TotalHours}h {span.Minutes}m"
                 : $"{span.Minutes}m {span.Seconds}s";
         }
-
     }
 }

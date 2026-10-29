@@ -1,7 +1,11 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using System.Numerics;
 
 namespace MentorRouletteTracker
 {
@@ -11,9 +15,11 @@ namespace MentorRouletteTracker
         private readonly HashSet<string> selectedPlayerGenders = new();
         private readonly HashSet<string> selectedPlayerStatuses = new();
         private readonly HashSet<string> selectedDutyTypes = new();
+
         private int selectedTimeRange = 0;
         private DateTime customStartDate = DateTime.Today.AddDays(-30);
         private DateTime customEndDate = DateTime.Today;
+
         private readonly Configuration config;
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
@@ -25,18 +31,24 @@ namespace MentorRouletteTracker
         private bool openDeleteConfirmation;
         private bool showDetailWindow;
 
-        private DutyRecord? recordToEdit;
+        // Duty history navigation
+        private string? dutyHistoryFilter;
+        private bool openDutyHistory;
 
+        private DutyRecord? recordToEdit;
         private bool openEditRecord;
         private int editWipeCount;
         private bool editJoinedInProgress;
         private string editError = string.Empty;
+
         private bool showNoteWindow = false;
         private string noteDraft = string.Empty;
         private DutyRecord? noteRecord = null;
+
         private string globalPlayerSearchText = string.Empty;
         private int selectedPeopleRace = 0;
         private int selectedHeatmapMetric = 0;
+
         public MainWindow(
             Configuration config,
             DutyTrackerService tracker,
@@ -57,11 +69,30 @@ namespace MentorRouletteTracker
         {
         }
 
+        // Called by DutyTimerWindow when the average-time
+        // button is clicked.
+        public void OpenDutyHistory(string dutyName)
+        {
+            if (string.IsNullOrWhiteSpace(dutyName))
+                return;
 
+            dutyHistoryFilter = dutyName;
+            openDutyHistory = true;
+
+            // Show all historical runs for this duty,
+            // regardless of previously selected global filters.
+            globalPlayerSearchText = string.Empty;
+            selectedDutyTypes.Clear();
+            selectedPlayerRaces.Clear();
+            selectedPlayerGenders.Clear();
+            selectedPlayerStatuses.Clear();
+            selectedTimeRange = 0;
+
+            IsOpen = true;
+        }
 
         public override void Draw()
         {
-
             int activeFilterCount =
                 selectedDutyTypes.Count +
                 selectedPlayerRaces.Count +
@@ -80,6 +111,7 @@ namespace MentorRouletteTracker
 
                 // Player search
                 ImGui.Text("Search Players");
+
                 ImGui.SetNextItemWidth(
                     Math.Min(300f, ImGui.GetContentRegionAvail().X));
 
@@ -98,6 +130,7 @@ namespace MentorRouletteTracker
                 ImGui.Text("Duty Types");
 
                 ImGui.SameLine();
+
                 ImGui.TextDisabled(
                     selectedDutyTypes.Count == 0
                         ? "(All)"
@@ -148,15 +181,15 @@ namespace MentorRouletteTracker
 
                 string[] races =
                 {
-        "Hyur",
-        "Elezen",
-        "Lalafell",
-        "Miqo'te",
-        "Roegadyn",
-        "Au Ra",
-        "Hrothgar",
-        "Viera"
-    };
+                    "Hyur",
+                    "Elezen",
+                    "Lalafell",
+                    "Miqo'te",
+                    "Roegadyn",
+                    "Au Ra",
+                    "Hrothgar",
+                    "Viera"
+                };
 
                 DrawFilterCheckboxes(
                     races,
@@ -175,9 +208,9 @@ namespace MentorRouletteTracker
 
                 string[] genders =
                 {
-        "Male",
-        "Female"
-    };
+                    "Male",
+                    "Female"
+                };
 
                 DrawFilterCheckboxes(
                     genders,
@@ -196,12 +229,12 @@ namespace MentorRouletteTracker
 
                 string[] statuses =
                 {
-        "Battle Mentor",
-        "Trade Mentor",
-        "Sprout",
-        "Party Member",
-        "Returner"
-    };
+                    "Battle Mentor",
+                    "Trade Mentor",
+                    "Sprout",
+                    "Party Member",
+                    "Returner"
+                };
 
                 DrawFilterCheckboxes(
                     statuses,
@@ -216,12 +249,12 @@ namespace MentorRouletteTracker
 
                 string[] timeRanges =
                 {
-        "All Time",
-        "Last 7 Days",
-        "Last 30 Days",
-        "Last 90 Days",
-        "Custom Range"
-    };
+                    "All Time",
+                    "Last 7 Days",
+                    "Last 30 Days",
+                    "Last 90 Days",
+                    "Custom Range"
+                };
 
                 ImGui.SetNextItemWidth(
                     Math.Min(220f, ImGui.GetContentRegionAvail().X));
@@ -300,28 +333,32 @@ namespace MentorRouletteTracker
                     selectedPlayerGenders.Clear();
                     selectedPlayerStatuses.Clear();
                     selectedTimeRange = 0;
+
+                    // Also clear the duty history filter.
+                    dutyHistoryFilter = null;
                 }
 
-                // Separate Global Filters from the main tabs
                 ImGui.Dummy(new Vector2(0, 8));
-
                 ImGui.Separator();
-
                 ImGui.Dummy(new Vector2(0, 8));
-
             }
-
 
             ImGui.Spacing();
 
             // Main Tabs
             if (ImGui.BeginTabBar("MainTabs"))
             {
-                if (ImGui.BeginTabItem("Records"))
+                var recordsTabFlags = openDutyHistory
+                    ? ImGuiTabItemFlags.SetSelected
+                    : ImGuiTabItemFlags.None;
+
+                if (ImGui.BeginTabItem("Records", recordsTabFlags))
                 {
                     DrawRecordsTab();
                     ImGui.EndTabItem();
                 }
+
+                openDutyHistory = false;
 
                 if (ImGui.BeginTabItem("Statistics"))
                 {
@@ -370,26 +407,5 @@ namespace MentorRouletteTracker
 
             DrawDeleteConfirmation();
         }
-
-
-
-
-
-
-
-
-
-
-        // Summary groupings contain player snapshots rather than their parent records.
-
-
-
-
-
-
-
-
-
-
     }
 }

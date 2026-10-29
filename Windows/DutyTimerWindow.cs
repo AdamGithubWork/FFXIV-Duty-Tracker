@@ -34,15 +34,16 @@ namespace MentorRouletteTracker
         public override void Draw()
         {
             var duty = tracker.ActiveDuty;
+
             if (duty == null)
                 return;
 
             var completedRuns = config.Records
-                .Where(r =>
-                    r.Completed &&
-                    r.TimeInDuty.TotalSeconds > 0 &&
+                .Where(record =>
+                    record.Completed &&
+                    record.TimeInDuty.TotalSeconds > 0 &&
                     string.Equals(
-                        r.DutyName,
+                        record.DutyName,
                         duty.DutyName,
                         StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -55,8 +56,8 @@ namespace MentorRouletteTracker
             }
             else
             {
-                var averageSeconds = completedRuns.Average(
-                    r => r.TimeInDuty.TotalSeconds);
+                double averageSeconds = completedRuns.Average(
+                    record => record.TimeInDuty.TotalSeconds);
 
                 var average = TimeSpan.FromSeconds(averageSeconds);
 
@@ -72,13 +73,18 @@ namespace MentorRouletteTracker
             ImGui.TextUnformatted("Average completion time:");
 
             if (ImGui.Button(averageText, new Vector2(180, 0)))
-                mainWindow.IsOpen = true;
+            {
+                mainWindow.OpenDutyHistory(duty.DutyName);
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(
+                    "Open the history of this duty");
+            }
 
             ImGui.TextDisabled(
                 $"Based on {completedRuns.Count} completed runs");
-
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Open Mentor Roulette Tracker");
         }
     }
 }
