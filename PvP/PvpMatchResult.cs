@@ -1,8 +1,4 @@
-﻿
-using System;
-using System.Collections.Generic;
-
-namespace MentorRouletteTracker.PvP;
+﻿namespace MentorRouletteTracker.PvP;
 
 public class PvpMatchResult
 {

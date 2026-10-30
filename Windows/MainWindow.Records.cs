@@ -1,10 +1,6 @@
-﻿
-using System;
-using System.IO;
-using System.Linq;
-using System.Numerics;
-using Dalamud.Bindings.ImGui;
+﻿using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using System.Numerics;
 
 namespace MentorRouletteTracker
 {

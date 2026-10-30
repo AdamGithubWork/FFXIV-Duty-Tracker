@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace MentorRouletteTracker
+﻿namespace MentorRouletteTracker
 {
     [Serializable]
     // Information about a party member from a specific duty

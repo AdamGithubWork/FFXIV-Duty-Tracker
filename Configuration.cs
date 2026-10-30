@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 namespace MentorRouletteTracker

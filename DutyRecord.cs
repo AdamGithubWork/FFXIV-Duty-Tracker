@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace MentorRouletteTracker
 {
     // Defines information stored about a duty

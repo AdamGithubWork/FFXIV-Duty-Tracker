@@ -1,9 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;

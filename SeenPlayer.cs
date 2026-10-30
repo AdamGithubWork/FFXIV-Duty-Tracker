@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace MentorRouletteTracker
+﻿namespace MentorRouletteTracker
 {
     [Serializable]
     // Stores long term tracking information of a player
