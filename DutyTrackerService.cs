@@ -18,23 +18,16 @@ namespace MentorRouletteTracker
         private readonly IFramework framework;
         private readonly IPluginLog log;
         private readonly Configuration config;
-
-        private DutyRecord? current;
-
-        private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromMilliseconds(250);
-        private static readonly TimeSpan ConfigSaveInterval = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan ConfigSaveInterval = TimeSpan.FromSeconds(15);
         private DateTime nextPartyRefresh = DateTime.MinValue;
         private DateTime nextConfigSave = DateTime.MinValue;
-
-        private readonly HashSet<string> countedPlayersForCurrentRun = new();
-
-        private readonly Dictionary<string, bool> previousDeathStates = new();
-
-        public bool Armed { get; set; } = true;
-
+        private DutyRecord? current;
         public DutyRecord? ActiveDuty => current;
+        private readonly HashSet<string> countedPlayersForCurrentRun = new();
+        private readonly Dictionary<string, bool> previousDeathStates = new();
+        public bool Armed { get; set; } = true;
         public event Action<DutyRecord>? RecordFinalized;
-
         public DutyTrackerService(
             IClientState clientState,
             IDutyState dutyState,
@@ -64,14 +57,6 @@ namespace MentorRouletteTracker
             RestorePendingDuty();
         }
 
-        public void Dispose()
-        {
-            this.clientState.TerritoryChanged -= OnTerritoryChanged;
-            this.dutyState.DutyStarted -= OnDutyStarted;
-            this.dutyState.DutyWiped -= OnDutyWiped;
-            this.dutyState.DutyCompleted -= OnDutyCompleted;
-            this.framework.Update -= OnFrameworkUpdate;
-        }
 
         private void RestorePendingDuty()
         {
@@ -168,7 +153,12 @@ namespace MentorRouletteTracker
             var now = DateTime.UtcNow;
             if (now >= nextPartyRefresh)
             {
-                nextPartyRefresh = now + PartyRefreshInterval;
+                var refreshInterval =
+                    now - current.Timestamp.ToUniversalTime() < TimeSpan.FromSeconds(10)
+                        ? PartyRefreshInterval / 30
+                        : PartyRefreshInterval;
+
+                nextPartyRefresh = now + refreshInterval;
                 PopulatePartyDetails();
             }
 
@@ -518,6 +508,14 @@ namespace MentorRouletteTracker
 
             return char.ToUpperInvariant(value[0]) +
                    value.Substring(1);
+        }
+        public void Dispose()
+        {
+            this.clientState.TerritoryChanged -= OnTerritoryChanged;
+            this.dutyState.DutyStarted -= OnDutyStarted;
+            this.dutyState.DutyWiped -= OnDutyWiped;
+            this.dutyState.DutyCompleted -= OnDutyCompleted;
+            this.framework.Update -= OnFrameworkUpdate;
         }
     }
 }
