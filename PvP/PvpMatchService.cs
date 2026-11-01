@@ -1,10 +1,6 @@
-﻿using Dalamud.Plugin.Ipc;
+﻿using Dalamud.Plugin;
+using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
-using Dalamud.Plugin;
-using System.Linq;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace MentorRouletteTracker.PvP
 {

@@ -104,7 +104,7 @@ namespace MentorRouletteTracker.DutyTracking
             if (objectTable.LocalPlayer == null)
                 return;
 
-            
+
 
             var now = DateTime.UtcNow;
             if (now >= nextPartyRefresh)
@@ -227,7 +227,7 @@ namespace MentorRouletteTracker.DutyTracking
             var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
             var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
-            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace,localPlayerGender, localPlayerWorld, localPlayerStatus);
+            ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayerStatus);
 
             current.LalafellCount = current.Party.Count(x =>
                 x.Race == "Lalafell" && x.Name != localPlayerName);

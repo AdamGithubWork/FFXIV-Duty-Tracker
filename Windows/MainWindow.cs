@@ -8,41 +8,51 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow : Window, IDisposable
     {
-        private readonly HashSet<string> selectedPlayerRaces = new();
-        private readonly HashSet<string> selectedPlayerGenders = new();
-        private readonly HashSet<string> selectedPlayerStatuses = new();
-        private readonly HashSet<string> selectedDutyTypes = new();
-
-        private int selectedTimeRange = 0;
-        private DateTime customStartDate = DateTime.Today.AddDays(-30);
-        private DateTime customEndDate = DateTime.Today;
-
+        // Dependencies
         private readonly Configuration config;
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
         private readonly IObjectTable objectTable;
 
-        private string lastExportMessage = string.Empty;
+        // Global filters
+        private readonly HashSet<string> selectedPlayerRaces = new();
+        private readonly HashSet<string> selectedPlayerGenders = new();
+        private readonly HashSet<string> selectedPlayerStatuses = new();
+        private readonly HashSet<string> selectedDutyTypes = new();
+
+        private string globalPlayerSearchText = string.Empty;
+        private int selectedTimeRange = 0;
+        private DateTime customStartDate = DateTime.Today.AddDays(-30);
+        private DateTime customEndDate = DateTime.Today;
+
+        // Record details
         private DutyRecord? selectedRecord;
-        private DutyRecord? recordPendingDeletion;
-        private bool openDeleteConfirmation;
         private bool showDetailWindow;
 
         // Duty history navigation
         private string? dutyHistoryFilter;
         private bool openDutyHistory;
 
+        // Record deletion
+        private DutyRecord? recordPendingDeletion;
+        private bool openDeleteConfirmation;
+
+        // Record editing
         private DutyRecord? recordToEdit;
         private bool openEditRecord;
         private int editWipeCount;
         private bool editJoinedInProgress;
         private string editError = string.Empty;
 
+        // Record notes
+        private DutyRecord? noteRecord = null;
         private bool showNoteWindow = false;
         private string noteDraft = string.Empty;
-        private DutyRecord? noteRecord = null;
 
-        private string globalPlayerSearchText = string.Empty;
+        // Export
+        private string lastExportMessage = string.Empty;
+
+        // Statistics
         private int selectedHeatmapMetric = 0;
 
         public MainWindow(

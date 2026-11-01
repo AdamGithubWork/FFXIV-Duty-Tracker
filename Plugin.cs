@@ -1,6 +1,5 @@
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
 using MentorRouletteTracker.PvP;
@@ -155,7 +154,6 @@ namespace MentorRouletteTracker
                 windowSystem.Draw;
 
             commandManager.RemoveHandler(CommandName);
-
             windowSystem.RemoveAllWindows();
             pvpMatchService.Dispose();
             mainWindow.Dispose();
