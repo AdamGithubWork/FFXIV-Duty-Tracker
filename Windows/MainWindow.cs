@@ -21,6 +21,7 @@ namespace MentorRouletteTracker
         private readonly HashSet<string> selectedDutyTypes = new();
 
         private string globalPlayerSearchText = string.Empty;
+        private string globalDutySearchText = string.Empty;
         private int selectedTimeRange = 0;
         private DateTime customStartDate = DateTime.Today.AddDays(-30);
         private DateTime customEndDate = DateTime.Today;
@@ -105,6 +106,7 @@ namespace MentorRouletteTracker
                 selectedPlayerGenders.Count +
                 selectedPlayerStatuses.Count +
                 (string.IsNullOrWhiteSpace(globalPlayerSearchText) ? 0 : 1) +
+                (string.IsNullOrWhiteSpace(globalDutySearchText) ? 0 : 1) +
                 (selectedTimeRange == 0 ? 0 : 1);
 
             string filterHeader = activeFilterCount == 0
@@ -127,7 +129,19 @@ namespace MentorRouletteTracker
                     100);
 
                 ImGui.TextDisabled("Search by player name or world.");
+                ImGui.Spacing();
 
+                ImGui.Text("Search Duties");
+
+                ImGui.SetNextItemWidth(
+                    Math.Min(300f, ImGui.GetContentRegionAvail().X));
+
+                ImGui.InputText(
+                    "##GlobalDutySearch",
+                    ref globalDutySearchText,
+                    100);
+
+                ImGui.TextDisabled("Search by duty name.");
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
@@ -334,6 +348,7 @@ namespace MentorRouletteTracker
                 if (ImGui.Button("Clear All Filters"))
                 {
                     globalPlayerSearchText = string.Empty;
+                    globalDutySearchText = string.Empty;
                     selectedDutyTypes.Clear();
                     selectedPlayerRaces.Clear();
                     selectedPlayerGenders.Clear();

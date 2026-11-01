@@ -111,6 +111,15 @@ namespace MentorRouletteTracker
                 $"{player.Name}@{player.World}".Contains(
                     search, StringComparison.OrdinalIgnoreCase);
         }
+        private bool MatchesGlobalDutySearch(DutyRecord record)
+        {
+            var search = globalDutySearchText.Trim();
+
+            return string.IsNullOrEmpty(search) ||
+                record.DutyName.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase);
+        }
 
     }
 }

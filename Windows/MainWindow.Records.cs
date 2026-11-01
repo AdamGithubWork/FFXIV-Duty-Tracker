@@ -150,9 +150,10 @@ namespace MentorRouletteTracker
                             x.Record.DutyName,
                             dutyHistoryFilter,
                             StringComparison.OrdinalIgnoreCase))
-                    .Where(x =>
-                        selectedDutyTypes.Count == 0 ||
-                        selectedDutyTypes.Contains(x.Record.DutyType))
+.Where(x =>
+    selectedDutyTypes.Count == 0 ||
+    selectedDutyTypes.Contains(x.Record.DutyType))
+.Where(x => MatchesGlobalDutySearch(x.Record))
                     .Where(x => MatchesDutyPlayerFilters(x.Record))
                     .Where(x => selectedTimeRange switch
                     {
