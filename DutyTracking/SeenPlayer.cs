@@ -1,4 +1,4 @@
-﻿namespace MentorRouletteTracker
+﻿namespace MentorRouletteTracker.DutyTracking
 {
     [Serializable]
     // Stores long term tracking information of a player

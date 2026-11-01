@@ -1,4 +1,4 @@
-﻿namespace MentorRouletteTracker
+﻿namespace MentorRouletteTracker.DutyTracking
 {
     [Serializable]
     // Information about a party member from a specific duty

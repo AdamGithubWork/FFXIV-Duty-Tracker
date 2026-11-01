@@ -1,4 +1,4 @@
-namespace MentorRouletteTracker
+namespace MentorRouletteTracker.DutyTracking
 {
     // Defines information stored about a duty
     public class DutyRecord

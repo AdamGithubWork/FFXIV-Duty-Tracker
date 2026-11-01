@@ -1,5 +1,5 @@
 ﻿using Dalamud.Bindings.ImGui;
-
+using MentorRouletteTracker.DutyTracking;
 namespace MentorRouletteTracker
 {
     public partial class MainWindow

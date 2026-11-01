@@ -1,5 +1,6 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
+using MentorRouletteTracker.DutyTracking;
 namespace MentorRouletteTracker
 {
     [Serializable]

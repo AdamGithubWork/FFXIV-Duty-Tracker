@@ -6,7 +6,7 @@ using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
 using Lumina.Excel.Sheets;
 
-namespace MentorRouletteTracker
+namespace MentorRouletteTracker.DutyTracking
 {
     public class DutyTrackerService : IDisposable
     {

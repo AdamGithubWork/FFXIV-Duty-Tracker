@@ -1,5 +1,6 @@
 ﻿using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 
 namespace MentorRouletteTracker
