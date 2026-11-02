@@ -24,6 +24,7 @@ namespace MentorRouletteTracker
                     _ => true
                 })
                 .Where(x => MatchesDutyPlayerFilters(x))
+                .Where(x => MatchesGlobalDutySearch(x))
                 .OrderBy(x => x.Timestamp)
                 .ToList();
             var dutiesByDayAndTime = records
@@ -93,6 +94,28 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 DrawDutySpecificDetails(records);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                // Analyze player characteristics within the selected filters.
+                // The lookup is built once for this draw rather than repeatedly
+                // scanning all records for each player death count.
+                var playerRecords = BuildStatisticsPlayerRecords(records);
+                DrawRaceStatistics(records, playerRecords, true);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                DrawGenderStatistics(records);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                DrawJobStatistics(records, playerRecords, true);
 
                 ImGui.Spacing();
                 ImGui.Separator();
@@ -666,15 +689,37 @@ namespace MentorRouletteTracker
         }
 
 
+        private static Dictionary<PartyMemberSnapshot, DutyRecord> BuildStatisticsPlayerRecords(
+            List<DutyRecord> records)
+        {
+            var lookup = new Dictionary<PartyMemberSnapshot, DutyRecord>(
+                ReferenceEqualityComparer.Instance);
+
+            foreach (var record in records)
+            {
+                foreach (var player in record.Party)
+                {
+                    lookup.TryAdd(player, record);
+                }
+            }
+
+            return lookup;
+        }
+
+
         private void DrawRaceStatistics(
             List<DutyRecord> records,
-            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
+            Dictionary<PartyMemberSnapshot, DutyRecord>? playerRecords = null,
+            bool applyPlayerFilters = false)
         {
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+
+            playerRecords ??= BuildStatisticsPlayerRecords(records);
 
             var characters = records
                 .SelectMany(x => x.Party)
                 .Where(x =>
+                    (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
                     (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Race) &&
                     x.Race != "Unknown")
@@ -952,9 +997,93 @@ namespace MentorRouletteTracker
         }
 
 
+        private void DrawGenderStatistics(List<DutyRecord> records)
+        {
+            ImGui.Text("Gender Statistics");
+            ImGui.Spacing();
+
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+
+            var stats = records
+                .SelectMany(record => record.Party.Select(player => new
+                {
+                    Record = record,
+                    Player = player
+                }))
+                .Where(x =>
+                    (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                    MatchesPlayerFilters(x.Player) &&
+                    !string.IsNullOrWhiteSpace(x.Player.Gender) &&
+                    x.Player.Gender != "Unknown")
+                .GroupBy(x => x.Player.Gender)
+                .Select(group => new
+                {
+                    Gender = group.Key,
+                    Seen = group.Count(),
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                })
+                .OrderBy(x => x.Gender)
+                .ToList();
+
+            if (stats.Count == 0)
+            {
+                ImGui.TextDisabled("No gender data matches the current filters.");
+                return;
+            }
+
+            if (ImGui.BeginTable(
+                "genderStats",
+                4,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.Resizable |
+                ImGuiTableFlags.SizingStretchProp |
+                ImGuiTableFlags.Sortable))
+            {
+                ImGui.TableSetupColumn("Gender");
+                ImGui.TableSetupColumn("Seen");
+                ImGui.TableSetupColumn("Deaths");
+                ImGui.TableSetupColumn("Deaths / Seen");
+                ImGui.TableHeadersRow();
+
+                var sortSpecs = ImGui.TableGetSortSpecs();
+                if (sortSpecs.SpecsCount > 0)
+                {
+                    var spec = sortSpecs.Specs;
+                    bool ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
+                    stats = spec.ColumnIndex switch
+                    {
+                        0 => ascending ? stats.OrderBy(x => x.Gender).ToList() : stats.OrderByDescending(x => x.Gender).ToList(),
+                        1 => ascending ? stats.OrderBy(x => x.Seen).ToList() : stats.OrderByDescending(x => x.Seen).ToList(),
+                        2 => ascending ? stats.OrderBy(x => x.Deaths).ToList() : stats.OrderByDescending(x => x.Deaths).ToList(),
+                        3 => ascending ? stats.OrderBy(x => (double)x.Deaths / x.Seen).ToList() : stats.OrderByDescending(x => (double)x.Deaths / x.Seen).ToList(),
+                        _ => stats
+                    };
+                    sortSpecs.SpecsDirty = false;
+                }
+
+                foreach (var stat in stats)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(stat.Gender);
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(stat.Seen.ToString());
+                    ImGui.TableSetColumnIndex(2);
+                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TableSetColumnIndex(3);
+                    ImGui.TextUnformatted(((double)stat.Deaths / stat.Seen).ToString("0.00"));
+                }
+
+                ImGui.EndTable();
+            }
+        }
+
+
         private void DrawJobStatistics(
             List<DutyRecord> records,
-            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
+            Dictionary<PartyMemberSnapshot, DutyRecord>? playerRecords = null,
+            bool applyPlayerFilters = false)
         {
             ImGui.Text("Job Statistics");
 
@@ -962,9 +1091,12 @@ namespace MentorRouletteTracker
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
+            playerRecords ??= BuildStatisticsPlayerRecords(records);
+
             var jobStats = records
                 .SelectMany(x => x.Party)
                 .Where(x =>
+                    (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
                     (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Job) &&
                     x.Job != "Unknown")
