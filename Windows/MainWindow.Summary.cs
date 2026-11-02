@@ -23,6 +23,7 @@ namespace MentorRouletteTracker
         // not on every ImGui frame. Changes made while the tab is open show up
         // at the next refresh. Nothing is persisted or filtered globally.
         private DateTime nextLifetimeSummaryRefresh = DateTime.MinValue;
+        private string? lifetimeSummaryDutyFilterKey;
         private string? lifetimeSummaryPlayerName;
         private bool lifetimeSummaryIncludeSelf;
         private readonly List<(string Title, List<(string Label, string Value)> Rows)> lifetimeSummarySections = new();
@@ -30,12 +31,22 @@ namespace MentorRouletteTracker
         private void DrawSummaryTab()
         {
             var localName = objectTable.LocalPlayer?.Name.TextValue;
+            // Only DUTY filters affect milestones. Player filters are intentionally ignored.
+            var dutyFilterKey = string.Join("|",
+                string.Join(",", selectedDutyTypes.OrderBy(x => x, StringComparer.Ordinal)),
+                globalDutySearchText.Trim(),
+                selectedTimeRange.ToString(),
+                customStartDate.Date.ToString("yyyyMMdd"),
+                customEndDate.Date.ToString("yyyyMMdd"));
+
             if (DateTime.UtcNow >= nextLifetimeSummaryRefresh ||
+                dutyFilterKey != lifetimeSummaryDutyFilterKey ||
                 localName != lifetimeSummaryPlayerName ||
                 lifetimeSummaryIncludeSelf != config.IncludeSelfInStatistics)
             {
                 RebuildLifetimeSummary(localName);
                 nextLifetimeSummaryRefresh = DateTime.UtcNow.AddSeconds(1);
+                lifetimeSummaryDutyFilterKey = dutyFilterKey;
                 lifetimeSummaryPlayerName = localName;
                 lifetimeSummaryIncludeSelf = config.IncludeSelfInStatistics;
             }
@@ -43,12 +54,12 @@ namespace MentorRouletteTracker
             if (ImGui.BeginChild("SummaryContent", Vector2.Zero, false,
                     ImGuiWindowFlags.HorizontalScrollbar))
             {
-                ImGui.Text("Lifetime Summary");
-                ImGui.TextDisabled("All recorded duties. Global filters do not apply.");
+                ImGui.Text("Summary Milestones");
+                ImGui.TextDisabled("Duty type, duty search and date filters apply. Player filters do not.");
                 ImGui.Separator();
 
-                if (config.Records.Count == 0)
-                    ImGui.TextDisabled("No duty records available.");
+                if (lifetimeSummarySections.Count == 0)
+                    ImGui.TextDisabled("No duties match the selected duty filters.");
                 else
                 {
                     foreach (var section in lifetimeSummarySections)
@@ -78,7 +89,21 @@ namespace MentorRouletteTracker
         private void RebuildLifetimeSummary(string? localName)
         {
             lifetimeSummarySections.Clear();
-            var records = config.Records.OrderBy(r => r.Timestamp).ToList();
+            var now = DateTime.Now;
+            var records = config.Records
+                .Where(r => selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(r.DutyType))
+                .Where(r => MatchesGlobalDutySearch(r))
+                .Where(r => selectedTimeRange switch
+                {
+                    1 => r.Timestamp >= now.AddDays(-7),
+                    2 => r.Timestamp >= now.AddDays(-30),
+                    3 => r.Timestamp >= now.AddDays(-90),
+                    4 => r.Timestamp >= customStartDate.Date &&
+                         r.Timestamp < customEndDate.Date.AddDays(1),
+                    _ => true
+                })
+                .OrderBy(r => r.Timestamp)
+                .ToList();
             if (records.Count == 0) return;
 
             var encounters = records
