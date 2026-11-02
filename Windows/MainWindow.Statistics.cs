@@ -666,7 +666,9 @@ namespace MentorRouletteTracker
         }
 
 
-        private void DrawRaceStatistics(List<DutyRecord> records)
+        private void DrawRaceStatistics(
+            List<DutyRecord> records,
+            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
@@ -692,7 +694,7 @@ namespace MentorRouletteTracker
                 {
                     Race = x.Key,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
+                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
                 })
                 .OrderBy(x => x.Race)
                 .ToList();
@@ -820,7 +822,7 @@ namespace MentorRouletteTracker
                     Race = x.Key.Race,
                     Gender = x.Key.Gender,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
+                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
                 })
                 .OrderBy(x => x.Race)
                 .ThenBy(x => x.Gender)
@@ -950,7 +952,9 @@ namespace MentorRouletteTracker
         }
 
 
-        private void DrawJobStatistics(List<DutyRecord> records)
+        private void DrawJobStatistics(
+            List<DutyRecord> records,
+            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             ImGui.Text("Job Statistics");
 
@@ -1000,7 +1004,7 @@ namespace MentorRouletteTracker
                     {
                         Job = x.Key,
                         Seen = x.Count(),
-                        Deaths = x.Sum(y => SummaryDeaths(y) ?? 0)
+                        Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
                     })
                     .ToList();
 

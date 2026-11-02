@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 
@@ -6,13 +7,14 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
-        private int? SummaryDeaths(PartyMemberSnapshot player)
+        private int? SummaryDeaths(
+            PartyMemberSnapshot player,
+            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
-            var record = config.Records.FirstOrDefault(r =>
-                r.Party.Any(p => ReferenceEquals(p, player)));
-            return record == null ? null : EffectiveDeaths(record, player);
+            return playerRecords.TryGetValue(player, out var record)
+                ? EffectiveDeaths(record, player)
+                : null;
         }
-
 
         private void DrawSummaryTab()
         {
@@ -36,6 +38,18 @@ namespace MentorRouletteTracker
                     ImGui.EndChild();
                     return;
                 }
+
+                // Associate each player snapshot with its duty record.
+                // This avoids searching every record for each death lookup.
+                Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords = records
+                    .SelectMany(record => record.Party.Select(player => new
+                    {
+                        Player = player,
+                        Record = record
+                    }))
+                    .ToDictionary(
+                        x => x.Player,
+                        x => x.Record);
 
                 var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
@@ -85,34 +99,34 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawSummaryStatusStatistics(players);
+                DrawSummaryStatusStatistics(players, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawSummaryWorldStatistics(players);
+                DrawSummaryWorldStatistics(players, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
                 // Reuse existing statistics with unfiltered records.
-                DrawRaceStatistics(records);
+                DrawRaceStatistics(records, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawJobStatistics(records);
+                DrawJobStatistics(records, playerRecords);
             }
 
             ImGui.EndChild();
         }
 
-
         private void DrawSummaryStatusStatistics(
-            List<PartyMemberSnapshot> players)
+            List<PartyMemberSnapshot> players,
+            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             ImGui.Text("Player Status Distribution");
             ImGui.Spacing();
@@ -126,7 +140,8 @@ namespace MentorRouletteTracker
                 {
                     Status = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(player => SummaryDeaths(player) ?? 0)
+                    Deaths = group.Sum(player =>
+                        SummaryDeaths(player, playerRecords) ?? 0)
                 })
                 .OrderByDescending(stat => stat.Encounters)
                 .ToList();
@@ -180,9 +195,9 @@ namespace MentorRouletteTracker
             }
         }
 
-
         private void DrawSummaryWorldStatistics(
-            List<PartyMemberSnapshot> players)
+            List<PartyMemberSnapshot> players,
+            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             ImGui.Text("Player World Distribution");
             ImGui.Spacing();
@@ -199,7 +214,8 @@ namespace MentorRouletteTracker
                 {
                     World = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(player => SummaryDeaths(player) ?? 0)
+                    Deaths = group.Sum(player =>
+                        SummaryDeaths(player, playerRecords) ?? 0)
                 })
                 .OrderByDescending(stat => stat.Encounters)
                 .ToList();
@@ -286,7 +302,6 @@ namespace MentorRouletteTracker
             }
         }
 
-
         private static void DrawStatisticRow(
             string statistic,
             string value)
@@ -299,6 +314,5 @@ namespace MentorRouletteTracker
             ImGui.TableSetColumnIndex(1);
             ImGui.TextUnformatted(value);
         }
-
     }
 }
