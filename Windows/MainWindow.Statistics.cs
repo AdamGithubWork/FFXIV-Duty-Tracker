@@ -121,6 +121,18 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
+                DrawStatusStatistics(records);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                DrawWorldStatistics(records);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
                 ImGui.Text("Duties by Day and Time");
                 ImGui.Separator();
                 var heatmapMetrics = new[]
@@ -1208,6 +1220,153 @@ namespace MentorRouletteTracker
             }
         }
 
+
+        // All of these statistics use completed, globally filtered duty records.
+        // Apply player-level filters as well so the distributions represent
+        // matching encounters, rather than every member of a matching party.
+        private void DrawStatusStatistics(List<DutyRecord> records)
+        {
+            ImGui.Text("Player Status Distribution");
+            ImGui.Spacing();
+
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+            var encounters = records
+                .SelectMany(record => record.Party.Select(player => new { Record = record, Player = player }))
+                .Where(x => (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                            MatchesPlayerFilters(x.Player))
+                .ToList();
+
+            var stats = encounters
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.Player.Status) ? "Unknown" : x.Player.Status)
+                .Select(group => new
+                {
+                    Status = group.Key,
+                    Encounters = group.Count(),
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                })
+                .OrderByDescending(x => x.Encounters)
+                .ToList();
+
+            if (stats.Count == 0)
+            {
+                ImGui.TextDisabled("No player status data matches the current filters.");
+                return;
+            }
+
+            if (ImGui.BeginTable("statsStatusDistribution", 4,
+                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp |
+                ImGuiTableFlags.Sortable))
+            {
+                ImGui.TableSetupColumn("Status");
+                ImGui.TableSetupColumn("Encounters");
+                ImGui.TableSetupColumn("Percentage");
+                ImGui.TableSetupColumn("Deaths / Encounter");
+                ImGui.TableHeadersRow();
+
+                var sortSpecs = ImGui.TableGetSortSpecs();
+                if (sortSpecs.SpecsCount > 0)
+                {
+                    var spec = sortSpecs.Specs;
+                    bool ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
+                    stats = spec.ColumnIndex switch
+                    {
+                        0 => ascending ? stats.OrderBy(x => x.Status).ToList() : stats.OrderByDescending(x => x.Status).ToList(),
+                        1 or 2 => ascending ? stats.OrderBy(x => x.Encounters).ToList() : stats.OrderByDescending(x => x.Encounters).ToList(),
+                        3 => ascending ? stats.OrderBy(x => (double)x.Deaths / x.Encounters).ToList() : stats.OrderByDescending(x => (double)x.Deaths / x.Encounters).ToList(),
+                        _ => stats
+                    };
+                    sortSpecs.SpecsDirty = false;
+                }
+
+                foreach (var stat in stats)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(stat.Status);
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(stat.Encounters.ToString());
+                    ImGui.TableSetColumnIndex(2);
+                    ImGui.TextUnformatted($"{(double)stat.Encounters / encounters.Count * 100:F1}%");
+                    ImGui.TableSetColumnIndex(3);
+                    ImGui.TextUnformatted($"{(double)stat.Deaths / stat.Encounters:F2}");
+                }
+                ImGui.EndTable();
+            }
+        }
+
+        private void DrawWorldStatistics(List<DutyRecord> records)
+        {
+            ImGui.Text("Player World Distribution");
+            ImGui.Spacing();
+
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+            var encounters = records
+                .SelectMany(record => record.Party.Select(player => new { Record = record, Player = player }))
+                .Where(x => (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                            MatchesPlayerFilters(x.Player) &&
+                            !string.IsNullOrWhiteSpace(x.Player.World) &&
+                            x.Player.World != "Unknown")
+                .ToList();
+
+            var stats = encounters
+                .GroupBy(x => x.Player.World)
+                .Select(group => new
+                {
+                    World = group.Key,
+                    Encounters = group.Count(),
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                })
+                .OrderByDescending(x => x.Encounters)
+                .ToList();
+
+            if (stats.Count == 0)
+            {
+                ImGui.TextDisabled("No player world data matches the current filters.");
+                return;
+            }
+
+            if (ImGui.BeginTable("statsWorldDistribution", 4,
+                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp |
+                ImGuiTableFlags.Sortable))
+            {
+                ImGui.TableSetupColumn("World");
+                ImGui.TableSetupColumn("Encounters");
+                ImGui.TableSetupColumn("Percentage");
+                ImGui.TableSetupColumn("Deaths / Encounter");
+                ImGui.TableHeadersRow();
+
+                var sortSpecs = ImGui.TableGetSortSpecs();
+                if (sortSpecs.SpecsCount > 0)
+                {
+                    var spec = sortSpecs.Specs;
+                    bool ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
+                    stats = spec.ColumnIndex switch
+                    {
+                        0 => ascending ? stats.OrderBy(x => x.World).ToList() : stats.OrderByDescending(x => x.World).ToList(),
+                        1 or 2 => ascending ? stats.OrderBy(x => x.Encounters).ToList() : stats.OrderByDescending(x => x.Encounters).ToList(),
+                        3 => ascending ? stats.OrderBy(x => (double)x.Deaths / x.Encounters).ToList() : stats.OrderByDescending(x => (double)x.Deaths / x.Encounters).ToList(),
+                        _ => stats
+                    };
+                    sortSpecs.SpecsDirty = false;
+                }
+
+                foreach (var stat in stats)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(stat.World);
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(stat.Encounters.ToString());
+                    ImGui.TableSetColumnIndex(2);
+                    ImGui.TextUnformatted($"{(double)stat.Encounters / encounters.Count * 100:F1}%");
+                    ImGui.TableSetColumnIndex(3);
+                    ImGui.TextUnformatted($"{(double)stat.Deaths / stat.Encounters:F2}");
+                }
+                ImGui.EndTable();
+            }
+        }
 
         private static string GetTimePeriod(DateTime timestamp)
         {
