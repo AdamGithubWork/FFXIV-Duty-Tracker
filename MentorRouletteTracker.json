@@ -1,12 +1,12 @@
 {
-  "Author": "You",
-  "Name": "Mentor Roulette Tracker",
+  "Author": "Adalith",
+  "Name": "Duty Tracker",
   "InternalName": "MentorRouletteTracker",
   "AssemblyVersion": "1.0.0.0",
-  "Punchline": "Tracks duty stats for Mentor Roulette runs.",
-  "Description": "Tracks duty name, duty type, join-in-progress status, wipe count, and Lalafell headcount for each duty run, with CSV export.",
+  "Punchline": "Track your FFXIV duties, players, and statistics.",
+  "Description": "Records duty history, player encounters, deaths, wipes, PvP statistics, and lifetime milestones. Includes detailed player and duty analysis, filtering, and CSV export.",
   "ApplicableVersion": "any",
   "RepoUrl": "",
-  "Tags": [ "utility", "tracking" ],
+  "Tags": [ "utility", "tracking", "stats" ],
   "DalamudApiLevel": 15
 }

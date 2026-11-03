@@ -8,8 +8,8 @@ namespace MentorRouletteTracker
 {
     public sealed class Plugin : IDalamudPlugin
     {
-        public string Name => "Mentor Roulette Tracker";
-        private const string CommandName = "/mrt";
+        public string Name => "Duty Tracker";
+        private const string CommandName = "/dt";
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
@@ -100,8 +100,8 @@ namespace MentorRouletteTracker
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
                 {
                     HelpMessage =
-                        "Open the Mentor Roulette Tracker window. " +
-                        "Use '/mrt arm' or '/mrt disarm' " +
+                        "Open the Duty Tracker window. " +
+                        "Use '/dt arm' or '/dt disarm' " +
                         "to toggle logging.",
                 });
 
@@ -128,7 +128,7 @@ namespace MentorRouletteTracker
                     tracker.Armed = true;
 
                     log.Info(
-                        "Mentor Roulette Tracker: armed.");
+                        "Duty Tracker: armed.");
 
                     break;
 
@@ -136,7 +136,7 @@ namespace MentorRouletteTracker
                     tracker.Armed = false;
 
                     log.Info(
-                        "Mentor Roulette Tracker: disarmed.");
+                        "Duty Tracker: disarmed.");
 
                     break;
 

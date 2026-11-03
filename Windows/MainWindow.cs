@@ -61,7 +61,7 @@ namespace MentorRouletteTracker
             DutyTrackerService tracker,
             string exportDirectory,
             IObjectTable objectTable)
-            : base("Mentor Roulette Tracker###MentorRouletteTrackerMain")
+            : base("Duty Tracker###MentorRouletteTrackerMain")
         {
             this.config = config;
             this.tracker = tracker;
