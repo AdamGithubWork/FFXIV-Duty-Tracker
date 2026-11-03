@@ -36,7 +36,7 @@ namespace MentorRouletteTracker
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Duty Analysis");
-                ImGui.TextDisabled("Compare completed duties using global filters.");
+                ImGui.TextDisabled("Completed duties matching global filters.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -46,11 +46,294 @@ namespace MentorRouletteTracker
                 }
                 else
                 {
+                    DrawDutyOverview(records);
+                    ImGui.Spacing();
+                    ImGui.Separator();
+                    ImGui.Spacing();
+
+                    DrawDutyTypeStatistics(records);
+                    ImGui.Spacing();
+                    ImGui.Separator();
+                    ImGui.Spacing();
+
+                    DrawMostCommonDuty(records);
+                    ImGui.Spacing();
+                    ImGui.Separator();
+                    ImGui.Spacing();
+
+                    DrawDutiesHeatmap(records);
+                    ImGui.Spacing();
+                    ImGui.Separator();
+                    ImGui.Spacing();
+
                     DrawDutySpecificDetails(records);
                 }
             }
 
             ImGui.EndChild();
+        }
+
+        private void DrawDutyOverview(List<DutyRecord> records)
+        {
+            ImGui.Text("Duty Overview");
+            ImGui.Spacing();
+
+            if (ImGui.BeginTable(
+                "dutyOverview",
+                2,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.SizingStretchProp))
+            {
+                ImGui.TableSetupColumn("Statistic");
+                ImGui.TableSetupColumn("Value");
+
+                DrawStatisticRow("Completed Duties", records.Count.ToString());
+                DrawStatisticRow("Average Duty Length",
+                    FormatDuration(TimeSpan.FromSeconds(
+                        records.Average(x => x.TimeInDuty.TotalSeconds))));
+                DrawStatisticRow("Average Wipes / Duty",
+                    records.Average(x => x.WipeCount).ToString("F2"));
+                DrawStatisticRow("Joined In Progress",
+                    records.Count(x => x.JoinedInProgress).ToString());
+
+                ImGui.EndTable();
+            }
+        }
+
+        private void DrawDutyTypeStatistics(List<DutyRecord> records)
+        {
+            ImGui.Text("Duties by Type");
+
+            ImGui.Spacing();
+
+            var typeCounts = records
+                .GroupBy(x => x.DutyType)
+                .OrderByDescending(x => x.Count())
+                .ThenBy(x => x.Key)
+                .ToList();
+
+            if (ImGui.BeginTable(
+                    "dutyTypeStats",
+                    2,
+                    ImGuiTableFlags.Borders |
+                    ImGuiTableFlags.RowBg |
+                    ImGuiTableFlags.SizingStretchProp))
+            {
+                ImGui.TableSetupColumn("Duty Type");
+                ImGui.TableSetupColumn("Count");
+
+                ImGui.TableHeadersRow();
+
+                foreach (var group in typeCounts)
+                {
+                    ImGui.TableNextRow();
+
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(group.Key);
+
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(
+                        group.Count().ToString());
+                }
+
+                ImGui.EndTable();
+            }
+        }
+
+        private void DrawMostCommonDuty(List<DutyRecord> records)
+        {
+            ImGui.Text("Most Common Duty");
+
+            ImGui.Spacing();
+
+            var mostCommon = records
+                .GroupBy(x => x.DutyName)
+                .OrderByDescending(x => x.Count())
+                .ThenBy(x => x.Key)
+                .First();
+
+            if (ImGui.BeginTable(
+                    "mostCommonDuty",
+                    2,
+                    ImGuiTableFlags.Borders |
+                    ImGuiTableFlags.RowBg |
+                    ImGuiTableFlags.SizingStretchProp))
+            {
+                ImGui.TableSetupColumn("Duty");
+                ImGui.TableSetupColumn("Times Completed");
+
+                ImGui.TableNextRow();
+
+                ImGui.TableSetColumnIndex(0);
+                ImGui.TextUnformatted(mostCommon.Key);
+
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextUnformatted(
+                    mostCommon.Count().ToString());
+
+                ImGui.EndTable();
+            }
+        }
+
+        private void DrawDutiesHeatmap(List<DutyRecord> records)
+        {
+            var dutiesByDayAndTime = records
+                .GroupBy(record => new
+                {
+                    Day = record.Timestamp.DayOfWeek,
+                    TimePeriod = GetTimePeriod(record.Timestamp)
+                })
+                .Select(group => new
+                {
+                    group.Key.Day,
+                    group.Key.TimePeriod,
+                    Count = group.Count(),
+                    AverageDuration = group.Average(x => x.TimeInDuty.TotalMinutes)
+                })
+                .ToList();
+            ImGui.Text("Duties by Day and Time");
+            ImGui.Separator();
+            var heatmapMetrics = new[]
+            {
+                    "Duty Count",
+                    "Average Duration"
+                };
+
+            ImGui.SetNextItemWidth(200);
+
+            ImGui.Combo(
+                "Metric##Heatmap",
+                ref selectedHeatmapMetric,
+                heatmapMetrics,
+                heatmapMetrics.Length);
+
+            ImGui.Spacing();
+            var timePeriods = new[]
+            {
+                    "Late Night",
+                    "Early Morning",
+                    "Morning",
+                    "Afternoon",
+                    "Evening",
+                    "Night"
+                };
+
+            var days = new[]
+            {
+                    DayOfWeek.Monday,
+                    DayOfWeek.Tuesday,
+                    DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday,
+                    DayOfWeek.Friday,
+                    DayOfWeek.Saturday,
+                    DayOfWeek.Sunday
+                };
+
+            if (ImGui.BeginTable(
+                "dutiesHeatmap",
+                7,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.SizingStretchProp))
+            {
+                ImGui.TableSetupColumn("Day");
+
+                foreach (var period in timePeriods)
+                {
+                    ImGui.TableSetupColumn(period);
+                }
+
+                ImGui.TableHeadersRow();
+
+                foreach (var day in days)
+                {
+                    ImGui.TableNextRow();
+
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(day.ToString());
+
+                    for (int i = 0; i < timePeriods.Length; i++)
+                    {
+                        var period = timePeriods[i];
+
+                        var group = dutiesByDayAndTime
+                            .FirstOrDefault(x => x.Day == day && x.TimePeriod == period);
+
+                        var count = group?.Count ?? 0;
+
+                        var value = selectedHeatmapMetric == 0
+                            ? count
+                            : group?.AverageDuration ?? 0;
+
+                        ImGui.TableSetColumnIndex(i + 1);
+
+                        var maxValue = Math.Max(
+                            1.0,
+                            dutiesByDayAndTime.Max(x =>
+                                selectedHeatmapMetric == 0
+                                    ? x.Count
+                                    : x.AverageDuration));
+
+                        var intensity = (float)(value / maxValue);
+
+                        Vector4 cellColor;
+
+                        if (selectedHeatmapMetric == 0)
+                        {
+                            // Duty Count: darker green -> brighter green
+                            cellColor = new Vector4(
+                                0.08f,
+                                0.25f + intensity * 0.45f,
+                                0.12f + intensity * 0.20f,
+                                1.0f);
+                        }
+                        else
+                        {
+                            // Average Duration: green -> yellow -> red
+                            cellColor = new Vector4(
+                                0.15f + intensity * 0.65f,
+                                0.65f - intensity * 0.45f,
+                                0.12f,
+                                1.0f);
+                        }
+
+                        if (count > 0)
+                        {
+                            ImGui.TableSetBgColor(
+                                ImGuiTableBgTarget.CellBg,
+                                ImGui.ColorConvertFloat4ToU32(cellColor));
+                        }
+
+                        ImGui.TextUnformatted(
+                            selectedHeatmapMetric == 0
+                                ? count.ToString()
+                                : count > 0
+                                    ? $"{value:F1}m"
+                                    : "—");
+                        if (ImGui.IsItemHovered() && count > 0)
+                        {
+                            ImGui.BeginTooltip();
+
+                            ImGui.TextUnformatted($"{day} - {period}");
+                            ImGui.Separator();
+
+                            ImGui.TextUnformatted($"Duties: {count}");
+
+                            if (selectedHeatmapMetric == 1)
+                            {
+                                ImGui.TextUnformatted(
+                                    $"Average Duration: {value:F1} minutes");
+                            }
+
+                            ImGui.EndTooltip();
+                        }
+                    }
+                }
+
+                ImGui.EndTable();
+            }
+
         }
 
         private void DrawDutySpecificDetails(List<DutyRecord> records)
@@ -241,6 +524,19 @@ namespace MentorRouletteTracker
 
                 ImGui.EndTable();
             }
+        }
+
+        private static string GetTimePeriod(DateTime timestamp)
+        {
+            return timestamp.Hour switch
+            {
+                < 4 => "Late Night",
+                < 8 => "Early Morning",
+                < 12 => "Morning",
+                < 16 => "Afternoon",
+                < 20 => "Evening",
+                _ => "Night"
+            };
         }
     }
 }

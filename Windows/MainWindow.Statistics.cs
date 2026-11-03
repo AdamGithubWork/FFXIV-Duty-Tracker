@@ -27,53 +27,23 @@ namespace MentorRouletteTracker
                 .Where(x => MatchesGlobalDutySearch(x))
                 .OrderBy(x => x.Timestamp)
                 .ToList();
-            var dutiesByDayAndTime = records
-                .GroupBy(record => new
-                {
-                    Day = record.Timestamp.DayOfWeek,
-                    TimePeriod = GetTimePeriod(record.Timestamp)
-                })
-                .Select(group => new
-                {
-                    group.Key.Day,
-                    group.Key.TimePeriod,
-                    Count = group.Count(),
-                    AverageDuration = group.Average(x => x.TimeInDuty.TotalMinutes)
-                })
-                .ToList();
             if (ImGui.BeginChild(
-                    "StatisticsContent",
-                    Vector2.Zero,
-                    false,
-                    ImGuiWindowFlags.HorizontalScrollbar))
+                "StatisticsContent",
+                Vector2.Zero,
+                false,
+                ImGuiWindowFlags.HorizontalScrollbar))
             {
-                ImGui.Text("Mentor Roulette Statistics");
-
-                ImGui.Spacing();
-
-                ImGui.TextDisabled(
-                    "Statistics based on completed duties.");
-
-                ImGui.Spacing();
-
+                ImGui.Text("Player Analysis");
+                ImGui.TextDisabled("Player statistics from completed duties matching global filters.");
                 ImGui.Separator();
-
                 ImGui.Spacing();
 
                 if (records.Count == 0)
                 {
-                    ImGui.TextDisabled(
-                        "No completed duties have been recorded yet.");
-
+                    ImGui.TextDisabled("No completed duties match the selected filters.");
                     ImGui.EndChild();
                     return;
                 }
-
-                DrawOverallStatistics(records);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
 
                 DrawSelectedPlayerStatistics(records);
 
@@ -81,21 +51,6 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawDutyTypeStatistics(records);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawMostCommonDuty(records);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                // Analyze player characteristics within the selected filters.
-                // The lookup is built once for this draw rather than repeatedly
-                // scanning all records for each player death count.
                 var playerRecords = BuildStatisticsPlayerRecords(records);
                 DrawRaceStatistics(records, playerRecords, true);
 
@@ -122,210 +77,9 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 DrawWorldStatistics(records);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                ImGui.Text("Duties by Day and Time");
-                ImGui.Separator();
-                var heatmapMetrics = new[]
-                {
-                    "Duty Count",
-                    "Average Duration"
-                };
-
-                ImGui.SetNextItemWidth(200);
-
-                ImGui.Combo(
-                    "Metric##Heatmap",
-                    ref selectedHeatmapMetric,
-                    heatmapMetrics,
-                    heatmapMetrics.Length);
-
-                ImGui.Spacing();
-                var timePeriods = new[]
-                {
-                    "Late Night",
-                    "Early Morning",
-                    "Morning",
-                    "Afternoon",
-                    "Evening",
-                    "Night"
-                };
-
-                var days = new[]
-                {
-                    DayOfWeek.Monday,
-                    DayOfWeek.Tuesday,
-                    DayOfWeek.Wednesday,
-                    DayOfWeek.Thursday,
-                    DayOfWeek.Friday,
-                    DayOfWeek.Saturday,
-                    DayOfWeek.Sunday
-                };
-
-                if (ImGui.BeginTable(
-                    "dutiesHeatmap",
-                    7,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
-                {
-                    ImGui.TableSetupColumn("Day");
-
-                    foreach (var period in timePeriods)
-                    {
-                        ImGui.TableSetupColumn(period);
-                    }
-
-                    ImGui.TableHeadersRow();
-
-                    foreach (var day in days)
-                    {
-                        ImGui.TableNextRow();
-
-                        ImGui.TableSetColumnIndex(0);
-                        ImGui.TextUnformatted(day.ToString());
-
-                        for (int i = 0; i < timePeriods.Length; i++)
-                        {
-                            var period = timePeriods[i];
-
-                            var group = dutiesByDayAndTime
-                                .FirstOrDefault(x => x.Day == day && x.TimePeriod == period);
-
-                            var count = group?.Count ?? 0;
-
-                            var value = selectedHeatmapMetric == 0
-                                ? count
-                                : group?.AverageDuration ?? 0;
-
-                            ImGui.TableSetColumnIndex(i + 1);
-
-                            var maxValue = Math.Max(
-                                1.0,
-                                dutiesByDayAndTime.Max(x =>
-                                    selectedHeatmapMetric == 0
-                                        ? x.Count
-                                        : x.AverageDuration));
-
-                            var intensity = (float)(value / maxValue);
-
-                            Vector4 cellColor;
-
-                            if (selectedHeatmapMetric == 0)
-                            {
-                                // Duty Count: darker green -> brighter green
-                                cellColor = new Vector4(
-                                    0.08f,
-                                    0.25f + intensity * 0.45f,
-                                    0.12f + intensity * 0.20f,
-                                    1.0f);
-                            }
-                            else
-                            {
-                                // Average Duration: green -> yellow -> red
-                                cellColor = new Vector4(
-                                    0.15f + intensity * 0.65f,
-                                    0.65f - intensity * 0.45f,
-                                    0.12f,
-                                    1.0f);
-                            }
-
-                            if (count > 0)
-                            {
-                                ImGui.TableSetBgColor(
-                                    ImGuiTableBgTarget.CellBg,
-                                    ImGui.ColorConvertFloat4ToU32(cellColor));
-                            }
-
-                            ImGui.TextUnformatted(
-                                selectedHeatmapMetric == 0
-                                    ? count.ToString()
-                                    : count > 0
-                                        ? $"{value:F1}m"
-                                        : "—");
-                            if (ImGui.IsItemHovered() && count > 0)
-                            {
-                                ImGui.BeginTooltip();
-
-                                ImGui.TextUnformatted($"{day} - {period}");
-                                ImGui.Separator();
-
-                                ImGui.TextUnformatted($"Duties: {count}");
-
-                                if (selectedHeatmapMetric == 1)
-                                {
-                                    ImGui.TextUnformatted(
-                                        $"Average Duration: {value:F1} minutes");
-                                }
-
-                                ImGui.EndTooltip();
-                            }
-                        }
-                    }
-
-                    ImGui.EndTable();
-                }
             }
 
             ImGui.EndChild();
-        }
-
-
-        private void DrawOverallStatistics(List<DutyRecord> records)
-        {
-            ImGui.Text("Overall");
-
-            ImGui.Spacing();
-
-            var averageSeconds =
-                records.Average(x => x.TimeInDuty.TotalSeconds);
-
-            var fastest = records.MinBy(x => x.TimeInDuty);
-            var longest = records.MaxBy(x => x.TimeInDuty);
-            var mostLalafell = records.MaxBy(x => x.LalafellCount);
-
-            if (ImGui.BeginTable(
-                    "overallStats",
-                    2,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
-            {
-                ImGui.TableSetupColumn("Statistic");
-                ImGui.TableSetupColumn("Value");
-
-                DrawStatisticRow(
-                    "Total Duties",
-                    records.Count.ToString());
-
-                DrawStatisticRow(
-                    "Average Duty Length",
-                    FormatDuration(
-                        TimeSpan.FromSeconds(averageSeconds)));
-
-                DrawStatisticRow(
-                    "Fastest Duty",
-                    fastest == null
-                        ? "N/A"
-                        : $"{FormatDuration(fastest.TimeInDuty)} — {fastest.DutyName}");
-
-                DrawStatisticRow(
-                    "Longest Duty",
-                    longest == null
-                        ? "N/A"
-                        : $"{FormatDuration(longest.TimeInDuty)} — {longest.DutyName}");
-
-                DrawStatisticRow(
-                    "Most Lalafell in One Duty",
-                    mostLalafell == null
-                        ? "N/A"
-                        : $"{mostLalafell.LalafellCount} — {mostLalafell.DutyName}");
-
-                ImGui.EndTable();
-            }
         }
 
 
@@ -424,83 +178,6 @@ namespace MentorRouletteTracker
             return record.DutyType == "PvP"
                 ? player.PvPScoreboardDeaths
                 : player.DeathCount;
-        }
-
-
-        private void DrawDutyTypeStatistics(List<DutyRecord> records)
-        {
-            ImGui.Text("Duties by Type");
-
-            ImGui.Spacing();
-
-            var typeCounts = records
-                .GroupBy(x => x.DutyType)
-                .OrderByDescending(x => x.Count())
-                .ThenBy(x => x.Key)
-                .ToList();
-
-            if (ImGui.BeginTable(
-                    "dutyTypeStats",
-                    2,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
-            {
-                ImGui.TableSetupColumn("Duty Type");
-                ImGui.TableSetupColumn("Count");
-
-                ImGui.TableHeadersRow();
-
-                foreach (var group in typeCounts)
-                {
-                    ImGui.TableNextRow();
-
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(group.Key);
-
-                    ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(
-                        group.Count().ToString());
-                }
-
-                ImGui.EndTable();
-            }
-        }
-
-
-        private void DrawMostCommonDuty(List<DutyRecord> records)
-        {
-            ImGui.Text("Most Common Duty");
-
-            ImGui.Spacing();
-
-            var mostCommon = records
-                .GroupBy(x => x.DutyName)
-                .OrderByDescending(x => x.Count())
-                .ThenBy(x => x.Key)
-                .First();
-
-            if (ImGui.BeginTable(
-                    "mostCommonDuty",
-                    2,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
-            {
-                ImGui.TableSetupColumn("Duty");
-                ImGui.TableSetupColumn("Times Completed");
-
-                ImGui.TableNextRow();
-
-                ImGui.TableSetColumnIndex(0);
-                ImGui.TextUnformatted(mostCommon.Key);
-
-                ImGui.TableSetColumnIndex(1);
-                ImGui.TextUnformatted(
-                    mostCommon.Count().ToString());
-
-                ImGui.EndTable();
-            }
         }
 
 
@@ -1027,6 +704,8 @@ namespace MentorRouletteTracker
         // All of these statistics use completed, globally filtered duty records.
         // Apply player-level filters as well so the distributions represent
         // matching encounters, rather than every member of a matching party.
+
+
         private void DrawStatusStatistics(List<DutyRecord> records)
         {
             ImGui.Text("Player Status Distribution");
@@ -1097,6 +776,7 @@ namespace MentorRouletteTracker
                 ImGui.EndTable();
             }
         }
+
 
         private void DrawWorldStatistics(List<DutyRecord> records)
         {
@@ -1170,19 +850,5 @@ namespace MentorRouletteTracker
                 ImGui.EndTable();
             }
         }
-
-        private static string GetTimePeriod(DateTime timestamp)
-        {
-            return timestamp.Hour switch
-            {
-                < 4 => "Late Night",
-                < 8 => "Early Morning",
-                < 12 => "Morning",
-                < 16 => "Afternoon",
-                < 20 => "Evening",
-                _ => "Night"
-            };
-        }
-
     }
 }
