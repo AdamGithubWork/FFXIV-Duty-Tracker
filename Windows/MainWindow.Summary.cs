@@ -26,7 +26,13 @@ namespace MentorRouletteTracker
         private string? lifetimeSummaryDutyFilterKey;
         private string? lifetimeSummaryPlayerName;
         private bool lifetimeSummaryIncludeSelf;
-        private readonly List<(string Title, List<(string Label, string Value)> Rows)> lifetimeSummarySections = new();
+        // A milestone can optionally point to the exact duty run that earned it.
+        private sealed record LifetimeMilestoneResult(string Text, DutyRecord? Record = null)
+        {
+            public static implicit operator LifetimeMilestoneResult(string text) => new(text);
+        }
+
+        private readonly List<(string Title, List<(string Label, LifetimeMilestoneResult Value)> Rows)> lifetimeSummarySections = new();
 
         private void DrawSummaryTab()
         {
@@ -76,7 +82,31 @@ namespace MentorRouletteTracker
                                 ImGui.TableSetupColumn("Result");
                                 ImGui.TableHeadersRow();
                                 foreach (var row in section.Rows)
-                                    DrawStatisticRow(row.Label, row.Value);
+                                {
+                                    ImGui.TableNextRow();
+                                    ImGui.TableSetColumnIndex(0);
+                                    ImGui.TextUnformatted(row.Label);
+                                    ImGui.TableSetColumnIndex(1);
+
+                                    if (row.Value.Record is DutyRecord record)
+                                    {
+                                        // Use the exact winning record, not the duty name:
+                                        // multiple runs may have the same name.
+                                        ImGui.PushID(row.Label);
+                                        if (ImGui.Selectable(row.Value.Text))
+                                        {
+                                            selectedRecord = record;
+                                            showDetailWindow = true;
+                                        }
+                                        if (ImGui.IsItemHovered())
+                                            ImGui.SetTooltip("Open this duty's details");
+                                        ImGui.PopID();
+                                    }
+                                    else
+                                    {
+                                        ImGui.TextUnformatted(row.Value.Text);
+                                    }
+                                }
                                 ImGui.EndTable();
                             }
                         }
@@ -133,22 +163,28 @@ namespace MentorRouletteTracker
             int CountLalafell(DutyRecord r) => byRecord[r].Count(e =>
                 e.Player.Race == "Lalafell");
 
-            void Add(string title, List<(string Label, string Value)> rows) =>
+            void Add(string title, List<(string Label, LifetimeMilestoneResult Value)> rows) =>
                 lifetimeSummarySections.Add((title, rows));
             string NoData = "N/A";
-            string DutyExt(IEnumerable<DutyRecord> candidates, Func<DutyRecord, double> metric,
+            LifetimeMilestoneResult DutyExt(IEnumerable<DutyRecord> candidates, Func<DutyRecord, double> metric,
                 bool maximum, Func<DutyRecord, string> metricText)
             {
                 var list = candidates.ToList();
                 if (list.Count == 0) return NoData;
                 var chosen = maximum ? list.MaxBy(metric) : list.MinBy(metric);
-                return chosen == null ? NoData : $"{metricText(chosen)} — {Duty(chosen)}";
+                return chosen == null
+                    ? NoData
+                    : new LifetimeMilestoneResult($"{metricText(chosen)} — {Duty(chosen)}", chosen);
             }
-            string PlayerExt(IEnumerable<LifetimeEncounter> candidates,
+            LifetimeMilestoneResult PlayerExt(IEnumerable<LifetimeEncounter> candidates,
                 Func<LifetimeEncounter, double> metric, Func<LifetimeEncounter, string> value)
             {
                 var chosen = candidates.MaxBy(metric);
-                return chosen == null ? NoData : $"{value(chosen)} — {Player(chosen)} — {Duty(chosen.Record)}";
+                return chosen == null
+                    ? NoData
+                    : new LifetimeMilestoneResult(
+                        $"{value(chosen)} — {Player(chosen)} — {Duty(chosen.Record)}",
+                        chosen.Record);
             }
             string NamedGroupExt<TKey>(IEnumerable<IGrouping<TKey, LifetimeEncounter>> groups,
                 Func<IGrouping<TKey, LifetimeEncounter>, double> metric,
