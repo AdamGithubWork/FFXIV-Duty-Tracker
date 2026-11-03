@@ -387,6 +387,12 @@ namespace MentorRouletteTracker
                     ImGui.EndTabItem();
                 }
 
+                if (ImGui.BeginTabItem("Duty Analysis"))
+                {
+                    DrawDutyAnalysisTab();
+                    ImGui.EndTabItem();
+                }
+
                 if (ImGui.BeginTabItem("Summary"))
                 {
                     DrawSummaryTab();
