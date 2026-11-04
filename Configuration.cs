@@ -1,18 +1,36 @@
+
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 using MentorRouletteTracker.DutyTracking;
+
 namespace MentorRouletteTracker
 {
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
         public int Version { get; set; } = 1;
+
         public List<uint> TrackedContentTypeIds { get; set; } = new();
+        public HashSet<uint> TimerVisibleContentTypeIds { get; set; } = new()
+        {
+            2,  // Dungeons
+            3,  // Guildhests
+            4,  // Trials
+            5,  // Raids
+            6,  // PvP
+            21, // Deep Dungeons
+            28, // Ultimate Raids
+            30, // V&C Dungeon Finder
+            37  // Chaotic Alliance Raid
+        };
+
         public bool TrackAllianceMembers { get; set; } = false;
         public bool IncludeSelfInStatistics { get; set; } = false;
+
         public List<DutyRecord> Records { get; set; } = new();
         public List<SeenPlayer> SeenPlayers { get; set; } = new();
         public DutyRecord? PendingDuty { get; set; }
+
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
 

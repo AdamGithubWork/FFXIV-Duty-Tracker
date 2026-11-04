@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 
 namespace MentorRouletteTracker
 {
@@ -6,11 +7,6 @@ namespace MentorRouletteTracker
     {
         private void DrawSettingsTab()
         {
-            ImGui.Text("Duty Tracking Options");
-            ImGui.TextDisabled("Check each duty type you would like recorded");
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
             var contentTypes = new (uint Id, string Name)[]
             {
                 (2, "Dungeons"),
@@ -24,12 +20,23 @@ namespace MentorRouletteTracker
                 (37, "Chaotic Alliance Raid")
             };
 
+            // Duty Tracking Options
+            ImGui.Text("Duty Tracking Options");
+            ImGui.TextDisabled(
+                "Check each duty type you would like recorded.");
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
             foreach (var contentType in contentTypes)
             {
-                var isTracked =
+                bool isTracked =
                     config.TrackedContentTypeIds.Contains(contentType.Id);
 
-                if (ImGui.Checkbox(contentType.Name, ref isTracked))
+                if (ImGui.Checkbox(
+                    $"{contentType.Name}##DutyTracking",
+                    ref isTracked))
                 {
                     if (isTracked)
                         config.TrackedContentTypeIds.Add(contentType.Id);
@@ -39,28 +46,66 @@ namespace MentorRouletteTracker
                     config.Save();
                 }
             }
+
             ImGui.Spacing();
             ImGui.Separator();
             ImGui.Spacing();
+
+            // Duty Timer Visibility
+            ImGui.Text("Duty Timer Visibility");
+            ImGui.TextDisabled(
+                "Choose which duty types display the floating timer.");
+
+            ImGui.Spacing();
+
+            foreach (var contentType in contentTypes)
+            {
+                bool showTimer =
+                    config.TimerVisibleContentTypeIds.Contains(contentType.Id);
+
+                if (ImGui.Checkbox(
+                    $"{contentType.Name}##TimerVisibility",
+                    ref showTimer))
+                {
+                    if (showTimer)
+                        config.TimerVisibleContentTypeIds.Add(contentType.Id);
+                    else
+                        config.TimerVisibleContentTypeIds.Remove(contentType.Id);
+
+                    config.Save();
+                }
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            // Player Tracking Options
             ImGui.Text("Player Tracking Options");
+
             ImGui.Spacing();
             ImGui.Separator();
             ImGui.Spacing();
+
             bool includeSelf = config.IncludeSelfInStatistics;
 
-            if (ImGui.Checkbox("Include yourself in statistics", ref includeSelf))
+            if (ImGui.Checkbox(
+                "Include yourself in statistics",
+                ref includeSelf))
             {
                 config.IncludeSelfInStatistics = includeSelf;
                 config.Save();
             }
+
             bool trackAlliance = config.TrackAllianceMembers;
 
-            if (ImGui.Checkbox("Track alliance members", ref trackAlliance))
+            if (ImGui.Checkbox(
+                "Track alliance members",
+                ref trackAlliance))
             {
                 config.TrackAllianceMembers = trackAlliance;
                 config.Save();
             }
         }
-
     }
 }

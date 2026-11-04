@@ -25,6 +25,7 @@ namespace MentorRouletteTracker.DutyTracking
         private DateTime nextConfigSave = DateTime.MinValue;
         private DutyRecord? current;
         public DutyRecord? ActiveDuty => current;
+        public uint? ActiveContentTypeId { get; private set; }
         private readonly HashSet<string> countedPlayersForCurrentRun = new();
         private readonly Dictionary<string, bool> previousDeathStates = new();
         public bool Armed { get; set; } = true;
@@ -66,6 +67,7 @@ namespace MentorRouletteTracker.DutyTracking
             {
                 if (cfc != null && current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
                 {
+                    ActiveContentTypeId = cfc.Value.ContentType.RowId;
                     previousDeathStates.Clear();
                     return;
                 }
@@ -130,6 +132,16 @@ namespace MentorRouletteTracker.DutyTracking
                 return;
 
             current = config.PendingDuty;
+
+            // Recover the duty type after a plugin reload only if the
+            // player is still in the same duty.
+            var cfc = FindContentFinderCondition(clientState.TerritoryType);
+            if (cfc != null &&
+                current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
+            {
+                ActiveContentTypeId = cfc.Value.ContentType.RowId;
+            }
+
             foreach (var player in current.Party)
             {
                 string playerKey = $"{player.Name}@{player.World}";
@@ -140,6 +152,7 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void StartNewDuty(ContentFinderCondition duty)
         {
+            ActiveContentTypeId = duty.ContentType.RowId;
             var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
             var dutyType = duty.ContentType.Value.Name.ExtractText();
 
@@ -178,6 +191,7 @@ namespace MentorRouletteTracker.DutyTracking
             config.Save();
 
             current = null;
+            ActiveContentTypeId = null;
 
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();

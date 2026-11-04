@@ -41,7 +41,6 @@ namespace MentorRouletteTracker
             this.clientState = clientState;
 
             var savedConfig = pluginInterface.GetPluginConfig() as Configuration;
-
             config = savedConfig ?? new Configuration();
 
             // Sets all content types as tracked by default when no saved configuration exists.
@@ -51,10 +50,7 @@ namespace MentorRouletteTracker
             }
 
             config.Initialize(pluginInterface);
-
-            // Remove duplicate content type IDs, if any. 
             config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
-
             config.Save();
 
             tracker = new DutyTrackerService(
@@ -77,7 +73,6 @@ namespace MentorRouletteTracker
             framework.Update += OnFrameworkUpdate;
 
             var exportDir = pluginInterface.GetPluginConfigDirectory();
-
             Directory.CreateDirectory(exportDir);
 
             mainWindow = new MainWindow(
@@ -85,14 +80,12 @@ namespace MentorRouletteTracker
                 tracker,
                 exportDir,
                 objectTable);
-
             windowSystem.AddWindow(mainWindow);
 
             dutyTimerWindow = new DutyTimerWindow(
                 tracker,
                 mainWindow,
                 config);
-
             windowSystem.AddWindow(dutyTimerWindow);
 
             commandManager.AddHandler(
@@ -106,16 +99,20 @@ namespace MentorRouletteTracker
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
-
             pluginInterface.UiBuilder.OpenMainUi += () =>
                 mainWindow.IsOpen = true;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
         {
+            // The timer is only visible when an active duty's actual
+            // ContentType ID has been enabled in Settings.
+            var contentTypeId = tracker.ActiveContentTypeId;
+
             dutyTimerWindow.IsOpen =
                 tracker.ActiveDuty != null &&
-                !clientState.IsPvP;
+                contentTypeId.HasValue &&
+                config.TimerVisibleContentTypeIds.Contains(contentTypeId.Value);
         }
 
         private void OnCommand(string command, string args)
@@ -126,18 +123,12 @@ namespace MentorRouletteTracker
             {
                 case "arm":
                     tracker.Armed = true;
-
-                    log.Info(
-                        "Duty Tracker: armed.");
-
+                    log.Info("Duty Tracker: armed.");
                     break;
 
                 case "disarm":
                     tracker.Armed = false;
-
-                    log.Info(
-                        "Duty Tracker: disarmed.");
-
+                    log.Info("Duty Tracker: disarmed.");
                     break;
 
                 default:
@@ -149,10 +140,7 @@ namespace MentorRouletteTracker
         public void Dispose()
         {
             framework.Update -= OnFrameworkUpdate;
-
-            pluginInterface.UiBuilder.Draw -=
-                windowSystem.Draw;
-
+            pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
             commandManager.RemoveHandler(CommandName);
             windowSystem.RemoveAllWindows();
             pvpMatchService.Dispose();
