@@ -11,7 +11,10 @@ namespace MentorRouletteTracker
         public int Version { get; set; } = 1;
 
         public List<uint> TrackedContentTypeIds { get; set; } = new();
-        public HashSet<uint> TimerVisibleContentTypeIds { get; set; } = new()
+
+        // Duty types that display the floating timer.
+        // PvP is disabled by default.
+        public List<uint> TimerVisibleContentTypeIds { get; set; } = new()
         {
             2,  // Dungeons
             3,  // Guildhests

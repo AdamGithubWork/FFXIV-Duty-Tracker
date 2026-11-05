@@ -31,7 +31,7 @@ namespace MentorRouletteTracker
 
             foreach (var contentType in contentTypes)
             {
-                bool isTracked =
+                var isTracked =
                     config.TrackedContentTypeIds.Contains(contentType.Id);
 
                 if (ImGui.Checkbox(
@@ -60,7 +60,7 @@ namespace MentorRouletteTracker
 
             foreach (var contentType in contentTypes)
             {
-                bool showTimer =
+                var showTimer =
                     config.TimerVisibleContentTypeIds.Contains(contentType.Id);
 
                 if (ImGui.Checkbox(
