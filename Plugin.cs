@@ -43,10 +43,13 @@ namespace MentorRouletteTracker
             var savedConfig = pluginInterface.GetPluginConfig() as Configuration;
             config = savedConfig ?? new Configuration();
 
-            // Sets all content types as tracked by default when no saved configuration exists.
             if (savedConfig == null)
             {
-                config.TrackedContentTypeIds.AddRange([2, 3, 4, 5, 6, 21, 28, 30, 37]);
+                config.TrackedContentTypeIds.AddRange(
+                    [2, 3, 4, 5, 6, 21, 28, 30, 37]);
+
+                config.TimerVisibleContentTypeIds.AddRange(
+                    [2, 3, 4, 5, 6, 21, 28, 30, 37]);
             }
 
             config.Initialize(pluginInterface);

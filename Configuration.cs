@@ -11,21 +11,7 @@ namespace MentorRouletteTracker
         public int Version { get; set; } = 1;
 
         public List<uint> TrackedContentTypeIds { get; set; } = new();
-
-        // Duty types that display the floating timer.
-        // PvP is disabled by default.
-        public List<uint> TimerVisibleContentTypeIds { get; set; } = new()
-        {
-            2,  // Dungeons
-            3,  // Guildhests
-            4,  // Trials
-            5,  // Raids
-            6,  // PvP
-            21, // Deep Dungeons
-            28, // Ultimate Raids
-            30, // V&C Dungeon Finder
-            37  // Chaotic Alliance Raid
-        };
+        public List<uint> TimerVisibleContentTypeIds { get; set; } = new();
 
         public bool TrackAllianceMembers { get; set; } = false;
         public bool IncludeSelfInStatistics { get; set; } = false;
