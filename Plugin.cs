@@ -54,6 +54,7 @@ namespace MentorRouletteTracker
 
             config.Initialize(pluginInterface);
             config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
+            config.TimerVisibleContentTypeIds = config.TimerVisibleContentTypeIds.Distinct().ToList();
             config.Save();
 
             tracker = new DutyTrackerService(
