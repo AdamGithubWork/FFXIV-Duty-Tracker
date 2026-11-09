@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 
@@ -36,9 +37,9 @@ namespace MentorRouletteTracker
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
             var now = DateTime.Now;
 
-            // Retain the record associated with each snapshot. This is needed
-            // for correct PvP/PvE death counts and clickable duty history.
+            // Retain the record associated with each snapshot.
             var encounters = config.Records
+                .Where(record => record.Completed)
                 .Where(record =>
                     selectedDutyTypes.Count == 0 ||
                     selectedDutyTypes.Contains(record.DutyType))
@@ -60,7 +61,6 @@ namespace MentorRouletteTracker
                 .Where(x =>
                     config.IncludeSelfInStatistics ||
                     x.Player.Name != localPlayerName)
-                // MatchesPlayerFilters already includes global player search.
                 .Where(x => MatchesPlayerFilters(x.Player))
                 .ToList();
 

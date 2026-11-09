@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
@@ -89,6 +90,7 @@ namespace MentorRouletteTracker
             // Show all historical runs for this duty,
             // regardless of previously selected global filters.
             globalPlayerSearchText = string.Empty;
+            globalDutySearchText = string.Empty;
             selectedDutyTypes.Clear();
             selectedPlayerRaces.Clear();
             selectedPlayerGenders.Clear();

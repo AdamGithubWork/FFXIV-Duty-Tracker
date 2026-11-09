@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 
@@ -8,7 +9,6 @@ namespace MentorRouletteTracker
     {
         private void DrawDutyAnalysisTab()
         {
-            // Match the existing Statistics duty selection and global filters.
             var now = DateTime.Now;
             var records = config.Records
                 .Where(x => x.Completed)
@@ -114,11 +114,11 @@ namespace MentorRouletteTracker
                 .ToList();
 
             if (ImGui.BeginTable(
-                    "dutyTypeStats",
-                    2,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
+                "dutyTypeStats",
+                2,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.SizingStretchProp))
             {
                 ImGui.TableSetupColumn("Duty Type");
                 ImGui.TableSetupColumn("Count");
@@ -154,11 +154,11 @@ namespace MentorRouletteTracker
                 .First();
 
             if (ImGui.BeginTable(
-                    "mostCommonDuty",
-                    2,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.SizingStretchProp))
+                "mostCommonDuty",
+                2,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.SizingStretchProp))
             {
                 ImGui.TableSetupColumn("Duty");
                 ImGui.TableSetupColumn("Times Completed");
@@ -192,13 +192,15 @@ namespace MentorRouletteTracker
                     AverageDuration = group.Average(x => x.TimeInDuty.TotalMinutes)
                 })
                 .ToList();
+
             ImGui.Text("Duties by Day and Time");
             ImGui.Separator();
+
             var heatmapMetrics = new[]
             {
-                    "Duty Count",
-                    "Average Duration"
-                };
+                "Duty Count",
+                "Average Duration"
+            };
 
             ImGui.SetNextItemWidth(200);
 
@@ -209,26 +211,27 @@ namespace MentorRouletteTracker
                 heatmapMetrics.Length);
 
             ImGui.Spacing();
+
             var timePeriods = new[]
             {
-                    "Late Night",
-                    "Early Morning",
-                    "Morning",
-                    "Afternoon",
-                    "Evening",
-                    "Night"
-                };
+                "Late Night",
+                "Early Morning",
+                "Morning",
+                "Afternoon",
+                "Evening",
+                "Night"
+            };
 
             var days = new[]
             {
-                    DayOfWeek.Monday,
-                    DayOfWeek.Tuesday,
-                    DayOfWeek.Wednesday,
-                    DayOfWeek.Thursday,
-                    DayOfWeek.Friday,
-                    DayOfWeek.Saturday,
-                    DayOfWeek.Sunday
-                };
+                DayOfWeek.Monday,
+                DayOfWeek.Tuesday,
+                DayOfWeek.Wednesday,
+                DayOfWeek.Thursday,
+                DayOfWeek.Friday,
+                DayOfWeek.Saturday,
+                DayOfWeek.Sunday
+            };
 
             if (ImGui.BeginTable(
                 "dutiesHeatmap",
@@ -281,7 +284,6 @@ namespace MentorRouletteTracker
 
                         if (selectedHeatmapMetric == 0)
                         {
-                            // Duty Count: darker green -> brighter green
                             cellColor = new Vector4(
                                 0.08f,
                                 0.25f + intensity * 0.45f,
@@ -290,7 +292,6 @@ namespace MentorRouletteTracker
                         }
                         else
                         {
-                            // Average Duration: green -> yellow -> red
                             cellColor = new Vector4(
                                 0.15f + intensity * 0.65f,
                                 0.65f - intensity * 0.45f,
@@ -311,13 +312,13 @@ namespace MentorRouletteTracker
                                 : count > 0
                                     ? $"{value:F1}m"
                                     : "—");
+
                         if (ImGui.IsItemHovered() && count > 0)
                         {
                             ImGui.BeginTooltip();
 
                             ImGui.TextUnformatted($"{day} - {period}");
                             ImGui.Separator();
-
                             ImGui.TextUnformatted($"Duties: {count}");
 
                             if (selectedHeatmapMetric == 1)
@@ -333,7 +334,6 @@ namespace MentorRouletteTracker
 
                 ImGui.EndTable();
             }
-
         }
 
         private void DrawDutySpecificDetails(List<DutyRecord> records)
@@ -356,13 +356,13 @@ namespace MentorRouletteTracker
             }
 
             if (ImGui.BeginTable(
-                    "dutySpecificDetails",
-                    8,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.Resizable |
-                    ImGuiTableFlags.SizingStretchProp |
-                    ImGuiTableFlags.Sortable))
+                "dutySpecificDetails",
+                8,
+                ImGuiTableFlags.Borders |
+                ImGuiTableFlags.RowBg |
+                ImGuiTableFlags.Resizable |
+                ImGuiTableFlags.SizingStretchProp |
+                ImGuiTableFlags.Sortable))
             {
                 ImGui.TableSetupColumn(
                     "Duty",
@@ -387,8 +387,9 @@ namespace MentorRouletteTracker
                         Deaths = x.Sum(y =>
                             y.Party
                                 .Where(p =>
-                                    !string.IsNullOrWhiteSpace(p.Name) && (config.IncludeSelfInStatistics ||
-                                    p.Name != objectTable.LocalPlayer?.Name.TextValue))
+                                    !string.IsNullOrWhiteSpace(p.Name) &&
+                                    (config.IncludeSelfInStatistics ||
+                                     p.Name != objectTable.LocalPlayer?.Name.TextValue))
                                 .Sum(p => EffectiveDeaths(y, p) ?? 0)),
 
                         TotalWipes = x.Sum(y => y.WipeCount),
@@ -494,32 +495,25 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Duty);
 
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(
-                        stat.Runs.ToString());
+                    ImGui.TextUnformatted(stat.Runs.ToString());
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(
-                        stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths.ToString());
 
                     ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(
-                        deathsPerRun.ToString("0.00"));
+                    ImGui.TextUnformatted(deathsPerRun.ToString("0.00"));
 
                     ImGui.TableSetColumnIndex(4);
-                    ImGui.TextUnformatted(
-                        stat.TotalWipes.ToString());
+                    ImGui.TextUnformatted(stat.TotalWipes.ToString());
 
                     ImGui.TableSetColumnIndex(5);
-                    ImGui.TextUnformatted(
-                        wipesPerRun.ToString("0.00"));
+                    ImGui.TextUnformatted(wipesPerRun.ToString("0.00"));
 
                     ImGui.TableSetColumnIndex(6);
-                    ImGui.TextUnformatted(
-                        FormatDuration(stat.AverageTime));
+                    ImGui.TextUnformatted(FormatDuration(stat.AverageTime));
 
                     ImGui.TableSetColumnIndex(7);
-                    ImGui.TextUnformatted(
-                        stat.InProgress.ToString());
+                    ImGui.TextUnformatted(stat.InProgress.ToString());
                 }
 
                 ImGui.EndTable();

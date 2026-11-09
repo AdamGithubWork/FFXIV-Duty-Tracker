@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+﻿
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
@@ -104,8 +105,32 @@ namespace MentorRouletteTracker
 
             ImGui.Spacing();
 
+            if (ImGui.BeginTabBar("DutyRecordTabs"))
+            {
+                var completedTabFlags = openDutyHistory
+                    ? ImGuiTabItemFlags.SetSelected
+                    : ImGuiTabItemFlags.None;
+
+                if (ImGui.BeginTabItem("Completed Duties", completedTabFlags))
+                {
+                    DrawRecordsTable(completed: true);
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Incomplete Duties"))
+                {
+                    DrawRecordsTable(completed: false);
+                    ImGui.EndTabItem();
+                }
+
+                ImGui.EndTabBar();
+            }
+        }
+
+        private void DrawRecordsTable(bool completed)
+        {
             if (ImGui.BeginTable(
-                    "records",
+                    completed ? "completedRecords" : "incompleteRecords",
                     9,
                     ImGuiTableFlags.Borders |
                     ImGuiTableFlags.RowBg |
@@ -142,6 +167,7 @@ namespace MentorRouletteTracker
                         Record = record,
                         Index = index
                     })
+                    .Where(x => x.Record.Completed == completed)
                     // Show only this duty when opened
                     // through the floating timer window.
                     .Where(x =>
@@ -150,11 +176,11 @@ namespace MentorRouletteTracker
                             x.Record.DutyName,
                             dutyHistoryFilter,
                             StringComparison.OrdinalIgnoreCase))
-.Where(x =>
-    selectedDutyTypes.Count == 0 ||
-    selectedDutyTypes.Contains(x.Record.DutyType))
-.Where(x => MatchesGlobalDutySearch(x.Record))
+                    .Where(x =>
+                        selectedDutyTypes.Count == 0 ||
+                        selectedDutyTypes.Contains(x.Record.DutyType))
                     .Where(x => MatchesDutyPlayerFilters(x.Record))
+                    .Where(x => MatchesGlobalDutySearch(x.Record))
                     .Where(x => selectedTimeRange switch
                     {
                         1 => x.Record.Timestamp >= now.AddDays(-7),
