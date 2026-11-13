@@ -82,6 +82,12 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 DrawWorldStatistics(records);
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                DrawWorldStatistics(records, groupByDatacenter: true);
             }
 
             ImGui.EndChild();
@@ -776,9 +782,11 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawWorldStatistics(List<DutyRecord> records)
+        private void DrawWorldStatistics(List<DutyRecord> records, bool groupByDatacenter = false)
         {
-            ImGui.Text("Player World Distribution");
+            ImGui.Text(groupByDatacenter
+                ? "Player World Distribution by Datacenter"
+                : "Player World Distribution");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
@@ -797,7 +805,9 @@ namespace MentorRouletteTracker
                 .ToList();
 
             var stats = encounters
-                .GroupBy(x => x.Player.World)
+                .GroupBy(x => groupByDatacenter
+                    ? worldDatacenters.GetValueOrDefault(x.Player.World, "Unknown")
+                    : x.Player.World)
                 .Select(group => new
                 {
                     World = group.Key,
@@ -815,7 +825,7 @@ namespace MentorRouletteTracker
             }
 
             if (ImGui.BeginTable(
-                "statsWorldDistribution",
+                groupByDatacenter ? "statsDatacenterDistribution" : "statsWorldDistribution",
                 4,
                 ImGuiTableFlags.Borders |
                 ImGuiTableFlags.RowBg |
@@ -823,7 +833,7 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.SizingStretchProp |
                 ImGuiTableFlags.Sortable))
             {
-                ImGui.TableSetupColumn("World");
+                ImGui.TableSetupColumn(groupByDatacenter ? "Datacenter" : "World");
                 ImGui.TableSetupColumn("Encounters");
                 ImGui.TableSetupColumn("Percentage");
                 ImGui.TableSetupColumn("Deaths / Encounter");

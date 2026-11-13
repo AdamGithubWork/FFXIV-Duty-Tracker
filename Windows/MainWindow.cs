@@ -14,6 +14,7 @@ namespace MentorRouletteTracker
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
         private readonly IObjectTable objectTable;
+        private readonly Dictionary<string, string> worldDatacenters = new(StringComparer.OrdinalIgnoreCase);
 
         // Global filters
         private readonly HashSet<string> selectedPlayerRaces = new();
@@ -68,6 +69,19 @@ namespace MentorRouletteTracker
             this.tracker = tracker;
             this.exportDirectory = exportDirectory;
             this.objectTable = objectTable;
+
+            // Logical home datacenters, using the verified North American server list.
+            var datacenters = new (string Name, string[] Worlds)[]
+            {
+                ("Aether", ["Adamantoise", "Cactuar", "Faerie", "Gilgamesh", "Jenova", "Midgardsormr", "Sargatanas", "Siren"]),
+                ("Crystal", ["Balmung", "Brynhildr", "Coeurl", "Diabolos", "Goblin", "Malboro", "Mateus", "Zalera"]),
+                ("Dynamis", ["Cuchulainn", "Golem", "Halicarnassus", "Kraken", "Maduin", "Marilith", "Rafflesia", "Seraph"]),
+                ("Primal", ["Behemoth", "Excalibur", "Exodus", "Famfrit", "Hyperion", "Lamia", "Leviathan", "Ultros"])
+            };
+
+            foreach (var datacenter in datacenters)
+                foreach (var world in datacenter.Worlds)
+                    worldDatacenters[world] = datacenter.Name;
 
             Size = new Vector2(800, 520);
             SizeCondition = ImGuiCond.FirstUseEver;
