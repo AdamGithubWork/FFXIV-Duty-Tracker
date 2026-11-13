@@ -17,6 +17,8 @@ namespace MentorRouletteTracker.PvP
         private DateTime nextPvpCheck = DateTime.MinValue;
         private static readonly TimeSpan PvpRetryInterval =
             TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan PvpRetryLimit =
+            TimeSpan.FromMinutes(30);
 
         public PvpMatchService(
             IDalamudPluginInterface pluginInterface,
@@ -182,6 +184,17 @@ namespace MentorRouletteTracker.PvP
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
             {
+                if (now - pvpQueuedAt[matchId] >= PvpRetryLimit)
+                {
+                    pendingPvpMatches.Remove(matchId);
+                    pvpQueuedAt.Remove(matchId);
+                    unknownPvpModes.Remove(matchId);
+                    processedPvpMatches.Add(matchId);
+                    log.Warning(
+                        $"PvP scoreboard {matchId}: stopped retrying after 30 minutes without applying results.");
+                    continue;
+                }
+
                 if (now < pendingPvpMatches[matchId])
                     continue;
 
