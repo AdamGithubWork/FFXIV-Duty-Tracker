@@ -174,6 +174,7 @@ namespace MentorRouletteTracker.DutyTracking
 
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
+            nextPartyRefresh = DateTime.MinValue;
             config.PendingDuty = current;
             config.Save();
         }
