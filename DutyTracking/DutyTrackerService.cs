@@ -213,7 +213,8 @@ namespace MentorRouletteTracker.DutyTracking
             {
                 var name = member.Name.TextValue;
                 if (string.IsNullOrWhiteSpace(name) ||
-                    name == localPlayerName ||
+                    (name == localPlayerName &&
+                     member.World.RowId == localPlayer.HomeWorld.RowId) ||
                     member.GameObject == null)
                     continue;
 
