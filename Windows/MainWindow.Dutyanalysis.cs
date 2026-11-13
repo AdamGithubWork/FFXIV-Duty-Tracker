@@ -389,7 +389,7 @@ namespace MentorRouletteTracker
                                 .Where(p =>
                                     !string.IsNullOrWhiteSpace(p.Name) &&
                                     (config.IncludeSelfInStatistics ||
-                                     p.Name != objectTable.LocalPlayer?.Name.TextValue))
+                                     !IsRecordingPlayer(y, p, objectTable.LocalPlayer?.Name.TextValue)))
                                 .Sum(p => EffectiveDeaths(y, p) ?? 0)),
 
                         TotalWipes = x.Sum(y => y.WipeCount),

@@ -94,16 +94,15 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             var matchingPlayers = records
-                .SelectMany(x => x.Party)
-                .Where(x =>
+                .SelectMany(record => record.Party.Where(player =>
                     config.IncludeSelfInStatistics ||
-                    x.Name != localPlayerName)
+                    !IsRecordingPlayer(record, player, localPlayerName)))
                 .ToList();
 
             var matchingCounts = records
                 .Select(record => record.Party.Count(player =>
                     config.IncludeSelfInStatistics ||
-                    player.Name != localPlayerName))
+                    !IsRecordingPlayer(record, player, localPlayerName)))
                 .ToList();
 
             var currentDrought = 0;
@@ -212,10 +211,11 @@ namespace MentorRouletteTracker
             playerRecords ??= BuildStatisticsPlayerRecords(records);
 
             var characters = records
-                .SelectMany(x => x.Party)
+                .SelectMany(record => record.Party.Where(player =>
+                    config.IncludeSelfInStatistics ||
+                    !IsRecordingPlayer(record, player, localPlayerName)))
                 .Where(x =>
                     (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
-                    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Race) &&
                     x.Race != "Unknown")
                 .ToList();
@@ -466,7 +466,7 @@ namespace MentorRouletteTracker
                     Player = player
                 }))
                 .Where(x =>
-                    (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
                     MatchesPlayerFilters(x.Player) &&
                     !string.IsNullOrWhiteSpace(x.Player.Gender) &&
                     x.Player.Gender != "Unknown")
@@ -568,10 +568,11 @@ namespace MentorRouletteTracker
             playerRecords ??= BuildStatisticsPlayerRecords(records);
 
             var jobStats = records
-                .SelectMany(x => x.Party)
+                .SelectMany(record => record.Party.Where(player =>
+                    config.IncludeSelfInStatistics ||
+                    !IsRecordingPlayer(record, player, localPlayerName)))
                 .Where(x =>
                     (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
-                    (config.IncludeSelfInStatistics || x.Name != localPlayerName) &&
                     !string.IsNullOrWhiteSpace(x.Job) &&
                     x.Job != "Unknown")
                 .GroupBy(x => x.Job)
@@ -685,7 +686,7 @@ namespace MentorRouletteTracker
                     Player = player
                 }))
                 .Where(x =>
-                    (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
                     MatchesPlayerFilters(x.Player))
                 .ToList();
 
@@ -789,7 +790,7 @@ namespace MentorRouletteTracker
                     Player = player
                 }))
                 .Where(x =>
-                    (config.IncludeSelfInStatistics || x.Player.Name != localPlayerName) &&
+                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
                     MatchesPlayerFilters(x.Player) &&
                     !string.IsNullOrWhiteSpace(x.Player.World) &&
                     x.Player.World != "Unknown")

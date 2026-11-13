@@ -617,7 +617,7 @@ namespace MentorRouletteTracker
 
                             ImGui.TableSetColumnIndex(0);
 
-                            if (member.Name == localPlayerName)
+                            if (IsRecordingPlayer(r, member, localPlayerName))
                             {
                                 ImGui.TextUnformatted(
                                     $"{member.Name} (You)");
@@ -644,7 +644,7 @@ namespace MentorRouletteTracker
 
                             ImGui.TableSetColumnIndex(6);
 
-                            if (member.Name == localPlayerName &&
+                            if (IsRecordingPlayer(r, member, localPlayerName) &&
                                 !config.IncludeSelfInStatistics)
                             {
                                 ImGui.TextUnformatted("-");

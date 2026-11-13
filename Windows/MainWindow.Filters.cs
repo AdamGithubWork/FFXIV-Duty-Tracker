@@ -87,10 +87,21 @@ namespace MentorRouletteTracker
 
             return record.Party.Any(player =>
                 (config.IncludeSelfInStatistics ||
-                 player.Name != localPlayerName) &&
+                 !IsRecordingPlayer(record, player, localPlayerName)) &&
                 MatchesPlayerFilters(player));
         }
 
+
+        private static bool IsRecordingPlayer(
+            DutyRecord record, PartyMemberSnapshot player, string? localPlayerName)
+        {
+            if (string.IsNullOrEmpty(record.RecorderName) ||
+                string.IsNullOrEmpty(record.RecorderWorld))
+                return player.Name == localPlayerName;
+
+            return player.Name == record.RecorderName &&
+                   player.World == record.RecorderWorld;
+        }
 
         private static bool IsValidDate(int year, int month, int day)
         {

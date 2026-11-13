@@ -143,7 +143,7 @@ namespace MentorRouletteTracker
 
             var encounters = records
                 .SelectMany(r => r.Party
-                    .Where(p => config.IncludeSelfInStatistics || p.Name != localName)
+                    .Where(p => config.IncludeSelfInStatistics || !IsRecordingPlayer(r, p, localName))
                     .Select(p => new LifetimeEncounter(r, p, EffectiveDeaths(r, p) ?? 0)))
                 .ToList();
 

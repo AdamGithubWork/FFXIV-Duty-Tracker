@@ -60,7 +60,7 @@ namespace MentorRouletteTracker
                 }))
                 .Where(x =>
                     config.IncludeSelfInStatistics ||
-                    x.Player.Name != localPlayerName)
+                    !IsRecordingPlayer(x.Record, x.Player, localPlayerName))
                 .Where(x => MatchesPlayerFilters(x.Player))
                 .ToList();
 
