@@ -103,8 +103,12 @@ namespace MentorRouletteTracker
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
-            pluginInterface.UiBuilder.OpenMainUi += () =>
-                mainWindow.IsOpen = true;
+            pluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
+        }
+
+        private void OnOpenMainUi()
+        {
+            mainWindow.IsOpen = true;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
@@ -145,6 +149,7 @@ namespace MentorRouletteTracker
         {
             framework.Update -= OnFrameworkUpdate;
             pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
+            pluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi;
             commandManager.RemoveHandler(CommandName);
             windowSystem.RemoveAllWindows();
             pvpMatchService.Dispose();
