@@ -165,10 +165,13 @@ namespace MentorRouletteTracker.DutyTracking
             else if (duty.AllianceRoulette)
                 dutyType = "Alliance Raids";
 
+            var localPlayer = objectTable.LocalPlayer;
             current = new DutyRecord
             {
                 DutyName = dutyName,
                 DutyType = dutyType,
+                RecorderName = localPlayer?.Name.TextValue ?? string.Empty,
+                RecorderWorld = localPlayer?.HomeWorld.Value.Name.ExtractText() ?? string.Empty,
                 JoinedInProgress = true
             };
 
@@ -239,6 +242,11 @@ namespace MentorRouletteTracker.DutyTracking
 
             var localPlayerJob = localPlayer.ClassJob.Value.Abbreviation.ExtractText();
             var localPlayerWorld = localPlayer.HomeWorld.Value.Name.ExtractText();
+            if (string.IsNullOrEmpty(current.RecorderName) || string.IsNullOrEmpty(current.RecorderWorld))
+            {
+                current.RecorderName = localPlayerName;
+                current.RecorderWorld = localPlayerWorld;
+            }
             // Uses CustomizeIndex enum to get race and gender from the local player's Customize array
             var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);

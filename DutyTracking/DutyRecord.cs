@@ -11,6 +11,8 @@ namespace MentorRouletteTracker.DutyTracking
         public int LalafellCount { get; set; }
         public bool Completed { get; set; }
         public string PlayerJob { get; set; } = string.Empty;
+        public string RecorderName { get; set; } = string.Empty;
+        public string RecorderWorld { get; set; } = string.Empty;
         public TimeSpan TimeInDuty { get; set; }
         public List<PartyMemberSnapshot> Party { get; set; } = new();
         public string Note { get; set; } = string.Empty;
