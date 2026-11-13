@@ -78,6 +78,7 @@ namespace MentorRouletteTracker.PvP
             }
 
             var matchingRecord = config.Records
+                .Where(r => r.DutyType == "PvP")
                 .Where(r =>
                     Math.Abs(
                         (r.Timestamp.ToUniversalTime() -
