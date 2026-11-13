@@ -39,6 +39,7 @@ namespace MentorRouletteTracker
                 ImGui.Text("Player Analysis");
                 ImGui.TextDisabled(
                     "Player statistics from completed duties matching global filters.");
+                ImGui.TextDisabled("Death averages use encounters with known death counts only.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -229,7 +230,8 @@ namespace MentorRouletteTracker
                 {
                     Race = x.Key,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
+                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                    AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                 })
                 .OrderBy(x => x.Race)
                 .ToList();
@@ -283,10 +285,10 @@ namespace MentorRouletteTracker
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceStats.OrderBy(x =>
-                                x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Race).ToList()
                             : raceStats.OrderByDescending(x =>
-                                x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Race).ToList(),
 
                         _ => raceStats
@@ -297,9 +299,7 @@ namespace MentorRouletteTracker
 
                 foreach (var stat in raceStats)
                 {
-                    var deathsPerSeen = stat.Seen == 0
-                        ? 0
-                        : (double)stat.Deaths / stat.Seen;
+                    var deathsPerSeen = stat.AverageDeaths;
 
                     ImGui.TableNextRow();
 
@@ -313,7 +313,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Deaths.ToString());
 
                     ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(deathsPerSeen.ToString("0.00"));
+                    ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
                 }
 
                 ImGui.EndTable();
@@ -340,7 +340,8 @@ namespace MentorRouletteTracker
                     Race = x.Key.Race,
                     Gender = x.Key.Gender,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
+                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                    AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                 })
                 .OrderBy(x => x.Race)
                 .ThenBy(x => x.Gender)
@@ -410,11 +411,11 @@ namespace MentorRouletteTracker
 
                         4 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceGenderStats.OrderBy(x =>
-                                x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList()
                             : raceGenderStats.OrderByDescending(x =>
-                                x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList(),
 
@@ -426,9 +427,7 @@ namespace MentorRouletteTracker
 
                 foreach (var stat in raceGenderStats)
                 {
-                    var deathsPerSeen = stat.Seen == 0
-                        ? 0
-                        : (double)stat.Deaths / stat.Seen;
+                    var deathsPerSeen = stat.AverageDeaths;
 
                     ImGui.TableNextRow();
 
@@ -445,7 +444,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Deaths.ToString());
 
                     ImGui.TableSetColumnIndex(4);
-                    ImGui.TextUnformatted(deathsPerSeen.ToString("0.00"));
+                    ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
                 }
 
                 ImGui.EndTable();
@@ -475,7 +474,8 @@ namespace MentorRouletteTracker
                 {
                     Gender = group.Key,
                     Seen = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderBy(x => x.Gender)
                 .ToList();
@@ -524,8 +524,8 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Deaths).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => (double)x.Deaths / x.Seen).ToList()
-                            : stats.OrderByDescending(x => (double)x.Deaths / x.Seen).ToList(),
+                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };
@@ -548,7 +548,7 @@ namespace MentorRouletteTracker
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(
-                        ((double)stat.Deaths / stat.Seen).ToString("0.00"));
+                        stat.AverageDeaths?.ToString("0.00") ?? "-");
                 }
 
                 ImGui.EndTable();
@@ -609,7 +609,8 @@ namespace MentorRouletteTracker
                     {
                         Job = x.Key,
                         Seen = x.Count(),
-                        Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0)
+                        Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                        AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                     })
                     .ToList();
 
@@ -635,10 +636,10 @@ namespace MentorRouletteTracker
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? stats.OrderBy(
-                                x => x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x => x.AverageDeaths)
                                 .ThenBy(x => x.Job).ToList()
                             : stats.OrderByDescending(
-                                x => x.Seen == 0 ? 0 : (double)x.Deaths / x.Seen)
+                                x => x.AverageDeaths)
                                 .ThenBy(x => x.Job).ToList(),
 
                         _ => stats
@@ -649,9 +650,7 @@ namespace MentorRouletteTracker
 
                 foreach (var stat in stats)
                 {
-                    var deathsPerSeen = stat.Seen == 0
-                        ? 0
-                        : (double)stat.Deaths / stat.Seen;
+                    var deathsPerSeen = stat.AverageDeaths;
 
                     ImGui.TableNextRow();
 
@@ -665,7 +664,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Deaths.ToString());
 
                     ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(deathsPerSeen.ToString("0.00"));
+                    ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
                 }
 
                 ImGui.EndTable();
@@ -699,7 +698,8 @@ namespace MentorRouletteTracker
                 {
                     Status = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderByDescending(x => x.Encounters)
                 .ToList();
@@ -744,8 +744,8 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Encounters).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => (double)x.Deaths / x.Encounters).ToList()
-                            : stats.OrderByDescending(x => (double)x.Deaths / x.Encounters).ToList(),
+                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };
@@ -769,7 +769,7 @@ namespace MentorRouletteTracker
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(
-                        $"{(double)stat.Deaths / stat.Encounters:F2}");
+                        stat.AverageDeaths?.ToString("F2") ?? "-");
                 }
 
                 ImGui.EndTable();
@@ -802,7 +802,8 @@ namespace MentorRouletteTracker
                 {
                     World = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderByDescending(x => x.Encounters)
                 .ToList();
@@ -847,8 +848,8 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Encounters).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => (double)x.Deaths / x.Encounters).ToList()
-                            : stats.OrderByDescending(x => (double)x.Deaths / x.Encounters).ToList(),
+                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };
@@ -872,7 +873,7 @@ namespace MentorRouletteTracker
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(
-                        $"{(double)stat.Deaths / stat.Encounters:F2}");
+                        stat.AverageDeaths?.ToString("F2") ?? "-");
                 }
 
                 ImGui.EndTable();

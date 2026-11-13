@@ -336,9 +336,27 @@ namespace MentorRouletteTracker
             }
         }
 
+        private double? AverageKnownDeathsPerRun(IEnumerable<DutyRecord> records)
+        {
+            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
+            return records.Select(record =>
+            {
+                var deaths = record.Party
+                    .Where(player => !string.IsNullOrWhiteSpace(player.Name) &&
+                        (config.IncludeSelfInStatistics || !IsRecordingPlayer(record, player, localPlayerName)))
+                    .Select(player => EffectiveDeaths(record, player))
+                    .ToList();
+
+                return deaths.Count > 0 && deaths.All(count => count.HasValue)
+                    ? (double?)deaths.Sum(count => count.GetValueOrDefault())
+                    : null;
+            }).Average();
+        }
+
         private void DrawDutySpecificDetails(List<DutyRecord> records)
         {
             ImGui.Text("Duty Specific Details");
+            ImGui.TextDisabled("Deaths / Run uses runs with known deaths for every included player.");
 
             ImGui.Spacing();
 
@@ -383,6 +401,7 @@ namespace MentorRouletteTracker
                     {
                         Duty = x.Key,
                         Runs = x.Count(),
+                        AverageDeaths = AverageKnownDeathsPerRun(x),
 
                         Deaths = x.Sum(y =>
                             y.Party
@@ -423,15 +442,11 @@ namespace MentorRouletteTracker
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? stats.OrderBy(x =>
-                                x.Runs == 0
-                                    ? 0
-                                    : (double)x.Deaths / x.Runs)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Duty)
                                 .ToList()
                             : stats.OrderByDescending(x =>
-                                x.Runs == 0
-                                    ? 0
-                                    : (double)x.Deaths / x.Runs)
+                                x.AverageDeaths)
                                 .ThenBy(x => x.Duty)
                                 .ToList(),
 
@@ -481,9 +496,7 @@ namespace MentorRouletteTracker
 
                 foreach (var stat in stats)
                 {
-                    var deathsPerRun = stat.Runs == 0
-                        ? 0
-                        : (double)stat.Deaths / stat.Runs;
+                    var deathsPerRun = stat.AverageDeaths;
 
                     var wipesPerRun = stat.Runs == 0
                         ? 0
@@ -501,7 +514,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Deaths.ToString());
 
                     ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(deathsPerRun.ToString("0.00"));
+                    ImGui.TextUnformatted(deathsPerRun?.ToString("0.00") ?? "-");
 
                     ImGui.TableSetColumnIndex(4);
                     ImGui.TextUnformatted(stat.TotalWipes.ToString());

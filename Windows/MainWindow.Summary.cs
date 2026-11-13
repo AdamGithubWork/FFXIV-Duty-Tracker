@@ -264,6 +264,11 @@ namespace MentorRouletteTracker
                 .GroupBy(e => (e.Player.Name, e.Player.World))
                 .ToList();
 
+            var playersWithKnownDeaths = encounters
+                .Where(e => EffectiveDeaths(e.Record, e.Player).HasValue)
+                .GroupBy(e => (e.Player.Name, e.Player.World))
+                .ToList();
+
             Add("Individual Player Records", new()
             {
                 ("Most frequently encountered player", NamedGroupExt(playersByIdentity,
@@ -278,15 +283,15 @@ namespace MentorRouletteTracker
                 ("Most cumulative deaths by a single player", NamedGroupExt(playersByIdentity,
                     g => g.Sum(e => e.Deaths),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Sum(e => e.Deaths)} deaths")),
-                ("Highest average deaths per encounter by a player", NamedGroupExt(playersByIdentity,
+                ("Highest average deaths per encounter by a player", NamedGroupExt(playersWithKnownDeaths,
                     g => g.Average(e => e.Deaths),
-                    g => $"{g.Key.Name}@{g.Key.World} — {g.Average(e => e.Deaths):F2} deaths/encounter ({g.Count()} encounters)")),
+                    g => $"{g.Key.Name}@{g.Key.World} — {g.Average(e => e.Deaths):F2} deaths/encounter ({g.Count()} known encounters)")),
                 ("Most different duties encountered with one player", NamedGroupExt(playersByIdentity,
                     g => g.Select(e => e.Record.DutyName).Distinct().Count(),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Select(e => e.Record.DutyName).Distinct().Count()} duties")),
                 ("Most deathless encounters with one player", NamedGroupExt(playersByIdentity,
-                    g => g.Count(e => e.Deaths == 0),
-                    g => $"{g.Key.Name}@{g.Key.World} — {g.Count(e => e.Deaths == 0)} deathless encounters"))
+                    g => g.Count(e => e.IsConfirmedDeathless),
+                    g => $"{g.Key.Name}@{g.Key.World} — {g.Count(e => e.IsConfirmedDeathless)} deathless encounters"))
             });
 
             string Streak(Func<DutyRecord, bool> qualifies)
@@ -362,7 +367,8 @@ namespace MentorRouletteTracker
             {
                 ("Longest streak without a wipe", Streak(r => r.WipeCount == 0)),
                 ("Longest streak of duties containing wipes", Streak(r => r.WipeCount > 0)),
-                ("Longest streak without a player death", Streak(r => TotalDeaths(r) == 0)),
+                ("Longest streak without a player death", Streak(r =>
+                    byRecord[r].Count > 0 && byRecord[r].All(e => e.IsConfirmedDeathless))),
                 ("Longest streak of duties containing at least one death", Streak(r => TotalDeaths(r) > 0)),
                 ("Longest streak without encountering a Lalafell", Streak(r => CountLalafell(r) == 0)),
                 ("Longest streak of duties containing a Lalafell", Streak(r => CountLalafell(r) > 0)),
@@ -504,7 +510,10 @@ namespace MentorRouletteTracker
         private sealed record LifetimeEncounter(
             DutyRecord Record,
             PartyMemberSnapshot Player,
-            int Deaths);
+            int Deaths)
+        {
+            public bool IsConfirmedDeathless => EffectiveDeaths(Record, Player) == 0;
+        }
 
         private static DateTime LifetimeWeekStart(DateTime date)
         {

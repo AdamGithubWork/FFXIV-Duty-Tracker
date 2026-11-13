@@ -26,7 +26,8 @@ namespace MentorRouletteTracker
             public required List<PlayerEncounter> Encounters { get; init; }
             public int TimesSeen => Encounters.Count;
             public required int TotalDeaths { get; init; }
-            public double AverageDeaths => TimesSeen == 0 ? 0 : (double)TotalDeaths / TimesSeen;
+            public int KnownDeathEncounters => Encounters.Count(x => EffectiveDeaths(x.Record, x.Player).HasValue);
+            public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double)TotalDeaths / KnownDeathEncounters;
         }
 
         private void DrawPeopleTab()
@@ -151,7 +152,7 @@ namespace MentorRouletteTracker
                     ImGui.TableSetColumnIndex(5);
                     ImGui.TextUnformatted(player.TotalDeaths.ToString());
                     ImGui.TableSetColumnIndex(6);
-                    ImGui.TextUnformatted(player.AverageDeaths.ToString("F2"));
+                    ImGui.TextUnformatted(player.AverageDeaths?.ToString("F2") ?? "-");
                 }
                 ImGui.EndTable();
             }
@@ -181,7 +182,7 @@ namespace MentorRouletteTracker
                 }
                 else
                 {
-                    ImGui.Text($"Encounters: {selected.TimesSeen}    Total deaths: {selected.TotalDeaths}    Average: {selected.AverageDeaths:F2}");
+                    ImGui.Text($"Encounters: {selected.TimesSeen}    Total deaths: {selected.TotalDeaths}    Average: {selected.AverageDeaths?.ToString("F2") ?? "-"}");
                     ImGui.Spacing();
 
                     if (ImGui.BeginTable(
