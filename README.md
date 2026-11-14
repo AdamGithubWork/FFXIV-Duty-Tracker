@@ -46,6 +46,8 @@ The day-and-time heatmap shows when you run duties or how long those runs take.
 See milestones across your completed duties: fastest clears, most wipes, player
 records, streaks, and busy days. Click a linked result to open that duty.
 Milestones use duty type, duty search, and date filters. Player filters don't apply.
+Use Customize milestones to show or hide individual milestones by category.
+Your choices are saved. Show all milestones restores everything.
 
 ### People
 

@@ -19,6 +19,7 @@ namespace MentorRouletteTracker
         public bool ShowStatusStatistics { get; set; } = true;
         public bool ShowWorldStatistics { get; set; } = true;
         public bool ShowDatacenterStatistics { get; set; } = true;
+        public HashSet<string> HiddenMilestones { get; set; } = new();
 
         [NonSerialized]
         private HistorySession? history;

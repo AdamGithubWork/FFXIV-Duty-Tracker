@@ -34,6 +34,7 @@ namespace MentorRouletteTracker
 
         private void DrawSummaryTab()
         {
+            config.HiddenMilestones ??= new();
             var localName = objectTable.LocalPlayer?.Name.TextValue;
 
             var dutyFilterKey = string.Join("|",
@@ -59,6 +60,7 @@ namespace MentorRouletteTracker
                     ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Milestones");
+                DrawMilestoneCustomization();
                 ImGui.TextDisabled("Completed duties only. Uses duty type, duty search, and date filters. Player filters don't apply.");
                 ImGui.TextDisabled("Death totals include known counts only. Duty death records require every included player's count. '-' means no known counts.");
                 ImGui.Separator();
@@ -67,8 +69,14 @@ namespace MentorRouletteTracker
                     ImGui.TextDisabled("No completed duties match your duty filters.");
                 else
                 {
+                    var anyVisible = false;
                     foreach (var section in milestoneSections)
                     {
+                        var visibleRows = section.Rows.Where(row =>
+                            !config.HiddenMilestones.Contains(MilestoneKey(section.Title, row.Label))).ToList();
+                        if (visibleRows.Count == 0)
+                            continue;
+                        anyVisible = true;
                         ImGui.Spacing();
                         if (ImGui.CollapsingHeader($"{section.Title}##Lifetime{section.Title}",
                                 ImGuiTreeNodeFlags.DefaultOpen))
@@ -81,7 +89,7 @@ namespace MentorRouletteTracker
                                 ImGui.TableSetupColumn("Result");
                                 ImGui.TableHeadersRow();
 
-                                foreach (var row in section.Rows)
+                                foreach (var row in visibleRows)
                                 {
                                     ImGui.TableNextRow();
                                     ImGui.TableSetColumnIndex(0);
@@ -110,10 +118,56 @@ namespace MentorRouletteTracker
                             }
                         }
                     }
+                    if (!anyVisible)
+                        ImGui.TextDisabled("No milestones selected. Choose some in Customize milestones.");
                 }
             }
 
             ImGui.EndChild();
+        }
+
+        private static string MilestoneKey(string category, string label) => $"{category}/{label}";
+
+        private void DrawMilestoneCustomization()
+        {
+            ImGui.SetNextItemWidth(Math.Min(260f, ImGui.GetContentRegionAvail().X));
+            if (!ImGui.BeginCombo("##MilestoneVisibility", "Customize milestones", ImGuiComboFlags.HeightLarge))
+                return;
+
+            var changed = false;
+            if (ImGui.Button("Show all milestones") && config.HiddenMilestones.Count > 0)
+            {
+                config.HiddenMilestones.Clear();
+                changed = true;
+            }
+            ImGui.Separator();
+
+            if (milestoneSections.Count == 0)
+                ImGui.TextWrapped("Milestone choices appear when completed duties match your duty filters.");
+            foreach (var section in milestoneSections)
+            {
+                ImGui.PushID(section.Title);
+                if (ImGui.CollapsingHeader(section.Title))
+                {
+                    foreach (var row in section.Rows)
+                    {
+                        var key = MilestoneKey(section.Title, row.Label);
+                        var visible = !config.HiddenMilestones.Contains(key);
+                        if (!ImGui.Checkbox(row.Label, ref visible))
+                            continue;
+                        if (visible)
+                            config.HiddenMilestones.Remove(key);
+                        else
+                            config.HiddenMilestones.Add(key);
+                        changed = true;
+                    }
+                }
+                ImGui.PopID();
+            }
+
+            if (changed)
+                config.Save();
+            ImGui.EndCombo();
         }
 
         private void RebuildMilestones(string? localName)
