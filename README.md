@@ -33,6 +33,8 @@ export your history to CSV.
 See players grouped by race, gender, job, status, home world, and datacenter.
 Tables show encounters, unique players, and death stats. Datacenter grouping
 currently covers North American home worlds; other worlds show as Unknown.
+Use Customize statistics to show or hide the overview, race, gender, job, status,
+home world, and datacenter sections. Your choices are saved; all sections start visible.
 
 ### Duty Analysis
 

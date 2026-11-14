@@ -20,6 +20,7 @@ namespace MentorRouletteTracker
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Player stats");
+                DrawStatisticsCustomization();
                 ImGui.TextDisabled(
                     "Players from completed duties that match your filters.");
                 ImGui.TextDisabled("Droughts count duties where no players match your filters.");
@@ -35,46 +36,63 @@ namespace MentorRouletteTracker
                 }
 
                 var playerRecords = BuildStatisticsPlayerRecords(records);
-                DrawSelectedPlayerStatistics(records, playerRecords);
+                var anyVisible = false;
+                void Section(bool visible, Action draw)
+                {
+                    if (!visible)
+                        return;
+                    if (anyVisible)
+                    {
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Spacing();
+                    }
+                    draw();
+                    anyVisible = true;
+                }
 
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
+                Section(config.ShowStatisticsOverview, () => DrawSelectedPlayerStatistics(records, playerRecords));
+                Section(config.ShowRaceStatistics, () => DrawRaceStatistics(records, playerRecords, true));
+                Section(config.ShowGenderStatistics, () => DrawGenderStatistics(records, playerRecords));
+                Section(config.ShowJobStatistics, () => DrawJobStatistics(records, playerRecords, true));
+                Section(config.ShowStatusStatistics, () => DrawStatusStatistics(records, playerRecords));
+                Section(config.ShowWorldStatistics, () => DrawWorldStatistics(records, playerRecords));
+                Section(config.ShowDatacenterStatistics, () => DrawWorldStatistics(records, playerRecords, groupByDatacenter: true));
 
-                DrawRaceStatistics(records, playerRecords, true);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawGenderStatistics(records, playerRecords);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawJobStatistics(records, playerRecords, true);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawStatusStatistics(records, playerRecords);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawWorldStatistics(records, playerRecords);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                DrawWorldStatistics(records, playerRecords, groupByDatacenter: true);
+                if (!anyVisible)
+                    ImGui.TextDisabled("No statistics selected. Choose sections in Customize statistics.");
             }
 
             ImGui.EndChild();
+        }
+
+        private void DrawStatisticsCustomization()
+        {
+            ImGui.SetNextItemWidth(Math.Min(240f, ImGui.GetContentRegionAvail().X));
+            if (!ImGui.BeginCombo("##StatisticsVisibility", "Customize statistics"))
+                return;
+
+            var changed = false;
+            void Option(string label, bool visible, Action<bool> update)
+            {
+                if (ImGui.Checkbox(label, ref visible))
+                {
+                    update(visible);
+                    changed = true;
+                }
+            }
+
+            Option("Overview", config.ShowStatisticsOverview, value => config.ShowStatisticsOverview = value);
+            Option("Race", config.ShowRaceStatistics, value => config.ShowRaceStatistics = value);
+            Option("Gender", config.ShowGenderStatistics, value => config.ShowGenderStatistics = value);
+            Option("Job", config.ShowJobStatistics, value => config.ShowJobStatistics = value);
+            Option("Status", config.ShowStatusStatistics, value => config.ShowStatusStatistics = value);
+            Option("Home world", config.ShowWorldStatistics, value => config.ShowWorldStatistics = value);
+            Option("Datacenter", config.ShowDatacenterStatistics, value => config.ShowDatacenterStatistics = value);
+
+            if (changed)
+                config.Save();
+            ImGui.EndCombo();
         }
 
         private void DrawSelectedPlayerStatistics(

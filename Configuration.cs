@@ -12,6 +12,13 @@ namespace MentorRouletteTracker
         public List<uint> TimerVisibleContentTypeIds { get; set; } = new();
         public bool TrackAllianceMembers { get; set; }
         public bool IncludeSelfInStatistics { get; set; }
+        public bool ShowStatisticsOverview { get; set; } = true;
+        public bool ShowRaceStatistics { get; set; } = true;
+        public bool ShowGenderStatistics { get; set; } = true;
+        public bool ShowJobStatistics { get; set; } = true;
+        public bool ShowStatusStatistics { get; set; } = true;
+        public bool ShowWorldStatistics { get; set; } = true;
+        public bool ShowDatacenterStatistics { get; set; } = true;
 
         [NonSerialized]
         private HistorySession? history;
