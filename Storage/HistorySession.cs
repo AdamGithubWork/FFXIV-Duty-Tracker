@@ -235,11 +235,15 @@ public sealed class HistorySession : IDisposable
             writer.WriteString("PendingDutyId", snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id);
             writer.WritePropertyName("Records");
             writer.WriteStartArray();
-            foreach (var row in snapshot.Duties.Where(row => !row.Pending)) writer.WriteRawValue(row.Json);
+            foreach (var row in snapshot.Duties.Where(row => !row.Pending))
+                JsonSerializer.Serialize(writer, row.ToRecord());
             writer.WriteEndArray();
             writer.WritePropertyName("PendingDuty");
             var active = snapshot.Duties.SingleOrDefault(row => row.Pending);
-            if (active == null) writer.WriteNullValue(); else writer.WriteRawValue(active.Json);
+            if (active == null)
+                writer.WriteNullValue();
+            else
+                JsonSerializer.Serialize(writer, active.ToRecord());
             writer.WritePropertyName("SeenPlayers");
             writer.WriteRawValue(snapshot.SeenPlayersJson);
             writer.WriteEndObject();

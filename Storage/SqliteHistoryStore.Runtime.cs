@@ -7,7 +7,7 @@ namespace MentorRouletteTracker.Storage;
 
 public sealed partial class SqliteHistoryStore
 {
-    private Dictionary<string, string> fingerprints = new();
+    private Dictionary<string, DutyWrite> savedDuties = new();
     private string seenFingerprint = "[]";
     private long revision;
     private string? pendingDutyId;
@@ -35,8 +35,8 @@ public sealed partial class SqliteHistoryStore
         }
         var data = new HistoryData { SeenPlayers = seen };
         var identities = new Dictionary<string, DutyRecord>();
-        var orders = new Dictionary<string, (bool Pending, int Order)>();
-        command.CommandText = "SELECT * FROM duty_runs ORDER BY history_order, rowid;";
+        var pendingIds = new HashSet<string>();
+        command.CommandText = "SELECT * FROM duty_runs ORDER BY rowid;";
         using (var reader = command.ExecuteReader())
         {
             while (reader.Read())
@@ -58,10 +58,10 @@ public sealed partial class SqliteHistoryStore
                 string id = (string)reader["id"];
                 bool pending = (long)reader["is_pending"] != 0;
                 identities.Add(id, record);
-                orders.Add(id, (pending, checked((int)(long)reader["history_order"])));
                 data.RecordIds.Add(record, id);
                 if (pending)
                 {
+                    pendingIds.Add(id);
                     if (data.PendingDuty != null) throw new InvalidDataException("Multiple active duties found.");
                     data.PendingDuty = record;
                 }
@@ -85,8 +85,8 @@ public sealed partial class SqliteHistoryStore
             }
         }
         transaction.Commit();
-        fingerprints = identities.ToDictionary(entry => entry.Key, entry =>
-            new DutyWrite(entry.Key, JsonSerializer.Serialize(entry.Value), orders[entry.Key].Pending, orders[entry.Key].Order).Fingerprint);
+        savedDuties = identities.ToDictionary(entry => entry.Key, entry =>
+            DutyWrite.Capture(entry.Key, entry.Value, pendingIds.Contains(entry.Key)));
         seenFingerprint = JsonSerializer.Serialize(data.SeenPlayers);
         pendingDutyId = data.PendingDuty == null ? null : data.RecordIds[data.PendingDuty];
         return data;
@@ -95,14 +95,16 @@ public sealed partial class SqliteHistoryStore
     internal static HistoryWrite Capture(HistoryData data)
     {
         var rows = new List<DutyWrite>();
-        void Add(DutyRecord record, bool pending, int order)
+        void Add(DutyRecord record, bool pending)
         {
             if (!data.RecordIds.TryGetValue(record, out var id))
                 data.RecordIds.Add(record, id = Guid.NewGuid().ToString("N"));
-            rows.Add(new(id, JsonSerializer.Serialize(record), pending, order));
+            rows.Add(DutyWrite.Capture(id, record, pending));
         }
-        for (int i = 0; i < data.Records.Count; i++) Add(data.Records[i], false, i);
-        if (data.PendingDuty != null) Add(data.PendingDuty, true, -1);
+        foreach (var record in data.Records)
+            Add(record, false);
+        if (data.PendingDuty != null)
+            Add(data.PendingDuty, true);
         if (rows.Select(row => row.Id).Distinct().Count() != rows.Count)
             throw new InvalidDataException("The same duty object is present more than once.");
         var retained = data.Records.ToHashSet();
@@ -122,7 +124,7 @@ public sealed partial class SqliteHistoryStore
                 id = Guid.NewGuid().ToString("N");
                 data.RecordIds.Add(data.PendingDuty, id);
             }
-            rows.Add(new DutyWrite(id, JsonSerializer.Serialize(data.PendingDuty), true, -1));
+            rows.Add(DutyWrite.Capture(id, data.PendingDuty, true));
         }
         return new HistoryWrite(rows, string.Empty, PendingOnly: true);
     }
@@ -138,14 +140,14 @@ public sealed partial class SqliteHistoryStore
             throw new IOException("Another database session changed the history.");
 
         var desired = snapshot.PendingOnly
-            ? new Dictionary<string, string>(fingerprints)
-            : new Dictionary<string, string>();
+            ? new Dictionary<string, DutyWrite>(savedDuties)
+            : new Dictionary<string, DutyWrite>();
         if (snapshot.PendingOnly && pendingDutyId != null)
             desired.Remove(pendingDutyId);
         foreach (var row in snapshot.Duties)
-            desired.Add(row.Id, row.Fingerprint);
-        var deleted = fingerprints.Keys.Except(desired.Keys).ToArray();
-        var changed = snapshot.Duties.Where(row => !fingerprints.TryGetValue(row.Id, out var previous) || previous != row.Fingerprint).ToArray();
+            desired.Add(row.Id, row);
+        var deleted = savedDuties.Keys.Except(desired.Keys).ToArray();
+        var changed = snapshot.Duties.Where(row => !savedDuties.TryGetValue(row.Id, out var previous) || !row.SameValues(previous)).ToArray();
         var seenJson = snapshot.PendingOnly ? seenFingerprint : snapshot.SeenPlayersJson;
         bool seenChanged = seenFingerprint != seenJson;
         if (deleted.Length == 0 && changed.Length == 0 && !seenChanged) { transaction.Commit(); return; }
@@ -154,7 +156,7 @@ public sealed partial class SqliteHistoryStore
             Execute(connection, transaction, "DELETE FROM duty_runs WHERE id=$id;", new() { ["id"] = id });
         foreach (var row in changed)
         {
-            var record = JsonSerializer.Deserialize<DutyRecord>(row.Json) ?? throw new InvalidDataException("Invalid duty snapshot.");
+            var record = row.Record;
             var fields = new Dictionary<string, object?>
             {
                 ["id"] = row.Id, ["timestamp"] = record.Timestamp.ToString("O", CultureInfo.InvariantCulture),
@@ -164,7 +166,7 @@ public sealed partial class SqliteHistoryStore
                 ["player_job"] = record.PlayerJob ?? string.Empty, ["recorder_name"] = record.RecorderName ?? string.Empty,
                 ["recorder_world"] = record.RecorderWorld ?? string.Empty, ["duration_ticks"] = record.TimeInDuty.Ticks,
                 ["note"] = record.Note ?? string.Empty, ["legacy_pvp_deaths"] = record.PvPDeaths,
-                ["is_pending"] = row.Pending ? 1 : 0, ["history_order"] = row.Order,
+                ["is_pending"] = row.Pending ? 1 : 0,
                 ["checkpoint_utc"] = record.CheckpointUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
             };
             var columns = fields.Keys.ToArray();
@@ -172,9 +174,9 @@ public sealed partial class SqliteHistoryStore
                 $"INSERT INTO duty_runs ({string.Join(',', columns)}) VALUES ({string.Join(',', columns.Select(column => '$' + column))}) " +
                 $"ON CONFLICT(id) DO UPDATE SET {string.Join(',', columns.Where(column => column != "id").Select(column => $"{column}=excluded.{column}"))};", fields);
             Execute(connection, transaction, "DELETE FROM duty_players WHERE duty_id=$id;", new() { ["id"] = row.Id });
-            for (int index = 0; index < record.Party.Count; index++)
+            for (int index = 0; index < row.Party.Count; index++)
             {
-                var player = record.Party[index];
+                var player = row.Party[index];
                 Execute(connection, transaction, """
                     INSERT INTO duty_players(duty_id,party_index,name,world,job,race,gender,status,death_count,pvp_scoreboard_deaths)
                     VALUES ($duty,$idx,$name,$world,$job,$race,$gender,$status,$deaths,$scoreboard);
@@ -190,7 +192,7 @@ public sealed partial class SqliteHistoryStore
             new() { ["seen"] = seenJson });
         transaction.Commit();
         revision++;
-        fingerprints = desired;
+        savedDuties = desired;
         seenFingerprint = seenJson;
         pendingDutyId = snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id;
     }

@@ -22,7 +22,9 @@ migration or fallback yet.
 - `upload_queue`: unused. No uploader is implemented.
 
 Schema v2 added the import archive and source-record IDs. Version 3 added
-`history_state` and `history_order`. `PRAGMA user_version` tracks the version.
+`history_state` and `history_order`. Version 4 removes `history_order` and loads
+duties in SQLite row order. Updating a duty keeps its row ID, so deleting an early
+record doesn't make later records look changed. `PRAGMA user_version` tracks the version.
 
 Timestamps use round-trip strings; durations use .NET ticks. Missing scoreboard
 death counts are stored as null, separate from zero.
@@ -43,8 +45,11 @@ The current code requires this manual step.
 
 ## Saving
 
-The session copies history into a snapshot on the calling thread, then writes it
-on one background worker. If another save is queued, the newer snapshot replaces it.
+The session copies duty and player fields into typed rows on the calling thread,
+then writes them on one background worker. Rows are compared by value to find
+changes. JSON is used for recovery files and the seen-player cache, rather than
+as an intermediate copy of each duty during saves.
+If another save is queued, the newer snapshot replaces it.
 Changed duties are updated in a transaction. Deleting a duty also deletes its party
 rows. A revision check catches writes from another database session.
 

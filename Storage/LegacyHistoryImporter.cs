@@ -119,8 +119,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             ["duration_ticks"] = TimeSpan.Parse(RequiredString(record, "TimeInDuty"), CultureInfo.InvariantCulture).Ticks,
             ["note"] = OptionalString(record, "Note"), ["legacy_pvp_deaths"] = OptionalNumber(record, "PvPDeaths"),
             ["is_pending"] = pending ? 1L : 0L, ["checkpoint_utc"] = checkpointUtc,
-            ["legacy_import_id"] = hash, ["legacy_record_index"] = (long)ordinal,
-            ["history_order"] = (long)ordinal
+            ["legacy_import_id"] = hash, ["legacy_record_index"] = (long)ordinal
         };
         var players = new List<Dictionary<string, object?>>();
         var party = record.GetProperty("Party");

@@ -6,7 +6,7 @@ namespace MentorRouletteTracker.Storage;
 
 public sealed partial class SqliteHistoryStore
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     private const int ApplicationId = 0x44555459; // DUTY
 
     public string DatabasePath { get; }
@@ -101,7 +101,15 @@ public sealed partial class SqliteHistoryStore
                     migration.Parameters.AddWithValue("$seen", LegacySeenJson(archive.RootElement));
                     migration.ExecuteNonQuery();
                 }
-                migration.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
+                migration.CommandText = "PRAGMA user_version = 3;";
+                migration.ExecuteNonQuery();
+                version = 3;
+            }
+            if (version == 3)
+            {
+                using var migration = connection.CreateCommand();
+                migration.Transaction = transaction;
+                migration.CommandText = "ALTER TABLE duty_runs DROP COLUMN history_order; PRAGMA user_version = 4;";
                 migration.ExecuteNonQuery();
             }
             if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)

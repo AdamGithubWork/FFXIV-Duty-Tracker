@@ -58,7 +58,6 @@ namespace MentorRouletteTracker.DutyTracking
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
             pendingRestoreNeeded = config.History.PendingDuty != null;
-            RestorePendingDuty();
         }
 
         private void OnTerritoryChanged(uint territoryId)
