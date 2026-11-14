@@ -43,10 +43,10 @@ public sealed partial class SqliteHistoryStore
             {
                 var record = new DutyRecord
                 {
-                    Timestamp = DateTime.Parse((string)reader["timestamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                    Timestamp = DateTime.Parse((string)reader["timestamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToLocalTime(),
                     CheckpointUtc = reader["checkpoint_utc"] is DBNull
                         ? null
-                        : DateTime.Parse((string)reader["checkpoint_utc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                        : DateTime.Parse((string)reader["checkpoint_utc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime(),
                     DutyName = (string)reader["duty_name"], DutyType = (string)reader["duty_type"],
                     JoinedInProgress = (long)reader["joined_in_progress"] != 0,
                     WipeCount = checked((int)(long)reader["wipe_count"]), LalafellCount = checked((int)(long)reader["lalafell_count"]),
@@ -159,7 +159,7 @@ public sealed partial class SqliteHistoryStore
             var record = row.Record;
             var fields = new Dictionary<string, object?>
             {
-                ["id"] = row.Id, ["timestamp"] = record.Timestamp.ToString("O", CultureInfo.InvariantCulture),
+                ["id"] = row.Id, ["timestamp"] = record.Timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
                 ["duty_name"] = record.DutyName ?? string.Empty, ["duty_type"] = record.DutyType ?? string.Empty,
                 ["joined_in_progress"] = record.JoinedInProgress ? 1 : 0, ["wipe_count"] = record.WipeCount,
                 ["lalafell_count"] = record.LalafellCount, ["completed"] = record.Completed ? 1 : 0,

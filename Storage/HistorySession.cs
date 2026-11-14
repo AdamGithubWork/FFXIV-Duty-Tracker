@@ -106,6 +106,11 @@ public sealed class HistorySession : IDisposable
             ?? throw new InvalidDataException($"Recovery file {path} has no seen-player array.");
         var pendingDuty = root.GetProperty("PendingDuty").Deserialize<DutyRecord>();
         var recovered = new HistoryData { Records = records, SeenPlayers = players, PendingDuty = pendingDuty };
+        foreach (var record in records.Concat(pendingDuty == null ? Enumerable.Empty<DutyRecord>() : new[] { pendingDuty }))
+        {
+            record.Timestamp = record.Timestamp.ToUniversalTime().ToLocalTime();
+            record.CheckpointUtc = record.CheckpointUtc?.ToUniversalTime();
+        }
         if (!root.TryGetProperty("BaseRevision", out var revision))
             return (path, null, recovered);
 

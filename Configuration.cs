@@ -45,6 +45,11 @@ namespace MentorRouletteTracker
             {
                 var session = new HistorySession(new SqliteHistoryStore(
                     Path.Combine(pi.GetPluginConfigDirectory(), "history.sqlite")), reportStorageError);
+                foreach (var record in Records.Concat(PendingDuty == null ? Enumerable.Empty<DutyRecord>() : new[] { PendingDuty }))
+                {
+                    record.Timestamp = record.Timestamp.ToUniversalTime().ToLocalTime();
+                    record.CheckpointUtc = record.CheckpointUtc?.ToUniversalTime();
+                }
                 if ((Records.Count > 0 || PendingDuty != null) &&
                     (JsonSerializer.Serialize(Records) != JsonSerializer.Serialize(session.Records) ||
                      JsonSerializer.Serialize(PendingDuty) != JsonSerializer.Serialize(session.PendingDuty) ||

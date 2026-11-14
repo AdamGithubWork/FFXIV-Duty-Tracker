@@ -24,10 +24,12 @@ migration or fallback yet.
 Schema v2 added the import archive and source-record IDs. Version 3 added
 `history_state` and `history_order`. Version 4 removes `history_order` and loads
 duties in SQLite row order. Updating a duty keeps its row ID, so deleting an early
-record doesn't make later records look changed. `PRAGMA user_version` tracks the version.
+record doesn't make later records look changed. Version 5 converts duty timestamps
+and checkpoints to UTC round-trip strings. `PRAGMA user_version` tracks the version.
 
-Timestamps use round-trip strings; durations use .NET ticks. Missing scoreboard
-death counts are stored as null, separate from zero.
+Timestamps use UTC round-trip strings and load as local time for display. Checkpoints
+stay in UTC; durations use .NET ticks. Older timestamps without an offset are treated
+as local time. Missing scoreboard death counts are stored as null, separate from zero.
 
 ## Importing JSON
 

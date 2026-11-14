@@ -41,8 +41,8 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
     public static DutyWrite Capture(string id, DutyRecord record, bool pending)
     {
         var row = new DutyRow(
-            record.Timestamp,
-            record.CheckpointUtc,
+            record.Timestamp.ToUniversalTime(),
+            record.CheckpointUtc?.ToUniversalTime(),
             record.DutyName ?? string.Empty,
             record.DutyType ?? string.Empty,
             record.JoinedInProgress,

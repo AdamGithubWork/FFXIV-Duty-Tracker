@@ -107,7 +107,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         }
         var values = new Dictionary<string, object?>
         {
-            ["id"] = id, ["timestamp"] = RequiredString(record, "Timestamp"),
+            ["id"] = id, ["timestamp"] = SqliteHistoryStore.UtcTimestamp(RequiredString(record, "Timestamp")),
             ["duty_name"] = RequiredString(record, "DutyName"), ["duty_type"] = RequiredString(record, "DutyType"),
             ["joined_in_progress"] = OptionalBoolean(record, "JoinedInProgress") ? 1L : 0L,
             ["wipe_count"] = OptionalNumber(record, "WipeCount") ?? 0L,

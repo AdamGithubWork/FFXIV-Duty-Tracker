@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -6,7 +7,7 @@ namespace MentorRouletteTracker.Storage;
 
 public sealed partial class SqliteHistoryStore
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     private const int ApplicationId = 0x44555459; // DUTY
 
     public string DatabasePath { get; }
@@ -111,6 +112,34 @@ public sealed partial class SqliteHistoryStore
                 migration.Transaction = transaction;
                 migration.CommandText = "ALTER TABLE duty_runs DROP COLUMN history_order; PRAGMA user_version = 4;";
                 migration.ExecuteNonQuery();
+                version = 4;
+            }
+            if (version == 4)
+            {
+                using var migration = connection.CreateCommand();
+                migration.Transaction = transaction;
+                migration.CommandText = "SELECT id, timestamp, checkpoint_utc FROM duty_runs;";
+                var timestamps = new List<(string Id, string Timestamp, string? Checkpoint)>();
+                using (var reader = migration.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        timestamps.Add((reader.GetString(0), UtcTimestamp(reader.GetString(1)),
+                            reader.IsDBNull(2) ? null : UtcTimestamp(reader.GetString(2))));
+                    }
+                }
+                migration.CommandText = "UPDATE duty_runs SET timestamp=$timestamp, checkpoint_utc=$checkpoint WHERE id=$id;";
+                foreach (var timestamp in timestamps)
+                {
+                    migration.Parameters.Clear();
+                    migration.Parameters.AddWithValue("$id", timestamp.Id);
+                    migration.Parameters.AddWithValue("$timestamp", timestamp.Timestamp);
+                    migration.Parameters.AddWithValue("$checkpoint", (object?)timestamp.Checkpoint ?? DBNull.Value);
+                    migration.ExecuteNonQuery();
+                }
+                migration.Parameters.Clear();
+                migration.CommandText = "PRAGMA user_version = 5;";
+                migration.ExecuteNonQuery();
             }
             if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)
                 throw new InvalidDataException("The database history state is missing.");
@@ -121,6 +150,10 @@ public sealed partial class SqliteHistoryStore
         settings.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;";
         settings.ExecuteNonQuery();
     }
+
+    internal static string UtcTimestamp(string value) =>
+        DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+            .ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
     internal static string LegacySeenJson(JsonElement root)
     {
