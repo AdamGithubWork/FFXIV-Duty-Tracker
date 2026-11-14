@@ -69,6 +69,11 @@ Job and world dropdowns allow multiple selections. Choose a role or North Americ
 datacenter to select its whole group, or pick individual jobs and home worlds.
 Choose All Jobs or All Worlds to clear that selection.
 
+Minimum encounters filters People and Statistics by how many matching completed
+duties you've shared with each player. Encounters with unknown deaths still count.
+The default is 1; Clear filters resets it to 1. Records, Duty Analysis, and Summary
+aren't affected by this minimum.
+
 Player filters must match the same player. Records and Duty Analysis keep duties
 with at least one matching player; Statistics and People count matching players.
 Statistics keeps duties without a match when calculating encounter droughts.

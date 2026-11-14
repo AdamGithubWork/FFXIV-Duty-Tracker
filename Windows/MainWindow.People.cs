@@ -30,23 +30,38 @@ namespace MentorRouletteTracker
             public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double?)TotalDeaths / KnownDeathEncounters;
         }
 
-        private void DrawPeopleTab()
+        private List<PlayerEncounter> GetMatchingPlayerEncounters(IEnumerable<DutyRecord> records)
         {
-            ImGui.Text("Players you've met");
-            ImGui.Spacing();
-
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-            var encounters = FilterDutyRecords(applyPlayerFilters: false)
+            var encounters = records
                 .SelectMany(record => record.Party.Select(player => new PlayerEncounter
                 {
                     Record = record,
                     Player = player
                 }))
-                .Where(x =>
-                    config.IncludeSelfInStatistics ||
-                    !IsRecordingPlayer(x.Record, x.Player, localPlayerName))
-                .Where(x => MatchesPlayerFilters(x.Player))
+                .Where(encounter =>
+                    (config.IncludeSelfInStatistics ||
+                     !IsRecordingPlayer(encounter.Record, encounter.Player, localPlayerName)) &&
+                    MatchesPlayerFilters(encounter.Player))
                 .ToList();
+            if (minimumEncounters <= 1)
+                return encounters;
+
+            var qualifiedPlayers = encounters
+                .GroupBy(encounter => (encounter.Player.Name, encounter.Player.World))
+                .Where(group => group.Select(encounter => encounter.Record)
+                    .Distinct(ReferenceEqualityComparer.Instance).Count() >= minimumEncounters)
+                .Select(group => group.Key).ToHashSet();
+            return encounters.Where(encounter =>
+                qualifiedPlayers.Contains((encounter.Player.Name, encounter.Player.World))).ToList();
+        }
+
+        private void DrawPeopleTab()
+        {
+            ImGui.Text("Players you've met");
+            ImGui.Spacing();
+
+            var encounters = GetMatchingPlayerEncounters(FilterDutyRecords(applyPlayerFilters: false));
 
             var people = encounters
                 .GroupBy(x => (x.Player.Name, x.Player.World))

@@ -25,6 +25,7 @@ namespace MentorRouletteTracker
         private string globalPlayerSearchText = string.Empty;
         private string globalDutySearchText = string.Empty;
         private int selectedTimeRange = 0;
+        private int minimumEncounters = 1;
         private DateTime customStartDate = DateTime.Today.AddDays(-30);
         private DateTime customEndDate = DateTime.Today;
 
@@ -101,6 +102,7 @@ namespace MentorRouletteTracker
             selectedPlayerJobs.Clear();
             selectedPlayerWorlds.Clear();
             selectedTimeRange = 0;
+            minimumEncounters = 1;
 
             IsOpen = true;
         }
@@ -128,7 +130,8 @@ namespace MentorRouletteTracker
                 (selectedPlayerWorlds.Count == 0 ? 0 : 1) +
                 (string.IsNullOrWhiteSpace(globalPlayerSearchText) ? 0 : 1) +
                 (string.IsNullOrWhiteSpace(globalDutySearchText) ? 0 : 1) +
-                (selectedTimeRange == 0 ? 0 : 1);
+                (selectedTimeRange == 0 ? 0 : 1) +
+                (minimumEncounters > 1 ? 1 : 0);
 
             string filterHeader = activeFilterCount == 0
                 ? "Filters"
@@ -198,7 +201,8 @@ namespace MentorRouletteTracker
                     selectedPlayerGenders.Count +
                     selectedPlayerStatuses.Count +
                     (selectedPlayerJobs.Count == 0 ? 0 : 1) +
-                    (selectedPlayerWorlds.Count == 0 ? 0 : 1);
+                    (selectedPlayerWorlds.Count == 0 ? 0 : 1) +
+                    (minimumEncounters > 1 ? 1 : 0);
 
                 ImGui.Text("Player filters");
                 ImGui.SameLine();
@@ -211,6 +215,11 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 DrawJobAndWorldFilters();
+                ImGui.Spacing();
+
+                ImGui.SetNextItemWidth(Math.Min(260f, ImGui.GetContentRegionAvail().X));
+                ImGui.SliderInt("Minimum encounters", ref minimumEncounters, 1, 100, "%d", ImGuiSliderFlags.AlwaysClamp);
+                ImGui.TextDisabled("People and Statistics: matching completed duties per player.");
                 ImGui.Spacing();
 
                 ImGui.Text("Race");
@@ -374,6 +383,7 @@ namespace MentorRouletteTracker
                     selectedPlayerJobs.Clear();
                     selectedPlayerWorlds.Clear();
                     selectedTimeRange = 0;
+                    minimumEncounters = 1;
 
                     dutyHistoryFilter = null;
                 }

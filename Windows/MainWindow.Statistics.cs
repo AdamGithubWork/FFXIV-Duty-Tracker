@@ -34,20 +34,20 @@ namespace MentorRouletteTracker
                     return;
                 }
 
-                DrawSelectedPlayerStatistics(records);
+                var playerRecords = BuildStatisticsPlayerRecords(records);
+                DrawSelectedPlayerStatistics(records, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                var playerRecords = BuildStatisticsPlayerRecords(records);
                 DrawRaceStatistics(records, playerRecords, true);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawGenderStatistics(records);
+                DrawGenderStatistics(records, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
@@ -59,42 +59,36 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawStatusStatistics(records);
+                DrawStatusStatistics(records, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawWorldStatistics(records);
+                DrawWorldStatistics(records, playerRecords);
 
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                DrawWorldStatistics(records, groupByDatacenter: true);
+                DrawWorldStatistics(records, playerRecords, groupByDatacenter: true);
             }
 
             ImGui.EndChild();
         }
 
-        private void DrawSelectedPlayerStatistics(List<DutyRecord> records)
+        private void DrawSelectedPlayerStatistics(
+            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
             ImGui.Text("Players in these duties");
             ImGui.Spacing();
 
             var matchingPlayers = records
-                .SelectMany(record => record.Party.Where(player =>
-                    config.IncludeSelfInStatistics ||
-                    !IsRecordingPlayer(record, player, localPlayerName)))
-                .Where(MatchesPlayerFilters)
+                .SelectMany(record => record.Party.Where(playerRecords.ContainsKey))
                 .ToList();
 
             var matchingCounts = records
-                .Select(record => record.Party.Count(player =>
-                    (config.IncludeSelfInStatistics ||
-                     !IsRecordingPlayer(record, player, localPlayerName)) && MatchesPlayerFilters(player)))
+                .Select(record => record.Party.Count(playerRecords.ContainsKey))
                 .ToList();
 
             var currentDrought = 0;
@@ -182,19 +176,14 @@ namespace MentorRouletteTracker
             return known.Count == 0 ? null : known.Sum(count => count.GetValueOrDefault());
         }
 
-        private static Dictionary<PartyMemberSnapshot, DutyRecord>
+        private Dictionary<PartyMemberSnapshot, DutyRecord>
             BuildStatisticsPlayerRecords(List<DutyRecord> records)
         {
             var lookup = new Dictionary<PartyMemberSnapshot, DutyRecord>(
                 ReferenceEqualityComparer.Instance);
 
-            foreach (var record in records)
-            {
-                foreach (var player in record.Party)
-                {
-                    lookup.TryAdd(player, record);
-                }
-            }
+            foreach (var encounter in GetMatchingPlayerEncounters(records))
+                lookup.TryAdd(encounter.Player, encounter.Record);
 
             return lookup;
         }
@@ -213,7 +202,7 @@ namespace MentorRouletteTracker
                     config.IncludeSelfInStatistics ||
                     !IsRecordingPlayer(record, player, localPlayerName)))
                 .Where(x =>
-                    (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
+                    (!applyPlayerFilters || playerRecords.ContainsKey(x)) &&
                     !string.IsNullOrWhiteSpace(x.Race) &&
                     x.Race != "Unknown")
                 .ToList();
@@ -444,7 +433,8 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawGenderStatistics(List<DutyRecord> records)
+        private void DrawGenderStatistics(
+            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             ImGui.Text("Players by gender");
             ImGui.Spacing();
@@ -459,7 +449,7 @@ namespace MentorRouletteTracker
                 }))
                 .Where(x =>
                     (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    MatchesPlayerFilters(x.Player) &&
+                    playerRecords.ContainsKey(x.Player) &&
                     !string.IsNullOrWhiteSpace(x.Player.Gender) &&
                     x.Player.Gender != "Unknown")
                 .GroupBy(x => x.Player.Gender)
@@ -565,7 +555,7 @@ namespace MentorRouletteTracker
                     config.IncludeSelfInStatistics ||
                     !IsRecordingPlayer(record, player, localPlayerName)))
                 .Where(x =>
-                    (!applyPlayerFilters || MatchesPlayerFilters(x)) &&
+                    (!applyPlayerFilters || playerRecords.ContainsKey(x)) &&
                     !string.IsNullOrWhiteSpace(x.Job) &&
                     x.Job != "Unknown")
                 .GroupBy(x => x.Job)
@@ -662,7 +652,8 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawStatusStatistics(List<DutyRecord> records)
+        private void DrawStatusStatistics(
+            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
         {
             ImGui.Text("Players by status");
             ImGui.Spacing();
@@ -677,7 +668,7 @@ namespace MentorRouletteTracker
                 }))
                 .Where(x =>
                     (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    MatchesPlayerFilters(x.Player))
+                    playerRecords.ContainsKey(x.Player))
                 .ToList();
 
             var stats = encounters
@@ -767,7 +758,9 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawWorldStatistics(List<DutyRecord> records, bool groupByDatacenter = false)
+        private void DrawWorldStatistics(
+            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords,
+            bool groupByDatacenter = false)
         {
             ImGui.Text(groupByDatacenter
                 ? "Players by datacenter"
@@ -784,7 +777,7 @@ namespace MentorRouletteTracker
                 }))
                 .Where(x =>
                     (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    MatchesPlayerFilters(x.Player) &&
+                    playerRecords.ContainsKey(x.Player) &&
                     !string.IsNullOrWhiteSpace(x.Player.World) &&
                     x.Player.World != "Unknown")
                 .ToList();
