@@ -9,24 +9,7 @@ namespace MentorRouletteTracker
     {
         private void DrawStatisticsTab()
         {
-            var now = DateTime.Now;
-
-            var records = config.History.Records
-                .Where(x => x.Completed)
-                .Where(x =>
-                    selectedDutyTypes.Count == 0 ||
-                    selectedDutyTypes.Contains(x.DutyType))
-                .Where(x => selectedTimeRange switch
-                {
-                    1 => x.Timestamp >= now.AddDays(-7),
-                    2 => x.Timestamp >= now.AddDays(-30),
-                    3 => x.Timestamp >= now.AddDays(-90),
-                    4 => x.Timestamp >= customStartDate.Date &&
-                         x.Timestamp < customEndDate.Date.AddDays(1),
-                    _ => true
-                })
-                .Where(x => MatchesDutyPlayerFilters(x))
-                .Where(x => MatchesGlobalDutySearch(x))
+            var records = FilterDutyRecords(applyPlayerFilters: false)
                 .OrderBy(x => x.Timestamp)
                 .ToList();
 
@@ -39,6 +22,7 @@ namespace MentorRouletteTracker
                 ImGui.Text("Player stats");
                 ImGui.TextDisabled(
                     "Players from completed duties that match your filters.");
+                ImGui.TextDisabled("Droughts count duties where no players match your filters.");
                 ImGui.TextDisabled("Death totals include known counts only. Averages skip unknown counts. '-' means no known counts.");
                 ImGui.Separator();
                 ImGui.Spacing();
@@ -104,12 +88,13 @@ namespace MentorRouletteTracker
                 .SelectMany(record => record.Party.Where(player =>
                     config.IncludeSelfInStatistics ||
                     !IsRecordingPlayer(record, player, localPlayerName)))
+                .Where(MatchesPlayerFilters)
                 .ToList();
 
             var matchingCounts = records
                 .Select(record => record.Party.Count(player =>
-                    config.IncludeSelfInStatistics ||
-                    !IsRecordingPlayer(record, player, localPlayerName)))
+                    (config.IncludeSelfInStatistics ||
+                     !IsRecordingPlayer(record, player, localPlayerName)) && MatchesPlayerFilters(player)))
                 .ToList();
 
             var currentDrought = 0;

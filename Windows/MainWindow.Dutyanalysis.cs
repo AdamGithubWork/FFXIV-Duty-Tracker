@@ -9,23 +9,7 @@ namespace MentorRouletteTracker
     {
         private void DrawDutyAnalysisTab()
         {
-            var now = DateTime.Now;
-            var records = config.History.Records
-                .Where(x => x.Completed)
-                .Where(x =>
-                    selectedDutyTypes.Count == 0 ||
-                    selectedDutyTypes.Contains(x.DutyType))
-                .Where(x => selectedTimeRange switch
-                {
-                    1 => x.Timestamp >= now.AddDays(-7),
-                    2 => x.Timestamp >= now.AddDays(-30),
-                    3 => x.Timestamp >= now.AddDays(-90),
-                    4 => x.Timestamp >= customStartDate.Date &&
-                         x.Timestamp < customEndDate.Date.AddDays(1),
-                    _ => true
-                })
-                .Where(x => MatchesDutyPlayerFilters(x))
-                .Where(x => MatchesGlobalDutySearch(x))
+            var records = FilterDutyRecords()
                 .OrderBy(x => x.Timestamp)
                 .ToList();
 
@@ -36,7 +20,7 @@ namespace MentorRouletteTracker
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Duty Analysis");
-                ImGui.TextDisabled("Completed duties that match your filters.");
+                ImGui.TextDisabled("Completed duties that match your filters. Death counts use matching players only.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -345,7 +329,7 @@ namespace MentorRouletteTracker
             return records.Select(record =>
             {
                 var deaths = record.Party
-                    .Where(player => !string.IsNullOrWhiteSpace(player.Name) &&
+                    .Where(player => !string.IsNullOrWhiteSpace(player.Name) && MatchesPlayerFilters(player) &&
                         (config.IncludeSelfInStatistics || !IsRecordingPlayer(record, player, localPlayerName)))
                     .Select(player => EffectiveDeaths(record, player))
                     .ToList();
@@ -409,7 +393,7 @@ namespace MentorRouletteTracker
                         Deaths = TotalKnownDeaths(x.SelectMany(y =>
                             y.Party
                                 .Where(p =>
-                                    !string.IsNullOrWhiteSpace(p.Name) &&
+                                    !string.IsNullOrWhiteSpace(p.Name) && MatchesPlayerFilters(p) &&
                                     (config.IncludeSelfInStatistics ||
                                      !IsRecordingPlayer(y, p, objectTable.LocalPlayer?.Name.TextValue)))
                                 .Select(p => EffectiveDeaths(y, p)))),

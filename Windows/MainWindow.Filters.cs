@@ -56,6 +56,30 @@ namespace MentorRouletteTracker
         }
 
 
+        private IEnumerable<DutyRecord> FilterDutyRecords(bool? completed = true, bool applyPlayerFilters = true)
+        {
+            var now = DateTime.Now;
+            return config.History.Records
+                .Where(record => !completed.HasValue || record.Completed == completed.Value)
+                .Where(record => MatchesDutyFilters(record, now))
+                .Where(record => !applyPlayerFilters || MatchesDutyPlayerFilters(record));
+        }
+
+        private bool MatchesDutyFilters(DutyRecord record, DateTime now)
+        {
+            return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(record.DutyType)) &&
+                MatchesGlobalDutySearch(record) &&
+                (selectedTimeRange switch
+                {
+                    1 => record.Timestamp >= now.AddDays(-7),
+                    2 => record.Timestamp >= now.AddDays(-30),
+                    3 => record.Timestamp >= now.AddDays(-90),
+                    4 => record.Timestamp.Date >= customStartDate.Date &&
+                         record.Timestamp.Date <= customEndDate.Date,
+                    _ => true
+                });
+        }
+
         private bool MatchesPlayerFilters(PartyMemberSnapshot player)
         {
             return
@@ -68,6 +92,9 @@ namespace MentorRouletteTracker
                 (selectedPlayerStatuses.Count == 0 ||
                  selectedPlayerStatuses.Contains(player.Status)) &&
 
+                (selectedPlayerJobs.Count == 0 || selectedPlayerJobs.Contains(player.Job)) &&
+                (selectedPlayerWorlds.Count == 0 || selectedPlayerWorlds.Contains(player.World)) &&
+
                 MatchesGlobalPlayerSearch(player);
         }
 
@@ -78,6 +105,8 @@ namespace MentorRouletteTracker
                 selectedPlayerRaces.Count > 0 ||
                 selectedPlayerGenders.Count > 0 ||
                 selectedPlayerStatuses.Count > 0 ||
+                selectedPlayerJobs.Count > 0 ||
+                selectedPlayerWorlds.Count > 0 ||
                 !string.IsNullOrWhiteSpace(globalPlayerSearchText);
 
             if (!hasPlayerFilters)

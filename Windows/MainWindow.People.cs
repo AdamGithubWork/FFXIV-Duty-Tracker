@@ -36,23 +36,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-            var now = DateTime.Now;
-
-            var encounters = config.History.Records
-                .Where(record => record.Completed)
-                .Where(record =>
-                    selectedDutyTypes.Count == 0 ||
-                    selectedDutyTypes.Contains(record.DutyType))
-                .Where(record => MatchesGlobalDutySearch(record))
-                .Where(record => selectedTimeRange switch
-                {
-                    1 => record.Timestamp >= now.AddDays(-7),
-                    2 => record.Timestamp >= now.AddDays(-30),
-                    3 => record.Timestamp >= now.AddDays(-90),
-                    4 => record.Timestamp >= customStartDate.Date &&
-                         record.Timestamp < customEndDate.Date.AddDays(1),
-                    _ => true
-                })
+            var encounters = FilterDutyRecords(applyPlayerFilters: false)
                 .SelectMany(record => record.Party.Select(player => new PlayerEncounter
                 {
                     Record = record,

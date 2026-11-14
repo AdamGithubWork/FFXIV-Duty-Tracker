@@ -172,20 +172,8 @@ namespace MentorRouletteTracker
                             x.Record.DutyName,
                             dutyHistoryFilter,
                             StringComparison.OrdinalIgnoreCase))
-                    .Where(x =>
-                        selectedDutyTypes.Count == 0 ||
-                        selectedDutyTypes.Contains(x.Record.DutyType))
+                    .Where(x => MatchesDutyFilters(x.Record, now))
                     .Where(x => MatchesDutyPlayerFilters(x.Record))
-                    .Where(x => MatchesGlobalDutySearch(x.Record))
-                    .Where(x => selectedTimeRange switch
-                    {
-                        1 => x.Record.Timestamp >= now.AddDays(-7),
-                        2 => x.Record.Timestamp >= now.AddDays(-30),
-                        3 => x.Record.Timestamp >= now.AddDays(-90),
-                        4 => x.Record.Timestamp >= customStartDate.Date &&
-                             x.Record.Timestamp < customEndDate.Date.AddDays(1),
-                        _ => true
-                    })
                     .ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();

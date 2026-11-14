@@ -63,8 +63,16 @@ Choose which duty types show the window in Settings.
 
 ## Filters
 
-Filter by duty type, duty name, player name or home world, race, gender, status,
-and date. You can use a preset date range or enter your own dates.
+Filter by duty type, duty name, player name or home world, job, race, gender,
+status, and date. You can use a preset date range or enter your own dates.
+Job and world dropdowns allow multiple selections. Choose a role or North American
+datacenter to select its whole group, or pick individual jobs and home worlds.
+Choose All Jobs or All Worlds to clear that selection.
+
+Player filters must match the same player. Records and Duty Analysis keep duties
+with at least one matching player; Statistics and People count matching players.
+Statistics keeps duties without a match when calculating encounter droughts.
+Summary uses duty and date filters only.
 
 ## Supported duties
 

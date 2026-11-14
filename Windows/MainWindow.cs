@@ -18,6 +18,8 @@ namespace MentorRouletteTracker
         private readonly HashSet<string> selectedPlayerRaces = new();
         private readonly HashSet<string> selectedPlayerGenders = new();
         private readonly HashSet<string> selectedPlayerStatuses = new();
+        private readonly HashSet<string> selectedPlayerJobs = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> selectedPlayerWorlds = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> selectedDutyTypes = new();
 
         private string globalPlayerSearchText = string.Empty;
@@ -96,6 +98,8 @@ namespace MentorRouletteTracker
             selectedPlayerRaces.Clear();
             selectedPlayerGenders.Clear();
             selectedPlayerStatuses.Clear();
+            selectedPlayerJobs.Clear();
+            selectedPlayerWorlds.Clear();
             selectedTimeRange = 0;
 
             IsOpen = true;
@@ -120,6 +124,8 @@ namespace MentorRouletteTracker
                 selectedPlayerRaces.Count +
                 selectedPlayerGenders.Count +
                 selectedPlayerStatuses.Count +
+                (selectedPlayerJobs.Count == 0 ? 0 : 1) +
+                (selectedPlayerWorlds.Count == 0 ? 0 : 1) +
                 (string.IsNullOrWhiteSpace(globalPlayerSearchText) ? 0 : 1) +
                 (string.IsNullOrWhiteSpace(globalDutySearchText) ? 0 : 1) +
                 (selectedTimeRange == 0 ? 0 : 1);
@@ -190,7 +196,9 @@ namespace MentorRouletteTracker
                 int activePlayerFilters =
                     selectedPlayerRaces.Count +
                     selectedPlayerGenders.Count +
-                    selectedPlayerStatuses.Count;
+                    selectedPlayerStatuses.Count +
+                    (selectedPlayerJobs.Count == 0 ? 0 : 1) +
+                    (selectedPlayerWorlds.Count == 0 ? 0 : 1);
 
                 ImGui.Text("Player filters");
                 ImGui.SameLine();
@@ -200,6 +208,9 @@ namespace MentorRouletteTracker
                         ? "(All)"
                         : $"({activePlayerFilters} selected)");
 
+                ImGui.Spacing();
+
+                DrawJobAndWorldFilters();
                 ImGui.Spacing();
 
                 ImGui.Text("Race");
@@ -360,6 +371,8 @@ namespace MentorRouletteTracker
                     selectedPlayerRaces.Clear();
                     selectedPlayerGenders.Clear();
                     selectedPlayerStatuses.Clear();
+                    selectedPlayerJobs.Clear();
+                    selectedPlayerWorlds.Clear();
                     selectedTimeRange = 0;
 
                     dutyHistoryFilter = null;

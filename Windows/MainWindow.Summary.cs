@@ -120,20 +120,7 @@ namespace MentorRouletteTracker
         {
             milestoneSections.Clear();
 
-            var now = DateTime.Now;
-            var records = config.History.Records
-                .Where(r => r.Completed)
-                .Where(r => selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(r.DutyType))
-                .Where(r => MatchesGlobalDutySearch(r))
-                .Where(r => selectedTimeRange switch
-                {
-                    1 => r.Timestamp >= now.AddDays(-7),
-                    2 => r.Timestamp >= now.AddDays(-30),
-                    3 => r.Timestamp >= now.AddDays(-90),
-                    4 => r.Timestamp >= customStartDate.Date &&
-                         r.Timestamp < customEndDate.Date.AddDays(1),
-                    _ => true
-                })
+            var records = FilterDutyRecords(applyPlayerFilters: false)
                 .OrderBy(r => r.Timestamp)
                 .ToList();
 
