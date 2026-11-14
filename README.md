@@ -20,6 +20,11 @@ PvP scoreboard deaths come from PvPStats. If Duty Tracker reloads before those
 results arrive, it looks up unfinished scoreboards again. Recent matches keep
 their 30-minute retry window; older matches get one check for saved results.
 
+Interrupted duties stay pending while login and loading states settle. A pending
+duty resumes only for the same character name and home world. If its recorder
+can't be verified, it is kept as an incomplete record at its last checkpoint.
+Resumed duty durations include time spent offline.
+
 ## Tabs
 
 ### Records

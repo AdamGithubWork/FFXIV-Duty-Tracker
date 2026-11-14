@@ -25,6 +25,8 @@ namespace MentorRouletteTracker.DutyTracking
         private DateTime nextHistorySave = DateTime.MinValue;
         private DutyRecord? current;
         private bool pendingRestoreNeeded;
+        private bool territoryCheckNeeded;
+        private bool dutyStartedWhileWaiting;
         public DutyRecord? ActiveDuty => current;
         public uint? ActiveContentTypeId { get; private set; }
         private readonly Dictionary<string, bool> previousDeathStates = new();
@@ -58,6 +60,7 @@ namespace MentorRouletteTracker.DutyTracking
             this.framework.Update += OnFrameworkUpdate;
             Armed = config.StorageAvailable;
             pendingRestoreNeeded = config.StorageAvailable && config.History.PendingDuty != null;
+            territoryCheckNeeded = pendingRestoreNeeded;
         }
 
         private void OnTerritoryChanged(uint territoryId)
@@ -65,6 +68,22 @@ namespace MentorRouletteTracker.DutyTracking
             if (!config.StorageAvailable)
                 return;
 
+            territoryCheckNeeded = true;
+            if (territoryId == 0 || territoryId != clientState.TerritoryType || !CanCheckDutyState())
+                return;
+            territoryCheckNeeded = false;
+
+            CheckCurrentTerritory();
+            if (!pendingRestoreNeeded && dutyStartedWhileWaiting)
+            {
+                if (current != null)
+                    current.JoinedInProgress = false;
+                dutyStartedWhileWaiting = false;
+            }
+        }
+
+        private void CheckCurrentTerritory()
+        {
             if (pendingRestoreNeeded)
             {
                 RestorePendingDuty();
@@ -72,18 +91,22 @@ namespace MentorRouletteTracker.DutyTracking
                     return;
             }
 
-            var cfc = FindContentFinderCondition(territoryId);
+            var cfc = FindContentFinderCondition(clientState.TerritoryType);
 
             if (current != null)
             {
-                if (cfc != null && current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
+                var sameRecorder = IsRecordedByCurrentPlayer(current);
+                if (sameRecorder && cfc != null && current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
                 {
                     ActiveContentTypeId = cfc.Value.ContentType.RowId;
                     previousDeathStates.Clear();
                     return;
                 }
 
-                FinalizeCurrent(completed: false);
+                if (sameRecorder)
+                    FinalizeCurrent(completed: false);
+                else
+                    FinalizeInterruptedDuty();
             }
 
             if (cfc == null || !Armed || !config.TrackedContentTypeIds.Contains(cfc.Value.ContentType.RowId))
@@ -93,6 +116,12 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void OnDutyStarted(IDutyStateEventArgs args)
         {
+            if (territoryCheckNeeded || pendingRestoreNeeded)
+            {
+                dutyStartedWhileWaiting = true;
+                OnTerritoryChanged(clientState.TerritoryType);
+                return;
+            }
             if (current != null && current.DutyName != string.Empty)
                 current.JoinedInProgress = false;
         }
@@ -104,12 +133,23 @@ namespace MentorRouletteTracker.DutyTracking
 
         private void OnDutyCompleted(IDutyStateEventArgs args)
         {
+            dutyStartedWhileWaiting = false;
             FinalizeCurrent(completed: true);
         }
         private void OnFrameworkUpdate(IFramework fw)
         {
             if (!config.StorageAvailable)
                 return;
+
+            if (!CanCheckDutyState())
+            {
+                if (current != null || pendingRestoreNeeded)
+                {
+                    territoryCheckNeeded = true;
+                    previousDeathStates.Clear();
+                }
+                return;
+            }
 
             if (pendingRestoreNeeded)
             {
@@ -118,8 +158,11 @@ namespace MentorRouletteTracker.DutyTracking
                     return;
 
                 if (current == null)
-                    OnTerritoryChanged(clientState.TerritoryType);
+                    territoryCheckNeeded = true;
             }
+
+            if (territoryCheckNeeded)
+                OnTerritoryChanged(clientState.TerritoryType);
 
             if (current == null)
                 return;
@@ -156,10 +199,7 @@ namespace MentorRouletteTracker.DutyTracking
             if (!pendingRestoreNeeded)
                 return;
 
-            // Login and loading screens can report a temporary territory.
-            if (!clientState.IsLoggedIn || objectTable.LocalPlayer == null ||
-                clientState.TerritoryType == 0 ||
-                condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
+            if (!CanCheckDutyState())
                 return;
 
             pendingRestoreNeeded = false;
@@ -168,27 +208,55 @@ namespace MentorRouletteTracker.DutyTracking
                 return;
 
             var cfc = FindContentFinderCondition(clientState.TerritoryType);
-            if (condition[ConditionFlag.BoundByDuty] && cfc != null &&
+            var sameRecorder = IsRecordedByCurrentPlayer(current);
+            if (sameRecorder && condition[ConditionFlag.BoundByDuty] && cfc != null &&
                 current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
             {
                 ActiveContentTypeId = cfc.Value.ContentType.RowId;
             }
             else
             {
-                var checkpoint = current.CheckpointUtc;
-                if (checkpoint == null)
-                {
-                    // Older records have no checkpoint, so use their last saved duration.
-                    checkpoint = current.Timestamp.ToUniversalTime() + current.TimeInDuty;
-                    log.Warning($"Pending duty {current.DutyName} has no checkpoint. Using its saved duration.");
-                }
-
-                log.Information($"Recovered incomplete duty: {current.DutyName}");
-                FinalizeCurrent(completed: false, endedAtUtc: checkpoint);
+                if (!sameRecorder)
+                    log.Warning("Pending duty recorder does not match the logged-in character, or is unknown. Keeping it incomplete.");
+                FinalizeInterruptedDuty();
                 return;
             }
 
             log.Information($"Restored pending duty: {current.DutyName}");
+        }
+
+        private bool CanCheckDutyState()
+        {
+            // Login and loading screens can report a temporary territory or player.
+            if (!clientState.IsLoggedIn || clientState.TerritoryType == 0 ||
+                condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
+                return false;
+            var player = objectTable.LocalPlayer;
+            return player != null && !string.IsNullOrWhiteSpace(player.Name.TextValue) &&
+                player.HomeWorld.RowId != 0;
+        }
+
+        private bool IsRecordedByCurrentPlayer(DutyRecord record)
+        {
+            var player = objectTable.LocalPlayer;
+            return player != null && !string.IsNullOrWhiteSpace(record.RecorderName) &&
+                !string.IsNullOrWhiteSpace(record.RecorderWorld) &&
+                record.RecorderName == player.Name.TextValue &&
+                record.RecorderWorld == player.HomeWorld.Value.Name.ExtractText();
+        }
+
+        private void FinalizeInterruptedDuty()
+        {
+            if (current == null)
+                return;
+            var checkpoint = current.CheckpointUtc;
+            if (checkpoint == null)
+            {
+                checkpoint = current.Timestamp.ToUniversalTime() + current.TimeInDuty;
+                log.Warning($"Pending duty {current.DutyName} has no checkpoint. Using its saved duration.");
+            }
+            log.Information($"Recovered incomplete duty: {current.DutyName}");
+            FinalizeCurrent(completed: false, endedAtUtc: checkpoint);
         }
         private void StartNewDuty(ContentFinderCondition duty)
         {
@@ -237,6 +305,7 @@ namespace MentorRouletteTracker.DutyTracking
 
             current = null;
             ActiveContentTypeId = null;
+            territoryCheckNeeded = false;
 
             previousDeathStates.Clear();
         }
