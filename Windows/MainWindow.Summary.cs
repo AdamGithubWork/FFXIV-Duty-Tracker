@@ -122,7 +122,7 @@ namespace MentorRouletteTracker
             lifetimeSummarySections.Clear();
 
             var now = DateTime.Now;
-            var records = config.Records
+            var records = config.History.Records
                 .Where(r => r.Completed)
                 .Where(r => selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(r.DutyType))
                 .Where(r => MatchesGlobalDutySearch(r))

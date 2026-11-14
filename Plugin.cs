@@ -3,6 +3,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
 using MentorRouletteTracker.PvP;
+using MentorRouletteTracker.Storage;
 
 namespace MentorRouletteTracker
 {
@@ -21,6 +22,7 @@ namespace MentorRouletteTracker
         private readonly MainWindow mainWindow;
         private readonly DutyTimerWindow dutyTimerWindow;
         private readonly PvpMatchService pvpMatchService;
+        private bool storageCheckRunning;
 
         public Plugin(
             IDalamudPluginInterface pluginInterface,
@@ -52,7 +54,7 @@ namespace MentorRouletteTracker
                     [2, 3, 4, 5, 6, 21, 28, 30, 37]);
             }
 
-            config.Initialize(pluginInterface);
+            config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history could not be saved."));
             config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
             config.TimerVisibleContentTypeIds = config.TimerVisibleContentTypeIds.Distinct().ToList();
             config.Save();
@@ -99,7 +101,8 @@ namespace MentorRouletteTracker
                     HelpMessage =
                         "Open the Duty Tracker window. " +
                         "Use '/dt arm' or '/dt disarm' " +
-                        "to toggle logging.",
+                        "to toggle logging. Use '/dt storagecheck' " +
+                        "to verify SQLite support without changing history.",
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -139,10 +142,30 @@ namespace MentorRouletteTracker
                     log.Info("Duty Tracker: disarmed.");
                     break;
 
+                case "storagecheck":
+                    _ = RunStorageCheckAsync();
+                    break;
+
                 default:
                     mainWindow.IsOpen = !mainWindow.IsOpen;
                     break;
             }
+        }
+
+        private async Task RunStorageCheckAsync()
+        {
+            if (storageCheckRunning) return;
+            storageCheckRunning = true;
+            try
+            {
+                await Task.Run(() => StorageDiagnostics.Run(pluginInterface.GetPluginConfigDirectory()));
+                log.Info("Duty Tracker: SQLite storage check passed. Live history was not changed.");
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Duty Tracker: SQLite storage check failed. Keep the current storage mode.");
+            }
+            finally { storageCheckRunning = false; }
         }
 
         public void Dispose()
@@ -155,6 +178,8 @@ namespace MentorRouletteTracker
             pvpMatchService.Dispose();
             mainWindow.Dispose();
             tracker.Dispose();
+            try { config.DisposeHistory(); }
+            catch (Exception ex) { log.Error(ex, "Duty Tracker history flush failed; check the recovery copy before restarting."); }
         }
     }
 }

@@ -47,10 +47,10 @@ namespace MentorRouletteTracker
                     exportDirectory,
                     $"mentor_roulette_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
-                CsvExporter.Export(config.Records, path);
+                CsvExporter.Export(config.History.Records, path);
 
                 lastExportMessage =
-                    $"Exported {config.Records.Count} records to {path}";
+                    $"Exported {config.History.Records.Count} records to {path}";
             }
 
             ImGui.SameLine();
@@ -69,9 +69,9 @@ namespace MentorRouletteTracker
 
                 if (ImGui.Button("Yes, clear"))
                 {
-                    config.Records.Clear();
-                    config.SeenPlayers.Clear();
-                    config.Save();
+                    config.History.Records.Clear();
+                    config.History.SeenPlayers.Clear();
+                    config.History.Save();
 
                     selectedRecord = null;
                     showDetailWindow = false;
@@ -161,7 +161,7 @@ namespace MentorRouletteTracker
 
                 var now = DateTime.Now;
 
-                var records = config.Records
+                var records = config.History.Records
                     .Select((record, index) => new
                     {
                         Record = record,
@@ -376,7 +376,7 @@ namespace MentorRouletteTracker
                     recordToEdit.WipeCount = editWipeCount;
                     recordToEdit.JoinedInProgress = editJoinedInProgress;
 
-                    config.Save();
+                    config.History.Save();
 
                     recordToEdit = null;
                     ImGui.CloseCurrentPopup();
@@ -428,11 +428,11 @@ namespace MentorRouletteTracker
                 {
                     var record = recordPendingDeletion;
 
-                    config.Records.Remove(record);
+                    config.History.Records.Remove(record);
 
                     RebuildSeenPlayers();
 
-                    config.Save();
+                    config.History.Save();
 
                     if (selectedRecord == record)
                     {
@@ -460,9 +460,9 @@ namespace MentorRouletteTracker
 
         private void RebuildSeenPlayers()
         {
-            config.SeenPlayers.Clear();
+            config.History.SeenPlayers.Clear();
 
-            var people = config.Records
+            var people = config.History.Records
                 .SelectMany(x => x.Party)
                 .GroupBy(x => new { x.Name, x.World });
 
@@ -478,7 +478,7 @@ namespace MentorRouletteTracker
                     .FirstOrDefault(x => x != "Unknown")
                     ?? "Unknown";
 
-                config.SeenPlayers.Add(new SeenPlayer
+                config.History.SeenPlayers.Add(new SeenPlayer
                 {
                     Name = group.Key.Name,
                     World = group.Key.World,
@@ -723,7 +723,7 @@ namespace MentorRouletteTracker
                 if (ImGui.Button("Save"))
                 {
                     noteRecord.Note = noteDraft;
-                    config.Save();
+                    config.History.Save();
                     isOpen = false;
                 }
 

@@ -39,7 +39,7 @@ namespace MentorRouletteTracker
             var now = DateTime.Now;
 
             // Retain the record associated with each snapshot.
-            var encounters = config.Records
+            var encounters = config.History.Records
                 .Where(record => record.Completed)
                 .Where(record =>
                     selectedDutyTypes.Count == 0 ||

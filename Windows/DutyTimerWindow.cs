@@ -36,7 +36,7 @@ namespace MentorRouletteTracker
             if (duty == null)
                 return;
 
-            var completedRuns = config.Records
+            var completedRuns = config.History.Records
                 .Where(record =>
                     record.Completed &&
                     record.TimeInDuty.TotalSeconds > 0 &&

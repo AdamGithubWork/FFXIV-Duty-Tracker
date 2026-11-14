@@ -10,7 +10,7 @@ namespace MentorRouletteTracker
         private void DrawDutyAnalysisTab()
         {
             var now = DateTime.Now;
-            var records = config.Records
+            var records = config.History.Records
                 .Where(x => x.Completed)
                 .Where(x =>
                     selectedDutyTypes.Count == 0 ||

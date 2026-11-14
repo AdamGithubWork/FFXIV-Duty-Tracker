@@ -123,15 +123,15 @@ namespace MentorRouletteTracker.DutyTracking
             if (now >= nextConfigSave)
             {
                 nextConfigSave = now + ConfigSaveInterval;
-                config.Save();
+                config.History.Save();
             }
         }
         private void RestorePendingDuty()
         {
-            if (config.PendingDuty == null)
+            if (config.History.PendingDuty == null)
                 return;
 
-            current = config.PendingDuty;
+            current = config.History.PendingDuty;
 
             // Recover the duty type after a plugin reload only if the
             // player is still in the same duty.
@@ -178,8 +178,8 @@ namespace MentorRouletteTracker.DutyTracking
             countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
             nextPartyRefresh = DateTime.MinValue;
-            config.PendingDuty = current;
-            config.Save();
+            config.History.PendingDuty = current;
+            config.History.Save();
         }
 
         private void FinalizeCurrent(bool completed)
@@ -190,9 +190,9 @@ namespace MentorRouletteTracker.DutyTracking
             current.Completed = completed;
             current.TimeInDuty = DateTime.Now - current.Timestamp;
 
-            config.Records.Add(current);
-            config.PendingDuty = null;
-            config.Save();
+            config.History.Records.Add(current);
+            config.History.PendingDuty = null;
+            config.History.Save();
 
             current = null;
             ActiveContentTypeId = null;
@@ -406,7 +406,7 @@ namespace MentorRouletteTracker.DutyTracking
         {
             SeenPlayer? seenPlayer = null;
 
-            foreach (var player in config.SeenPlayers)
+            foreach (var player in config.History.SeenPlayers)
             {
                 if (player.Name == name && player.World == world)
                 {
@@ -427,7 +427,7 @@ namespace MentorRouletteTracker.DutyTracking
                         World = world,
                         TimesSeen = 1
                     };
-                    config.SeenPlayers.Add(seenPlayer);
+                    config.History.SeenPlayers.Add(seenPlayer);
                     log.Info($"New player seen: {name}");
                 }
                 else

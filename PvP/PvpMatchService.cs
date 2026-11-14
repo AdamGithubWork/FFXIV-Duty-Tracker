@@ -77,7 +77,7 @@ namespace MentorRouletteTracker.PvP
                 return false;
             }
 
-            var matchingRecord = config.Records
+            var matchingRecord = config.History.Records
                 .Where(r => r.DutyType == "PvP")
                 .Where(r =>
                     Math.Abs(
@@ -163,7 +163,7 @@ namespace MentorRouletteTracker.PvP
                 }
             }
 
-            config.Save();
+            config.History.Save();
 
             log.Information(
                 $"PvP scoreboard applied: " +

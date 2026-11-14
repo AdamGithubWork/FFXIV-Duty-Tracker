@@ -2,6 +2,8 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 using MentorRouletteTracker.DutyTracking;
+using MentorRouletteTracker.Storage;
+using System.Text.Json;
 
 namespace MentorRouletteTracker
 {
@@ -19,18 +21,67 @@ namespace MentorRouletteTracker
         public List<DutyRecord> Records { get; set; } = new();
         public List<SeenPlayer> SeenPlayers { get; set; } = new();
         public DutyRecord? PendingDuty { get; set; }
+        public bool UseSqliteHistory { get; set; } = false;
+
+        [NonSerialized]
+        private HistorySession? history;
+        [NonSerialized]
+        private bool sqliteHistoryActive;
+
+        internal HistorySession History => history ?? throw new InvalidOperationException("History is not initialized.");
+
+        // Retain legacy fields for loading old profiles, but omit history from settings after activation.
+        public bool ShouldSerializeRecords() => !sqliteHistoryActive;
+        public bool ShouldSerializeSeenPlayers() => !sqliteHistoryActive;
+        public bool ShouldSerializePendingDuty() => !sqliteHistoryActive;
 
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
 
-        public void Initialize(IDalamudPluginInterface pi)
+        public void Initialize(IDalamudPluginInterface pi, Action<Exception>? reportStorageError = null)
         {
+            if (history != null) throw new InvalidOperationException("History has already been initialized.");
             this.pluginInterface = pi;
+            if (UseSqliteHistory)
+            {
+                var session = new HistorySession(new SqliteHistoryStore(
+                    Path.Combine(pi.GetPluginConfigDirectory(), "history.sqlite")), reportStorageError);
+                // A first activation must match the legacy history still present in the profile.
+                if ((Records.Count > 0 || PendingDuty != null) &&
+                    (JsonSerializer.Serialize(Records) != JsonSerializer.Serialize(session.Records) ||
+                     JsonSerializer.Serialize(PendingDuty) != JsonSerializer.Serialize(session.PendingDuty) ||
+                     JsonSerializer.Serialize(SeenPlayers) != JsonSerializer.Serialize(session.SeenPlayers)))
+                    throw new InvalidDataException("SQLite history does not match this profile. Import and verify the latest backup before activation.");
+                history = session;
+                sqliteHistoryActive = true;
+                Records = new();
+                SeenPlayers = new();
+                PendingDuty = null;
+            }
+            else
+            {
+                history = new HistorySession(new HistoryData
+                {
+                    Records = Records, SeenPlayers = SeenPlayers, PendingDuty = PendingDuty
+                }, state =>
+                {
+                    Records = state.Records;
+                    SeenPlayers = state.SeenPlayers;
+                    PendingDuty = state.PendingDuty;
+                    pluginInterface.SavePluginConfig(this);
+                });
+            }
         }
 
         public void Save()
         {
-            this.pluginInterface?.SavePluginConfig(this);
+            if (history == null) { pluginInterface?.SavePluginConfig(this); return; }
+            if (UseSqliteHistory != sqliteHistoryActive)
+                throw new InvalidOperationException("Changing storage mode requires a verified migration and plugin restart.");
+            history.Save();
+            if (sqliteHistoryActive) pluginInterface?.SavePluginConfig(this);
         }
+
+        public void DisposeHistory() => history?.Dispose();
     }
 }

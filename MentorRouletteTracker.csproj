@@ -55,5 +55,6 @@
 	<ItemGroup>
 		<PackageReference Include="DalamudPackager" Version="2.1.13" />
 		<PackageReference Include="LiteDB" Version="5.0.21" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
 	</ItemGroup>
 </Project>

@@ -174,7 +174,7 @@ namespace MentorRouletteTracker
 
                 ImGui.Spacing();
 
-                var dutyTypes = config.Records
+                var dutyTypes = config.History.Records
                     .Select(record => record.DutyType)
                     .Where(type => !string.IsNullOrWhiteSpace(type))
                     .Concat(new[] { "Extreme Trials", "Savage Raids" })
