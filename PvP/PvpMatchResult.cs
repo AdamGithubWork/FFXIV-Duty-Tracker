@@ -1,5 +1,7 @@
 ﻿namespace MentorRouletteTracker.PvP;
 
+public readonly record struct PvpMatchReference(string MatchId, DateTime DutyStartTime, bool IsFrontline);
+
 public class PvpMatchResult
 {
     public string MatchId { get; set; } = string.Empty;

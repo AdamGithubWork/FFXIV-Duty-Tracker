@@ -16,7 +16,9 @@ The plugin started as Mentor Roulette Tracker. It now tracks other duty types to
 - Party members: name, home world, job, race, gender, status, and recorded deaths
 
 You can choose which duty types to record and whether to track alliance members.
-PvP scoreboard deaths come from PvP Tracker.
+PvP scoreboard deaths come from PvPStats. If Duty Tracker reloads before those
+results arrive, it looks up unfinished scoreboards again. Recent matches keep
+their 30-minute retry window; older matches get one check for saved results.
 
 ## Tabs
 

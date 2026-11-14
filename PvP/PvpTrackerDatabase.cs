@@ -9,9 +9,54 @@ public static class PvpTrackerDatabase
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
 
+    public static List<PvpMatchReference>? FindMatches(IEnumerable<DateTime> dutyStartTimes, IPluginLog log)
+    {
+        return FindMatches(DatabasePath, dutyStartTimes, log);
+    }
+
+    internal static List<PvpMatchReference>? FindMatches(
+        string databasePath, IEnumerable<DateTime> dutyStartTimes, IPluginLog log)
+    {
+        var times = dutyStartTimes.Select(time => time.ToUniversalTime()).Distinct().ToArray();
+        if (times.Length == 0)
+            return new();
+        if (!File.Exists(databasePath))
+            return null;
+
+        try
+        {
+            using var db = new LiteDatabase(new ConnectionString { Filename = databasePath, ReadOnly = true });
+            var matches = new List<PvpMatchReference>();
+            var ranges = times.Select(time => Query.Between("DutyStartTime",
+                time.AddSeconds(-30), time.AddSeconds(30))).ToArray();
+            var query = ranges.Length == 1 ? ranges[0] : Query.Or(ranges);
+
+            foreach (var collectionName in new[] { "ccmatch", "flmatch" })
+            {
+                foreach (var match in db.GetCollection<BsonDocument>(collectionName).Find(query))
+                {
+                    if (match["_id"].IsObjectId && match["DutyStartTime"].IsDateTime)
+                        matches.Add(new(match["_id"].AsObjectId.ToString(),
+                            match["DutyStartTime"].AsDateTime, collectionName == "flmatch"));
+                }
+            }
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"Could not find unfinished PvP scoreboards: {ex.Message}");
+            return null;
+        }
+    }
+
     public static PvpMatchResult? GetMatch(string matchId, IPluginLog log)
     {
-        if (!File.Exists(DatabasePath) ||
+        return GetMatch(DatabasePath, matchId, log);
+    }
+
+    internal static PvpMatchResult? GetMatch(string databasePath, string matchId, IPluginLog log)
+    {
+        if (!File.Exists(databasePath) ||
             string.IsNullOrWhiteSpace(matchId) ||
             matchId.Length != 24 ||
             !matchId.All(Uri.IsHexDigit))
@@ -21,7 +66,7 @@ public static class PvpTrackerDatabase
         {
             using var db = new LiteDatabase(new ConnectionString
             {
-                Filename = DatabasePath,
+                Filename = databasePath,
                 ReadOnly = true
             });
 
