@@ -39,7 +39,7 @@ namespace MentorRouletteTracker
                 ImGui.Text("Player stats");
                 ImGui.TextDisabled(
                     "Players from completed duties that match your filters.");
-                ImGui.TextDisabled("Unknown death counts are left out of averages.");
+                ImGui.TextDisabled("Death totals include known counts only. Averages skip unknown counts. '-' means no known counts.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -191,6 +191,12 @@ namespace MentorRouletteTracker
                 : player.DeathCount;
         }
 
+        private static int? TotalKnownDeaths(IEnumerable<int?> counts)
+        {
+            var known = counts.Where(count => count.HasValue).ToList();
+            return known.Count == 0 ? null : known.Sum(count => count.GetValueOrDefault());
+        }
+
         private static Dictionary<PartyMemberSnapshot, DutyRecord>
             BuildStatisticsPlayerRecords(List<DutyRecord> records)
         {
@@ -236,7 +242,7 @@ namespace MentorRouletteTracker
                 {
                     Race = x.Key,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                    Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
                     AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                 })
                 .OrderBy(x => x.Race)
@@ -284,17 +290,15 @@ namespace MentorRouletteTracker
                                 .ThenBy(x => x.Race).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceStats.OrderBy(x => x.Deaths)
+                            ? raceStats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths)
                                 .ThenBy(x => x.Race).ToList()
-                            : raceStats.OrderByDescending(x => x.Deaths)
+                            : raceStats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths)
                                 .ThenBy(x => x.Race).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceStats.OrderBy(x =>
-                                x.AverageDeaths)
+                            ? raceStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
                                 .ThenBy(x => x.Race).ToList()
-                            : raceStats.OrderByDescending(x =>
-                                x.AverageDeaths)
+                            : raceStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
                                 .ThenBy(x => x.Race).ToList(),
 
                         _ => raceStats
@@ -316,7 +320,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
@@ -346,7 +350,7 @@ namespace MentorRouletteTracker
                     Race = x.Key.Race,
                     Gender = x.Key.Gender,
                     Seen = x.Count(),
-                    Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                    Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
                     AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                 })
                 .OrderBy(x => x.Race)
@@ -408,20 +412,18 @@ namespace MentorRouletteTracker
                                 .ThenBy(x => x.Gender).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceGenderStats.OrderBy(x => x.Deaths)
+                            ? raceGenderStats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList()
-                            : raceGenderStats.OrderByDescending(x => x.Deaths)
+                            : raceGenderStats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList(),
 
                         4 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceGenderStats.OrderBy(x =>
-                                x.AverageDeaths)
+                            ? raceGenderStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList()
-                            : raceGenderStats.OrderByDescending(x =>
-                                x.AverageDeaths)
+                            : raceGenderStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
                                 .ThenBy(x => x.Race)
                                 .ThenBy(x => x.Gender).ToList(),
 
@@ -447,7 +449,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
 
                     ImGui.TableSetColumnIndex(4);
                     ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
@@ -480,7 +482,7 @@ namespace MentorRouletteTracker
                 {
                     Gender = group.Key,
                     Seen = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
                     AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderBy(x => x.Gender)
@@ -526,12 +528,12 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Seen).ToList(),
 
                         2 => ascending
-                            ? stats.OrderBy(x => x.Deaths).ToList()
-                            : stats.OrderByDescending(x => x.Deaths).ToList(),
+                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ToList()
+                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
-                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
+                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };
@@ -550,7 +552,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(
@@ -615,7 +617,7 @@ namespace MentorRouletteTracker
                     {
                         Job = x.Key,
                         Seen = x.Count(),
-                        Deaths = x.Sum(y => SummaryDeaths(y, playerRecords) ?? 0),
+                        Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
                         AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
                     })
                     .ToList();
@@ -637,15 +639,13 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Seen).ThenBy(x => x.Job).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Deaths).ThenBy(x => x.Job).ToList()
-                            : stats.OrderByDescending(x => x.Deaths).ThenBy(x => x.Job).ToList(),
+                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ThenBy(x => x.Job).ToList()
+                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ThenBy(x => x.Job).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(
-                                x => x.AverageDeaths)
+                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
                                 .ThenBy(x => x.Job).ToList()
-                            : stats.OrderByDescending(
-                                x => x.AverageDeaths)
+                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
                                 .ThenBy(x => x.Job).ToList(),
 
                         _ => stats
@@ -667,7 +667,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(deathsPerSeen?.ToString("0.00") ?? "-");
@@ -704,7 +704,7 @@ namespace MentorRouletteTracker
                 {
                     Status = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
                     AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderByDescending(x => x.Encounters)
@@ -750,8 +750,8 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Encounters).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
-                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
+                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };
@@ -812,7 +812,7 @@ namespace MentorRouletteTracker
                 {
                     World = group.Key,
                     Encounters = group.Count(),
-                    Deaths = group.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0),
+                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
                     AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
                 })
                 .OrderByDescending(x => x.Encounters)
@@ -858,8 +858,8 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Encounters).ToList(),
 
                         3 => ascending
-                            ? stats.OrderBy(x => x.AverageDeaths).ToList()
-                            : stats.OrderByDescending(x => x.AverageDeaths).ToList(),
+                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ToList()
+                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths).ToList(),
 
                         _ => stats
                     };

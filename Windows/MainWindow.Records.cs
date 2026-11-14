@@ -565,8 +565,8 @@ namespace MentorRouletteTracker
                                     : sortedParty.OrderByDescending(x => x.Status ?? "Unknown").ToList(),
 
                                 6 => ascending
-                                    ? sortedParty.OrderBy(x => EffectiveDeaths(r, x)).ToList()
-                                    : sortedParty.OrderByDescending(x => EffectiveDeaths(r, x)).ToList(),
+                                    ? sortedParty.OrderBy(x => !EffectiveDeaths(r, x).HasValue).ThenBy(x => EffectiveDeaths(r, x)).ToList()
+                                    : sortedParty.OrderBy(x => !EffectiveDeaths(r, x).HasValue).ThenByDescending(x => EffectiveDeaths(r, x)).ToList(),
 
                                 _ => sortedParty
                             };

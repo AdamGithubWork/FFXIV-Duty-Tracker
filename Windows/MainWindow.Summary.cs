@@ -60,6 +60,7 @@ namespace MentorRouletteTracker
             {
                 ImGui.Text("Milestones");
                 ImGui.TextDisabled("Completed duties only. Uses duty type, duty search, and date filters. Player filters don't apply.");
+                ImGui.TextDisabled("Death totals include known counts only. Duty death records require every included player's count. '-' means no known counts.");
                 ImGui.Separator();
 
                 if (milestoneSections.Count == 0)
@@ -142,7 +143,7 @@ namespace MentorRouletteTracker
             var encounters = records
                 .SelectMany(r => r.Party
                     .Where(p => config.IncludeSelfInStatistics || !IsRecordingPlayer(r, p, localName))
-                    .Select(p => new MilestoneEncounter(r, p, EffectiveDeaths(r, p) ?? 0)))
+                    .Select(p => new MilestoneEncounter(r, p, EffectiveDeaths(r, p))))
                 .ToList();
 
             Dictionary<DutyRecord, List<MilestoneEncounter>> byRecord =
@@ -154,10 +155,13 @@ namespace MentorRouletteTracker
             foreach (var e in encounters)
                 byRecord[e.Record].Add(e);
 
-            int TotalDeaths(DutyRecord r) => byRecord[r].Sum(e => e.Deaths);
+            int? TotalDeaths(DutyRecord r) => TotalKnownDeaths(byRecord[r].Select(e => e.KnownDeaths));
+
+            var knownDeathEncounters = encounters.Where(e => e.KnownDeaths.HasValue).ToList();
+            var dutiesWithKnownDeaths = records.Where(r =>
+                byRecord[r].Count > 0 && byRecord[r].All(e => e.KnownDeaths.HasValue)).ToList();
 
             var completed = records.Where(r => r.Completed).ToList();
-            var positiveDuration = records.Where(r => r.TimeInDuty.TotalMinutes > 0).ToList();
 
             string Duty(DutyRecord r) => $"{r.DutyName} — {r.Timestamp:yyyy-MM-dd HH:mm}";
             string Player(MilestoneEncounter e) => $"{e.Player.Name}@{e.Player.World}";
@@ -226,7 +230,7 @@ namespace MentorRouletteTracker
                 ("Total unique players", encounters.Select(e => (e.Player.Name, e.Player.World)).Distinct().Count().ToString()),
                 ("Total unique worlds", encounters.Select(e => e.Player.World)
                     .Where(w => !string.IsNullOrWhiteSpace(w) && w != "Unknown").Distinct().Count().ToString()),
-                ("Total deaths observed", encounters.Sum(e => e.Deaths).ToString()),
+                ("Total deaths observed", TotalKnownDeaths(encounters.Select(e => e.KnownDeaths))?.ToString() ?? "-"),
                 ("Total wipes", records.Sum(r => r.WipeCount).ToString()),
                 ("Total duties joined in progress", records.Count(r => r.JoinedInProgress).ToString()),
                 ("Different duties completed", records.Select(r => r.DutyName).Distinct().Count().ToString())
@@ -238,10 +242,10 @@ namespace MentorRouletteTracker
                     r => FormatMilestoneDuration(r.TimeInDuty))),
                 ("Longest completed duty", DutyExt(completed, r => r.TimeInDuty.TotalSeconds, true,
                     r => FormatMilestoneDuration(r.TimeInDuty))),
-                ("Most deaths in a single duty", DutyExt(records, r => TotalDeaths(r), true,
+                ("Most deaths in a single duty", DutyExt(dutiesWithKnownDeaths, r => TotalDeaths(r).GetValueOrDefault(), true,
                     r => $"{TotalDeaths(r)} deaths")),
-                ("Highest deaths per minute in a duty", DutyExt(positiveDuration,
-                    r => TotalDeaths(r) / r.TimeInDuty.TotalMinutes, true,
+                ("Highest deaths per minute in a duty", DutyExt(dutiesWithKnownDeaths.Where(r => r.TimeInDuty.TotalMinutes > 0),
+                    r => TotalDeaths(r).GetValueOrDefault() / r.TimeInDuty.TotalMinutes, true,
                     r => $"{TotalDeaths(r) / r.TimeInDuty.TotalMinutes:F2} deaths/min")),
                 ("Most wipes in a single duty", DutyExt(records, r => r.WipeCount, true,
                     r => $"{r.WipeCount} wipes")),
@@ -264,8 +268,7 @@ namespace MentorRouletteTracker
                 .GroupBy(e => (e.Player.Name, e.Player.World))
                 .ToList();
 
-            var playersWithKnownDeaths = encounters
-                .Where(e => EffectiveDeaths(e.Record, e.Player).HasValue)
+            var playersWithKnownDeaths = knownDeathEncounters
                 .GroupBy(e => (e.Player.Name, e.Player.World))
                 .ToList();
 
@@ -274,13 +277,13 @@ namespace MentorRouletteTracker
                 ("Player seen most often", NamedGroupExt(playersByIdentity,
                     g => g.Count(),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Count()} encounters")),
-                ("Most deaths by one player in a duty", PlayerExt(encounters,
+                ("Most deaths by one player in a duty", PlayerExt(knownDeathEncounters,
                     e => e.Deaths, e => $"{e.Deaths} deaths")),
                 ("Highest deaths per minute by one player", PlayerExt(
-                    encounters.Where(e => e.Record.TimeInDuty.TotalMinutes > 0),
+                    knownDeathEncounters.Where(e => e.Record.TimeInDuty.TotalMinutes > 0),
                     e => e.Deaths / e.Record.TimeInDuty.TotalMinutes,
                     e => $"{e.Deaths / e.Record.TimeInDuty.TotalMinutes:F2} deaths/min ({e.Deaths} deaths)")),
-                ("Most total deaths by one player", NamedGroupExt(playersByIdentity,
+                ("Most total deaths by one player", NamedGroupExt(playersWithKnownDeaths,
                     g => g.Sum(e => e.Deaths),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Sum(e => e.Deaths)} deaths")),
                 ("Highest average deaths per player encounter", NamedGroupExt(playersWithKnownDeaths,
@@ -289,7 +292,7 @@ namespace MentorRouletteTracker
                 ("Most different duties with one player", NamedGroupExt(playersByIdentity,
                     g => g.Select(e => e.Record.DutyName).Distinct().Count(),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Select(e => e.Record.DutyName).Distinct().Count()} duties")),
-                ("Most deathless encounters with one player", NamedGroupExt(playersByIdentity,
+                ("Most deathless encounters with one player", NamedGroupExt(playersByIdentity.Where(g => g.Any(e => e.IsConfirmedDeathless)),
                     g => g.Count(e => e.IsConfirmedDeathless),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Count(e => e.IsConfirmedDeathless)} deathless encounters"))
             });
@@ -402,7 +405,7 @@ namespace MentorRouletteTracker
             List<MilestoneEncounter> DayPlayers(DateTime day) =>
                 playerByDay.TryGetValue(day, out var items) ? items : new();
 
-            int DayDeaths(DateTime day) => DayPlayers(day).Sum(e => e.Deaths);
+            int? DayDeaths(DateTime day) => TotalKnownDeaths(DayPlayers(day).Select(e => e.KnownDeaths));
             int DayLalafell(DateTime day) =>
                 DayPlayers(day).Count(e => e.Player.Race == "Lalafell");
 
@@ -483,8 +486,8 @@ namespace MentorRouletteTracker
                 ("Most time spent in duties in one day", TopPeriod(byDay,
                     g => g.Sum(r => r.TimeInDuty.Ticks),
                     g => $"{FormatMilestoneDuration(TimeSpan.FromTicks(g.Sum(r => r.TimeInDuty.Ticks)))} — {g.Key:yyyy-MM-dd}")),
-                ("Most deaths observed in one day", TopPeriod(byDay,
-                    g => DayDeaths(g.Key),
+                ("Most deaths observed in one day", TopPeriod(byDay.Where(g => DayDeaths(g.Key).HasValue),
+                    g => DayDeaths(g.Key).GetValueOrDefault(),
                     g => $"{DayDeaths(g.Key)} deaths — {g.Key:yyyy-MM-dd}")),
                 ("Most wipes in one day", TopPeriod(byDay,
                     g => g.Sum(r => r.WipeCount),
@@ -509,9 +512,10 @@ namespace MentorRouletteTracker
         private sealed record MilestoneEncounter(
             DutyRecord Record,
             PartyMemberSnapshot Player,
-            int Deaths)
+            int? KnownDeaths)
         {
-            public bool IsConfirmedDeathless => EffectiveDeaths(Record, Player) == 0;
+            public int Deaths => KnownDeaths.GetValueOrDefault();
+            public bool IsConfirmedDeathless => KnownDeaths == 0;
         }
 
         private static DateTime StartOfWeek(DateTime date)

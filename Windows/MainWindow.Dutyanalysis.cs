@@ -359,7 +359,7 @@ namespace MentorRouletteTracker
         private void DrawDutySpecificDetails(List<DutyRecord> records)
         {
             ImGui.Text("Stats by duty");
-            ImGui.TextDisabled("Deaths / Run leaves out runs where an included player has an unknown death count.");
+            ImGui.TextDisabled("Death totals include known counts only. Deaths / Run skips runs with unknown counts. '-' means no known counts.");
 
             ImGui.Spacing();
 
@@ -406,13 +406,13 @@ namespace MentorRouletteTracker
                         Runs = x.Count(),
                         AverageDeaths = AverageKnownDeathsPerRun(x),
 
-                        Deaths = x.Sum(y =>
+                        Deaths = TotalKnownDeaths(x.SelectMany(y =>
                             y.Party
                                 .Where(p =>
                                     !string.IsNullOrWhiteSpace(p.Name) &&
                                     (config.IncludeSelfInStatistics ||
                                      !IsRecordingPlayer(y, p, objectTable.LocalPlayer?.Name.TextValue)))
-                                .Sum(p => EffectiveDeaths(y, p) ?? 0)),
+                                .Select(p => EffectiveDeaths(y, p)))),
 
                         TotalWipes = x.Sum(y => y.WipeCount),
 
@@ -440,16 +440,14 @@ namespace MentorRouletteTracker
                             : stats.OrderByDescending(x => x.Runs).ThenBy(x => x.Duty).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Deaths).ThenBy(x => x.Duty).ToList()
-                            : stats.OrderByDescending(x => x.Deaths).ThenBy(x => x.Duty).ToList(),
+                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ThenBy(x => x.Duty).ToList()
+                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ThenBy(x => x.Duty).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x =>
-                                x.AverageDeaths)
+                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
                                 .ThenBy(x => x.Duty)
                                 .ToList()
-                            : stats.OrderByDescending(x =>
-                                x.AverageDeaths)
+                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
                                 .ThenBy(x => x.Duty)
                                 .ToList(),
 
@@ -514,7 +512,7 @@ namespace MentorRouletteTracker
                     ImGui.TextUnformatted(stat.Runs.ToString());
 
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(stat.Deaths.ToString());
+                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(deathsPerRun?.ToString("0.00") ?? "-");

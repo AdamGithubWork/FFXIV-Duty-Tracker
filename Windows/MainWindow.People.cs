@@ -25,9 +25,9 @@ namespace MentorRouletteTracker
             public required string Gender { get; init; }
             public required List<PlayerEncounter> Encounters { get; init; }
             public int TimesSeen => Encounters.Count;
-            public required int TotalDeaths { get; init; }
+            public required int? TotalDeaths { get; init; }
             public int KnownDeathEncounters => Encounters.Count(x => EffectiveDeaths(x.Record, x.Player).HasValue);
-            public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double)TotalDeaths / KnownDeathEncounters;
+            public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double?)TotalDeaths / KnownDeathEncounters;
         }
 
         private void DrawPeopleTab()
@@ -78,7 +78,7 @@ namespace MentorRouletteTracker
                         Gender = entries.Select(x => x.Player.Gender)
                             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x != "Unknown") ?? "Unknown",
                         Encounters = entries,
-                        TotalDeaths = entries.Sum(x => EffectiveDeaths(x.Record, x.Player) ?? 0)
+                        TotalDeaths = TotalKnownDeaths(entries.Select(x => EffectiveDeaths(x.Record, x.Player)))
                     };
                 })
                 .ToList();
@@ -89,6 +89,7 @@ namespace MentorRouletteTracker
             ImGui.TextDisabled($"({uniqueLalafell} Lalafell)");
             ImGui.Spacing();
             ImGui.TextDisabled("Click a player to see your duties together. Click a column to sort.");
+            ImGui.TextDisabled("Death totals include known counts only. Averages skip unknown counts. '-' means no known counts.");
             ImGui.Spacing();
 
             if (ImGui.BeginTable(
@@ -122,8 +123,8 @@ namespace MentorRouletteTracker
                         2 => ascending ? people.OrderBy(x => x.Race).ThenBy(x => x.Name).ToList() : people.OrderByDescending(x => x.Race).ThenBy(x => x.Name).ToList(),
                         3 => ascending ? people.OrderBy(x => x.Gender).ThenBy(x => x.Name).ToList() : people.OrderByDescending(x => x.Gender).ThenBy(x => x.Name).ToList(),
                         4 => ascending ? people.OrderBy(x => x.TimesSeen).ThenBy(x => x.Name).ToList() : people.OrderByDescending(x => x.TimesSeen).ThenBy(x => x.Name).ToList(),
-                        5 => ascending ? people.OrderBy(x => x.TotalDeaths).ThenBy(x => x.Name).ToList() : people.OrderByDescending(x => x.TotalDeaths).ThenBy(x => x.Name).ToList(),
-                        6 => ascending ? people.OrderBy(x => x.AverageDeaths).ThenBy(x => x.Name).ToList() : people.OrderByDescending(x => x.AverageDeaths).ThenBy(x => x.Name).ToList(),
+                        5 => ascending ? people.OrderBy(x => !x.TotalDeaths.HasValue).ThenBy(x => x.TotalDeaths).ThenBy(x => x.Name).ToList() : people.OrderBy(x => !x.TotalDeaths.HasValue).ThenByDescending(x => x.TotalDeaths).ThenBy(x => x.Name).ToList(),
+                        6 => ascending ? people.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ThenBy(x => x.Name).ToList() : people.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths).ThenBy(x => x.Name).ToList(),
                         _ => people
                     };
                     sortSpecs.SpecsDirty = false;
@@ -149,7 +150,7 @@ namespace MentorRouletteTracker
                     ImGui.TableSetColumnIndex(4);
                     ImGui.TextUnformatted(player.TimesSeen.ToString());
                     ImGui.TableSetColumnIndex(5);
-                    ImGui.TextUnformatted(player.TotalDeaths.ToString());
+                    ImGui.TextUnformatted(player.TotalDeaths?.ToString() ?? "-");
                     ImGui.TableSetColumnIndex(6);
                     ImGui.TextUnformatted(player.AverageDeaths?.ToString("F2") ?? "-");
                 }
@@ -181,7 +182,7 @@ namespace MentorRouletteTracker
                 }
                 else
                 {
-                    ImGui.Text($"Encounters: {selected.TimesSeen}    Total deaths: {selected.TotalDeaths}    Average: {selected.AverageDeaths?.ToString("F2") ?? "-"}");
+                    ImGui.Text($"Encounters: {selected.TimesSeen}    Known death counts: {selected.KnownDeathEncounters}    Total deaths: {selected.TotalDeaths?.ToString() ?? "-"}    Average: {selected.AverageDeaths?.ToString("F2") ?? "-"}");
                     ImGui.Spacing();
 
                     if (ImGui.BeginTable(
@@ -221,7 +222,7 @@ namespace MentorRouletteTracker
                             ImGui.TableSetColumnIndex(3);
                             ImGui.TextUnformatted(entry.Player.Job);
                             ImGui.TableSetColumnIndex(4);
-                            ImGui.TextUnformatted((EffectiveDeaths(entry.Record, entry.Player) ?? 0).ToString());
+                            ImGui.TextUnformatted(EffectiveDeaths(entry.Record, entry.Player)?.ToString() ?? "-");
                         }
                         ImGui.EndTable();
                     }
