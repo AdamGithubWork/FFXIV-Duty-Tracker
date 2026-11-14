@@ -129,9 +129,11 @@ public sealed partial class SqliteHistoryStore
         return new HistoryWrite(rows, string.Empty, PendingOnly: true);
     }
 
-    internal void SaveHistory(HistoryWrite snapshot)
+    internal void SaveHistory(HistoryWrite snapshot, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var connection = OpenExisting();
+        cancellationToken.ThrowIfCancellationRequested();
         using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -153,9 +155,13 @@ public sealed partial class SqliteHistoryStore
         if (deleted.Length == 0 && changed.Length == 0 && !seenChanged) { transaction.Commit(); return; }
 
         foreach (string id in deleted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             Execute(connection, transaction, "DELETE FROM duty_runs WHERE id=$id;", new() { ["id"] = id });
+        }
         foreach (var row in changed)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var record = row.Record;
             var fields = new Dictionary<string, object?>
             {
@@ -176,6 +182,7 @@ public sealed partial class SqliteHistoryStore
             Execute(connection, transaction, "DELETE FROM duty_players WHERE duty_id=$id;", new() { ["id"] = row.Id });
             for (int index = 0; index < row.Party.Count; index++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var player = row.Party[index];
                 Execute(connection, transaction, """
                     INSERT INTO duty_players(duty_id,party_index,name,world,job,race,gender,status,death_count,pvp_scoreboard_deaths)
@@ -188,8 +195,10 @@ public sealed partial class SqliteHistoryStore
                 });
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         Execute(connection, transaction, "UPDATE history_state SET revision=revision+1,seen_players_json=$seen WHERE id=1;",
             new() { ["seen"] = seenJson });
+        cancellationToken.ThrowIfCancellationRequested();
         transaction.Commit();
         revision++;
         savedDuties = desired;
@@ -197,15 +206,27 @@ public sealed partial class SqliteHistoryStore
         pendingDutyId = snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id;
     }
 
-    private SqliteConnection OpenExisting()
+    internal SqliteConnection OpenExisting()
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
             DataSource = DatabasePath, Mode = SqliteOpenMode.ReadWrite, ForeignKeys = true,
             Pooling = false, DefaultTimeout = 5
         }.ToString());
-        try { connection.Open(); return connection; }
+        try
+        {
+            connection.Open();
+            ConfigureConnection(connection);
+            return connection;
+        }
         catch { connection.Dispose(); throw; }
+    }
+
+    private static void ConfigureConnection(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;";
+        command.ExecuteNonQuery();
     }
 
     private static void Execute(SqliteConnection connection, SqliteTransaction transaction, string sql, Dictionary<string, object?> parameters)

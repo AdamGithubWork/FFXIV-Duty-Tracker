@@ -43,12 +43,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         var seenJson = SqliteHistoryStore.LegacySeenJson(root);
 
         store.Initialize();
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = store.DatabasePath, Mode = SqliteOpenMode.ReadWrite,
-            ForeignKeys = true, Pooling = false, DefaultTimeout = 5
-        }.ToString());
-        connection.Open();
+        using var connection = store.OpenExisting();
         using var transaction = connection.BeginTransaction();
 
         bool alreadyImported;

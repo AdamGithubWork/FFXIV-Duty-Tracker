@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using MentorRouletteTracker.DutyTracking;
 
 namespace MentorRouletteTracker.Storage;
@@ -10,11 +11,15 @@ public sealed class HistorySession : IDisposable
     private readonly Action<HistoryData>? legacySave;
     private readonly Action<Exception>? reportError;
     private readonly object gate = new();
+    private readonly CancellationTokenSource writeCancellation = new();
+    private static readonly TimeSpan ShutdownSaveTimeout = TimeSpan.FromSeconds(5);
     private readonly string? recoveryPath;
     private HistoryWrite? pending;
     private HistoryWrite? pendingDuty;
     private HistoryWrite? recoverySnapshot;
     private bool retryFullSave;
+    private bool shutdownTimedOut;
+    private HistoryWrite? shutdownSnapshot;
     private Task worker = Task.CompletedTask;
     private bool running;
     private bool disposed;
@@ -37,7 +42,7 @@ public sealed class HistorySession : IDisposable
         var directory = Path.GetDirectoryName(store.DatabasePath)!;
         var prefix = Path.GetFileNameWithoutExtension(store.DatabasePath) + "-recovery-";
         recoveryPath = Path.Combine(directory, prefix + Guid.NewGuid().ToString("N") + ".json");
-        data = Task.Run(store.LoadHistory).GetAwaiter().GetResult();
+        data = store.LoadHistory();
         RecoverHistory(Directory.EnumerateFiles(directory, prefix + "*.json").ToArray());
         recoverySnapshot = SqliteHistoryStore.Capture(data);
     }
@@ -182,7 +187,10 @@ public sealed class HistorySession : IDisposable
             {
                 if (pending == null && pendingDuty == null)
                 {
-                    running = false;
+                    if (shutdownTimedOut)
+                        FinishTimedOutWrite();
+                    else
+                        running = false;
                     return;
                 }
                 full = pending;
@@ -202,39 +210,73 @@ public sealed class HistorySession : IDisposable
             snapshot = full != null || retryFullSave ? recoverySnapshot! : active!;
             try
             {
-                store!.SaveHistory(snapshot);
-                if (File.Exists(recoveryPath)) File.Delete(recoveryPath!);
-                retryFullSave = false;
-                lock (gate) lastError = null;
+                store!.SaveHistory(snapshot, writeCancellation.Token);
+                lock (gate)
+                {
+                    if (shutdownTimedOut)
+                    {
+                        FinishTimedOutWrite();
+                        return;
+                    }
+                    if (File.Exists(recoveryPath))
+                        File.Delete(recoveryPath!);
+                    retryFullSave = false;
+                    lastError = null;
+                }
             }
             catch (Exception ex)
             {
-                retryFullSave = true;
                 Exception failure;
-                try
+                lock (gate)
                 {
-                    WriteRecovery(recoverySnapshot!);
-                    failure = new IOException($"SQLite history was not saved. A recovery copy is at {recoveryPath}.", ex);
+                    if (shutdownTimedOut)
+                    {
+                        FinishTimedOutWrite();
+                        return;
+                    }
+                    retryFullSave = true;
+                    try
+                    {
+                        WriteRecovery(recoverySnapshot!);
+                        failure = new IOException($"SQLite history was not saved. A recovery copy is at {recoveryPath}.", ex);
+                    }
+                    catch (Exception backupError)
+                    {
+                        failure = new AggregateException("Could not save history or its recovery copy.", ex, backupError);
+                    }
+                    lastError = failure;
                 }
-                catch (Exception backupError)
-                {
-                    failure = new AggregateException("Could not save history or its recovery copy.", ex, backupError);
-                }
-                lock (gate) lastError = failure;
                 try { reportError?.Invoke(failure); }
                 catch { /* A logging failure must not terminate the history writer. */ }
             }
         }
     }
 
-    private void WriteRecovery(HistoryWrite snapshot)
+    private void FinishTimedOutWrite()
+    {
+        try
+        {
+            // The transaction has exited, so its final revision is now known.
+            WriteRecovery(shutdownSnapshot!);
+        }
+        catch (Exception ex)
+        {
+            lastError = ex;
+            try { reportError?.Invoke(ex); }
+            catch { }
+        }
+        running = false;
+    }
+
+    private void WriteRecovery(HistoryWrite snapshot, bool includeRevision = true)
     {
         var temporaryPath = recoveryPath + ".tmp";
         using (var stream = File.Create(temporaryPath))
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("BaseRevision", store!.Revision);
+            if (includeRevision)
+                writer.WriteNumber("BaseRevision", store!.Revision);
             writer.WritePropertyName("DutyIds");
             JsonSerializer.Serialize(writer, snapshot.Duties.Where(row => !row.Pending).Select(row => row.Id));
             writer.WriteString("PendingDutyId", snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id);
@@ -260,13 +302,52 @@ public sealed class HistorySession : IDisposable
 
     public void Flush()
     {
+        Flush(Timeout.InfiniteTimeSpan);
+    }
+
+    private void Flush(TimeSpan timeout)
+    {
         Save();
         if (legacySave != null) return;
+        var elapsed = Stopwatch.StartNew();
         while (true)
         {
             Task current;
             lock (gate) current = worker;
-            current.GetAwaiter().GetResult();
+            try
+            {
+                if (timeout == Timeout.InfiniteTimeSpan)
+                    current.GetAwaiter().GetResult();
+                else
+                {
+                    var remaining = timeout - elapsed.Elapsed;
+                    if (remaining <= TimeSpan.Zero)
+                        throw new TimeoutException();
+                    current.WaitAsync(remaining).GetAwaiter().GetResult();
+                }
+            }
+            catch (TimeoutException ex)
+            {
+                var snapshot = SqliteHistoryStore.Capture(data);
+                try
+                {
+                    lock (gate)
+                    {
+                        shutdownTimedOut = true;
+                        shutdownSnapshot = snapshot;
+                        pending = null;
+                        pendingDuty = null;
+                        writeCancellation.Cancel();
+                        // An in-flight commit may still be finishing at the deadline.
+                        WriteRecovery(snapshot, includeRevision: !running);
+                    }
+                }
+                catch (Exception backupError)
+                {
+                    throw new AggregateException("History save timed out and its recovery copy could not be saved.", ex, backupError);
+                }
+                throw new TimeoutException($"History save did not finish within {timeout.TotalSeconds:0} seconds. A recovery copy is at {recoveryPath}.", ex);
+            }
             lock (gate)
             {
                 if (running || pending != null || pendingDuty != null) continue;
@@ -279,7 +360,7 @@ public sealed class HistorySession : IDisposable
     public void Dispose()
     {
         lock (gate) if (disposed) return;
-        try { Flush(); }
+        try { Flush(ShutdownSaveTimeout); }
         finally { lock (gate) disposed = true; }
     }
 }

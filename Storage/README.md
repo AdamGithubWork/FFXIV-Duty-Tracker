@@ -55,7 +55,17 @@ If another save is queued, the newer snapshot replaces it.
 Changed duties are updated in a transaction. Deleting a duty also deletes its party
 rows. A revision check catches writes from another database session.
 
-Shutdown waits for queued saves. If a database save fails, the session logs the
+SQLite connections enable foreign keys and use `synchronous=FULL`. History loads
+directly during initialization.
+
+Shutdown waits up to five seconds for queued SQLite saves. If the wait expires,
+the session writes a full recovery copy and cancels further database work. A write
+already in progress finishes or rolls back before the worker records its final
+revision in that recovery file. Until then, changed recovery contents need review.
+The five seconds limits the wait for the worker; writing the recovery copy also
+takes disk time. JSON mode still uses its synchronous configuration save.
+
+If a database save fails, the session logs the
 error and writes a recovery JSON file with the duty IDs and database revision.
 A successful retry removes that file. On startup, a recovery from the current
 database revision is saved back to SQLite before its file is removed.

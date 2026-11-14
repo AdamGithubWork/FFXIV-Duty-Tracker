@@ -33,6 +33,7 @@ public sealed partial class SqliteHistoryStore
             DefaultTimeout = 5
         }.ToString());
         connection.Open();
+        ConfigureConnection(connection);
 
         using (var transaction = connection.BeginTransaction())
         {
@@ -147,7 +148,7 @@ public sealed partial class SqliteHistoryStore
         }
 
         using var settings = connection.CreateCommand();
-        settings.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;";
+        settings.CommandText = "PRAGMA journal_mode = WAL;";
         settings.ExecuteNonQuery();
     }
 
