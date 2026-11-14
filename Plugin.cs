@@ -80,8 +80,6 @@ namespace MentorRouletteTracker
                 log,
                 config);
 
-            framework.Update += OnFrameworkUpdate;
-
             var exportDir = pluginInterface.GetPluginConfigDirectory();
             Directory.CreateDirectory(exportDir);
 
@@ -110,6 +108,7 @@ namespace MentorRouletteTracker
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
             pluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
+            framework.Update += OnFrameworkUpdate;
         }
 
         private void OnOpenMainUi()

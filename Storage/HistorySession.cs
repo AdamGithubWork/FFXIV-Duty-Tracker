@@ -25,6 +25,7 @@ public sealed class HistorySession : IDisposable
     private Exception? lastError;
 
     public List<DutyRecord> Records => data.Records;
+    internal long ChangeVersion { get; private set; }
     public DutyRecord? PendingDuty { get => data.PendingDuty; set => data.PendingDuty = value; }
 
     public HistorySession(SqliteHistoryStore store, Action<Exception>? reportError = null)
@@ -131,6 +132,7 @@ public sealed class HistorySession : IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             // The latest snapshot includes earlier edits, so only keep one queued save.
+            ChangeVersion++;
             pending = snapshot;
             pendingDuty = null;
             if (!running)

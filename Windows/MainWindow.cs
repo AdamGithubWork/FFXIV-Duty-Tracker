@@ -33,6 +33,7 @@ namespace MentorRouletteTracker
         private bool showDetailWindow;
 
         private string? dutyHistoryFilter;
+        private bool dutyHistoryFullRunsOnly;
         private bool openDutyHistory;
 
         private DutyRecord? recordPendingDeletion;
@@ -84,12 +85,13 @@ namespace MentorRouletteTracker
         {
         }
 
-        public void OpenDutyHistory(string dutyName)
+        public void OpenDutyHistory(string dutyName, bool fullRunsOnly = false)
         {
             if (string.IsNullOrWhiteSpace(dutyName))
                 return;
 
             dutyHistoryFilter = dutyName;
+            dutyHistoryFullRunsOnly = fullRunsOnly;
             openDutyHistory = true;
 
             // Opening a duty from the timer resets unrelated filters.
@@ -386,6 +388,7 @@ namespace MentorRouletteTracker
                     minimumEncounters = 1;
 
                     dutyHistoryFilter = null;
+                    dutyHistoryFullRunsOnly = false;
                 }
 
                 ImGui.Dummy(new Vector2(0, 8));

@@ -12,8 +12,9 @@ namespace MentorRouletteTracker
         private readonly Configuration config;
         private DutyRecord? cachedDuty;
         private int cachedRecordCount = -1;
+        private long cachedChangeVersion = -1;
         private int cachedRunCount;
-        private string averageText = "No completed runs yet";
+        private string averageText = "No full runs yet";
 
         public DutyTimerWindow(
             DutyTrackerService tracker,
@@ -40,49 +41,51 @@ namespace MentorRouletteTracker
             if (duty == null)
                 return;
 
-            if (!ReferenceEquals(cachedDuty, duty) || cachedRecordCount != config.History.Records.Count)
-            {
-                UpdateAverage(duty);
-            }
+            RefreshAverage(duty);
 
             ImGui.TextUnformatted(duty.DutyName);
             ImGui.Separator();
 
             ImGui.TextUnformatted("Average clear time:");
 
-            if (ImGui.Button(averageText, new Vector2(180, 0)))
+            if (ImGui.Button(averageText + "###AverageClearTime", new Vector2(180, 0)))
             {
-                mainWindow.OpenDutyHistory(duty.DutyName);
+                mainWindow.OpenDutyHistory(duty.DutyName, fullRunsOnly: true);
             }
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("View previous runs");
+                ImGui.SetTooltip("View full runs used for this average");
             }
 
             ImGui.TextDisabled($"Based on {cachedRunCount} full runs");
         }
 
+        internal static bool IsFullRunForDuty(DutyRecord record, string dutyName) =>
+            record.Completed && !record.JoinedInProgress && record.TimeInDuty > TimeSpan.Zero &&
+            string.Equals(record.DutyName, dutyName, StringComparison.OrdinalIgnoreCase);
+
+        private void RefreshAverage(DutyRecord duty)
+        {
+            if (!ReferenceEquals(cachedDuty, duty) || cachedRecordCount != config.History.Records.Count ||
+                cachedChangeVersion != config.History.ChangeVersion)
+                UpdateAverage(duty);
+        }
+
         private void UpdateAverage(DutyRecord duty)
         {
             var completedRuns = config.History.Records
-                .Where(record =>
-                    record.Completed &&
-                    !record.JoinedInProgress &&
-                    record.TimeInDuty.TotalSeconds > 0 &&
-                    string.Equals(
-                        record.DutyName,
-                        duty.DutyName,
-                        StringComparison.OrdinalIgnoreCase))
+                .Where(record => IsFullRunForDuty(record, duty.DutyName))
                 .ToList();
 
             cachedDuty = duty;
             cachedRecordCount = config.History.Records.Count;
+            cachedChangeVersion = config.History.ChangeVersion;
             cachedRunCount = completedRuns.Count;
 
             if (completedRuns.Count == 0)
             {
-                averageText = "No completed runs yet";
+                averageText = "No full runs yet";
             }
             else
             {

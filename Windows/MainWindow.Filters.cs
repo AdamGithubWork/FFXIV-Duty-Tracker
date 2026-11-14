@@ -65,6 +65,13 @@ namespace MentorRouletteTracker
                 .Where(record => !applyPlayerFilters || MatchesDutyPlayerFilters(record));
         }
 
+        private bool MatchesDutyHistory(DutyRecord record)
+        {
+            return dutyHistoryFilter == null || (dutyHistoryFullRunsOnly
+                ? DutyTimerWindow.IsFullRunForDuty(record, dutyHistoryFilter)
+                : string.Equals(record.DutyName, dutyHistoryFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
         private bool MatchesDutyFilters(DutyRecord record, DateTime now)
         {
             return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(record.DutyType)) &&

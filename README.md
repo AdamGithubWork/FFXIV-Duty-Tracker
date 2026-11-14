@@ -67,7 +67,8 @@ members, and whether to include yourself in stats.
 ## Duty timer
 
 The optional timer window shows your current duty and its average completion
-time from previous completed runs that weren't joined in progress. Click the time to see those runs.
+time from previous completed runs that weren't joined in progress. Click the time
+to see the full runs used for that average. The average refreshes after record edits.
 Choose which duty types show the window in Settings.
 
 ## Filters

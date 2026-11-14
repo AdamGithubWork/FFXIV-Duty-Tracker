@@ -13,13 +13,14 @@ namespace MentorRouletteTracker
             if (!string.IsNullOrWhiteSpace(dutyHistoryFilter))
             {
                 ImGui.TextUnformatted(
-                    $"Duty history: {dutyHistoryFilter}");
+                    $"Duty history: {dutyHistoryFilter}" + (dutyHistoryFullRunsOnly ? " (full runs only)" : ""));
 
                 ImGui.SameLine();
 
                 if (ImGui.Button("Show all duties"))
                 {
                     dutyHistoryFilter = null;
+                    dutyHistoryFullRunsOnly = false;
                 }
 
                 ImGui.Separator();
@@ -166,12 +167,7 @@ namespace MentorRouletteTracker
                         Index = index
                     })
                     .Where(x => x.Record.Completed == completed)
-                    .Where(x =>
-                        dutyHistoryFilter == null ||
-                        string.Equals(
-                            x.Record.DutyName,
-                            dutyHistoryFilter,
-                            StringComparison.OrdinalIgnoreCase))
+                    .Where(x => MatchesDutyHistory(x.Record))
                     .Where(x => MatchesDutyFilters(x.Record, now))
                     .Where(x => MatchesDutyPlayerFilters(x.Record))
                     .ToList();
