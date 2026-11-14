@@ -17,8 +17,12 @@ namespace MentorRouletteTracker
         private HistorySession? history;
         [NonSerialized]
         private IDalamudPluginInterface? pluginInterface;
+        [NonSerialized]
+        private string? storageError;
 
         internal HistorySession History => history ?? throw new InvalidOperationException("History is not initialized.");
+        internal bool StorageAvailable => history != null;
+        internal string? StorageError => storageError;
 
         public void Initialize(IDalamudPluginInterface pi, Action<Exception>? reportStorageError = null, bool createDatabase = false)
         {
@@ -26,10 +30,21 @@ namespace MentorRouletteTracker
                 throw new InvalidOperationException("History has already been initialized.");
             pluginInterface = pi;
             var path = Path.Combine(pi.GetPluginConfigDirectory(), "history.sqlite");
-            var store = new SqliteHistoryStore(path);
-            if (createDatabase && !File.Exists(path))
-                store.Initialize();
-            history = new HistorySession(store, reportStorageError);
+            storageError = null;
+            try
+            {
+                var store = new SqliteHistoryStore(path);
+                if (createDatabase && !File.Exists(path))
+                    store.Initialize();
+                history = new HistorySession(store, reportStorageError);
+            }
+            catch (Exception ex)
+            {
+                storageError = ex is FileNotFoundException
+                    ? "Couldn't find history.sqlite."
+                    : $"Couldn't load duty history: {ex.Message}";
+                reportStorageError?.Invoke(ex);
+            }
         }
 
         public void Save()

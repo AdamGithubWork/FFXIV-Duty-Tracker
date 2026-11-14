@@ -56,11 +56,15 @@ namespace MentorRouletteTracker.DutyTracking
             this.dutyState.DutyWiped += OnDutyWiped;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
-            pendingRestoreNeeded = config.History.PendingDuty != null;
+            Armed = config.StorageAvailable;
+            pendingRestoreNeeded = config.StorageAvailable && config.History.PendingDuty != null;
         }
 
         private void OnTerritoryChanged(uint territoryId)
         {
+            if (!config.StorageAvailable)
+                return;
+
             if (pendingRestoreNeeded)
             {
                 RestorePendingDuty();
@@ -104,6 +108,9 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void OnFrameworkUpdate(IFramework fw)
         {
+            if (!config.StorageAvailable)
+                return;
+
             if (pendingRestoreNeeded)
             {
                 RestorePendingDuty();

@@ -1,3 +1,4 @@
+#if DEBUG
 using MentorRouletteTracker.DutyTracking;
 
 namespace MentorRouletteTracker.Storage;
@@ -37,3 +38,4 @@ public static class StorageDiagnostics
         }
     }
 }
+#endif

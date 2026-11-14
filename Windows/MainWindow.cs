@@ -103,6 +103,18 @@ namespace MentorRouletteTracker
 
         public override void Draw()
         {
+            if (!config.StorageAvailable)
+            {
+                ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "Duty history couldn't be loaded");
+                ImGui.TextWrapped(config.StorageError ?? "History storage is unavailable.");
+                ImGui.TextUnformatted("Recording is paused.");
+                ImGui.Spacing();
+                ImGui.TextWrapped("If the database is missing, unload Duty Tracker and restore it from a backup. Then reload the plugin.");
+                ImGui.TextWrapped($"Database: {Path.Combine(exportDirectory, "history.sqlite")}");
+                ImGui.TextWrapped("For other storage errors, check the Dalamud log before restoring files.");
+                return;
+            }
+
             int activeFilterCount =
                 selectedDutyTypes.Count +
                 selectedPlayerRaces.Count +

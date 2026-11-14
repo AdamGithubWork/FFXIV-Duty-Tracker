@@ -39,6 +39,9 @@ namespace MentorRouletteTracker.PvP
         }
         private void OnPvpMatchSaved(string matchId)
         {
+            if (!config.StorageAvailable)
+                return;
+
             if (string.IsNullOrWhiteSpace(matchId) ||
                 processedPvpMatches.Contains(matchId) ||
                 pendingPvpMatches.ContainsKey(matchId))
@@ -64,6 +67,9 @@ namespace MentorRouletteTracker.PvP
 
         private bool ApplyPvpMatch(string matchId)
         {
+            if (!config.StorageAvailable)
+                return false;
+
             var result =
                 PvpTrackerDatabase.GetMatch(matchId, log);
 
@@ -171,6 +177,9 @@ namespace MentorRouletteTracker.PvP
         }
         private void OnFrameworkUpdate(IFramework framework)
         {
+            if (!config.StorageAvailable)
+                return;
+
             var now = DateTime.UtcNow;
 
             if (now < nextPvpCheck || pendingPvpMatches.Count == 0)

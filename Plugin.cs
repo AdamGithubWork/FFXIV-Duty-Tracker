@@ -3,7 +3,6 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
 using MentorRouletteTracker.PvP;
-using MentorRouletteTracker.Storage;
 
 namespace MentorRouletteTracker
 {
@@ -22,7 +21,6 @@ namespace MentorRouletteTracker
         private readonly MainWindow mainWindow;
         private readonly DutyTimerWindow dutyTimerWindow;
         private readonly PvpMatchService pvpMatchService;
-        private bool storageCheckRunning;
 
         public Plugin(
             IDalamudPluginInterface pluginInterface,
@@ -54,10 +52,16 @@ namespace MentorRouletteTracker
                     [2, 3, 4, 5, 6, 21, 28, 30, 37]);
             }
 
-            config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history could not be saved."), createDatabase: savedConfig == null);
-            config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
-            config.TimerVisibleContentTypeIds = config.TimerVisibleContentTypeIds.Distinct().ToList();
-            config.Save();
+            config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history storage error."), createDatabase: savedConfig == null);
+            var trackedTypes = config.TrackedContentTypeIds.Distinct().ToList();
+            var timerTypes = config.TimerVisibleContentTypeIds.Distinct().ToList();
+            var settingsChanged = savedConfig == null ||
+                trackedTypes.Count != config.TrackedContentTypeIds.Count ||
+                timerTypes.Count != config.TimerVisibleContentTypeIds.Count;
+            config.TrackedContentTypeIds = trackedTypes;
+            config.TimerVisibleContentTypeIds = timerTypes;
+            if (config.StorageAvailable && settingsChanged)
+                config.Save();
 
             tracker = new DutyTrackerService(
                 clientState,
@@ -87,6 +91,8 @@ namespace MentorRouletteTracker
                 exportDir,
                 objectTable);
             windowSystem.AddWindow(mainWindow);
+            if (!config.StorageAvailable)
+                mainWindow.IsOpen = true;
 
             dutyTimerWindow = new DutyTimerWindow(
                 tracker,
@@ -99,8 +105,7 @@ namespace MentorRouletteTracker
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
                 {
                     HelpMessage =
-                        "Open Duty Tracker. Use '/dt arm' to record duties or '/dt disarm' to stop recording. " +
-                        "Use '/dt storagecheck' to check SQLite support.",
+                        "Open Duty Tracker. Use '/dt arm' to record duties or '/dt disarm' to stop recording.",
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -129,6 +134,12 @@ namespace MentorRouletteTracker
             switch (args)
             {
                 case "arm":
+                    if (!config.StorageAvailable)
+                    {
+                        mainWindow.IsOpen = true;
+                        log.Warning("Duty recording is paused because history storage is unavailable.");
+                        break;
+                    }
                     tracker.Armed = true;
                     log.Information("Duty Tracker: recording enabled.");
                     break;
@@ -138,30 +149,10 @@ namespace MentorRouletteTracker
                     log.Information("Duty Tracker: recording disabled.");
                     break;
 
-                case "storagecheck":
-                    _ = RunStorageCheckAsync();
-                    break;
-
                 default:
                     mainWindow.IsOpen = !mainWindow.IsOpen;
                     break;
             }
-        }
-
-        private async Task RunStorageCheckAsync()
-        {
-            if (storageCheckRunning) return;
-            storageCheckRunning = true;
-            try
-            {
-                await Task.Run(() => StorageDiagnostics.Run(pluginInterface.GetPluginConfigDirectory()));
-                log.Information("Duty Tracker: SQLite check passed.");
-            }
-            catch (Exception ex)
-            {
-                log.Error(ex, "Duty Tracker: SQLite check failed.");
-            }
-            finally { storageCheckRunning = false; }
         }
 
         public void Dispose()

@@ -36,9 +36,14 @@ Backups are separate files. Clearing records leaves those backup files in place.
 
 ## Loading and settings
 
-An existing profile requires its history database. A missing database causes an
-error instead of creating empty replacement history. Only a new profile can create
-a new database automatically.
+An existing profile requires its history database. If history can't load, the
+plugin opens a storage-error screen and pauses recording and PvP updates. History
+controls stay hidden until the database can load. Restore a missing database while
+the plugin is unloaded, then reload it. Only a new profile can create an empty
+database automatically.
+
+Startup saves settings only for a new profile or when duplicate content-type IDs
+were removed, and only after history loaded successfully.
 
 Settings saves write only the JSON settings. Duty edits and tracking events save
 through the history session.
@@ -64,7 +69,7 @@ copies are kept as `.json.stale` files. Conflicting or unreadable recoveries nee
 review. A copy without a revision is removed if it matches the database; changed
 contents need review until its revision is known.
 
-## SQLite check
+## Development checks
 
-`/dt storagecheck` checks SQLite with a temporary database. It doesn't open your
-history database. Look for `Duty Tracker: SQLite check passed.` in Dalamud's log.
+`StorageDiagnostics` is compiled only in debug builds. There is no public storage
+check command.

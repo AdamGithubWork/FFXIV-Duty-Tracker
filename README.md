@@ -77,7 +77,6 @@ Alliance Raids have their own categories.
 | `/dt` | Open or close Duty Tracker |
 | `/dt arm` | Start recording duties |
 | `/dt disarm` | Stop recording new duties |
-| `/dt storagecheck` | Check SQLite support using a temporary database |
 
 ## Saved data
 
