@@ -5,7 +5,7 @@ namespace MentorRouletteTracker.Storage;
 
 public sealed partial class SqliteHistoryStore
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
     private const int ApplicationId = 0x44555459; // DUTY
 
     public string DatabasePath { get; }
@@ -41,9 +41,9 @@ public sealed partial class SqliteHistoryStore
             {
                 var tableCount = ReadInteger(connection, transaction, """
                     SELECT COUNT(*) FROM sqlite_master
-                    WHERE type = 'table' AND name IN ('duty_runs', 'duty_players', 'upload_queue');
+                    WHERE type = 'table' AND name IN ('duty_runs', 'duty_players');
                     """);
-                if (tableCount != 3)
+                if (tableCount != 2)
                     throw new InvalidDataException("History database tables are missing. Restore a backup before proceeding.");
             }
             else
@@ -139,6 +139,14 @@ public sealed partial class SqliteHistoryStore
                 migration.Transaction = transaction;
                 migration.CommandText = "ALTER TABLE history_state DROP COLUMN seen_players_json; PRAGMA user_version = 6;";
                 migration.ExecuteNonQuery();
+                version = 6;
+            }
+            if (version == 6)
+            {
+                using var migration = connection.CreateCommand();
+                migration.Transaction = transaction;
+                migration.CommandText = "DROP TABLE IF EXISTS upload_queue; PRAGMA user_version = 7;";
+                migration.ExecuteNonQuery();
             }
             if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)
                 throw new InvalidDataException("The database history state is missing.");
@@ -197,22 +205,10 @@ public sealed partial class SqliteHistoryStore
             PRIMARY KEY (duty_id, party_index)
         ) STRICT;
 
-        -- Reserved for a future opt-in upload implementation. No uploader exists yet.
-        CREATE TABLE upload_queue (
-            submission_id TEXT NOT NULL PRIMARY KEY,
-            duty_id TEXT NOT NULL UNIQUE REFERENCES duty_runs(id) ON DELETE CASCADE,
-            payload_version INTEGER NOT NULL,
-            payload_json TEXT NOT NULL,
-            queued_at_utc TEXT NOT NULL,
-            next_attempt_utc TEXT,
-            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0)
-        ) STRICT;
-
         CREATE INDEX idx_duty_runs_timestamp ON duty_runs(timestamp);
         CREATE INDEX idx_duty_runs_type_completed ON duty_runs(duty_type, completed);
         CREATE UNIQUE INDEX idx_single_pending_duty ON duty_runs(is_pending) WHERE is_pending = 1;
         CREATE INDEX idx_duty_players_identity ON duty_players(name, world);
-        CREATE INDEX idx_upload_queue_retry ON upload_queue(next_attempt_utc);
         """;
 
     private const string ImportSchema = """

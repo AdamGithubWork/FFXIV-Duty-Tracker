@@ -19,14 +19,15 @@ migration or fallback yet.
 - `duty_players`: party members for each duty, kept in their original order.
 - `history_state`: the write revision used to detect another database writer.
 - `legacy_imports`: the original JSON backup, its checksum, and import counts.
-- `upload_queue`: unused. No uploader is implemented.
 
 Schema v2 added the import archive and source-record IDs. Version 3 added
 `history_state` and `history_order`. Version 4 removes `history_order` and loads
 duties in SQLite row order. Updating a duty keeps its row ID, so deleting an early
 record doesn't make later records look changed. Version 5 converts duty timestamps
 and checkpoints to UTC round-trip strings. Version 6 removes the separate seen-player
-cache. Encounter counts come from duty records. `PRAGMA user_version` tracks the version.
+cache. Encounter counts come from duty records. Version 7 removes the unused upload
+queue and its indexes. Uploads are postponed until after public release.
+`PRAGMA user_version` tracks the version.
 
 Timestamps use UTC round-trip strings and load as local time for display. Checkpoints
 stay in UTC; durations use .NET ticks. Older timestamps without an offset are treated
