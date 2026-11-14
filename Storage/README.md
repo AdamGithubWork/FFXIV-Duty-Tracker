@@ -9,7 +9,7 @@ JSON is still the default. Existing profiles aren't switched to SQLite automatic
 With `UseSqliteHistory` enabled, history loads from `history.sqlite` in the plugin's
 config folder. Settings stay in JSON, without Records, SeenPlayers, or PendingDuty.
 
-SQLite loading fails if the database is missing, a recovery file needs review, or
+SQLite loading fails if the database is missing, a recovery file can't be applied, or
 the first load doesn't match history still in the JSON config. There is no automatic
 migration or fallback yet.
 
@@ -49,8 +49,14 @@ Changed duties are updated in a transaction. Deleting a duty also deletes its pa
 rows. A revision check catches writes from another database session.
 
 Shutdown waits for queued saves. If a database save fails, the session logs the
-error and writes a recovery JSON file. A successful retry removes that file.
-Otherwise, the recovery file needs review before the next load.
+error and writes a recovery JSON file with the duty IDs and database revision.
+A successful retry removes that file. On startup, a recovery from the current
+database revision is saved back to SQLite before its file is removed.
+
+Older recoveries are kept as `.json.stale` files and reported in the log. Conflicting
+recoveries, invalid files, or files from a newer database revision need review.
+Recovery files from older plugin versions have no revision or IDs. If their contents
+match the database, they're removed; otherwise, their edits need review too.
 
 ## Current limits
 

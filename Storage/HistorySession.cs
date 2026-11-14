@@ -33,10 +33,91 @@ public sealed class HistorySession : IDisposable
         this.reportError = reportError;
         var directory = Path.GetDirectoryName(store.DatabasePath)!;
         var prefix = Path.GetFileNameWithoutExtension(store.DatabasePath) + "-recovery-";
-        if (Directory.Exists(directory) && Directory.EnumerateFiles(directory, prefix + "*.json").Any())
-            throw new InvalidDataException("A recovery file needs to be reviewed before loading history.");
         recoveryPath = Path.Combine(directory, prefix + Guid.NewGuid().ToString("N") + ".json");
         data = Task.Run(store.LoadHistory).GetAwaiter().GetResult();
+        RecoverHistory(Directory.EnumerateFiles(directory, prefix + "*.json").ToArray());
+    }
+
+    private void RecoverHistory(string[] paths)
+    {
+        var recoveries = paths.Select(ReadRecovery).OrderBy(recovery => recovery.Revision).ToList();
+        foreach (var group in recoveries.Where(recovery => recovery.Revision >= store!.Revision)
+                     .GroupBy(recovery => recovery.Revision))
+        {
+            if (group.Select(recovery => JsonSerializer.Serialize(SqliteHistoryStore.Capture(recovery.Data)))
+                .Distinct(StringComparer.Ordinal).Count() > 1)
+                throw new InvalidDataException("Recovery files contain different edits for the same database revision.");
+        }
+
+        foreach (var recovery in recoveries)
+        {
+            if (recovery.Revision == null)
+            {
+                if (JsonSerializer.Serialize(recovery.Data) != JsonSerializer.Serialize(data))
+                    throw new InvalidDataException($"Recovery file {recovery.Path} has no database revision. Its edits need review.");
+                store!.SaveHistory(SqliteHistoryStore.Capture(data));
+            }
+            else if (recovery.Revision < store!.Revision)
+            {
+                // Keep older edits available for review without replacing newer history.
+                var archivedPath = recovery.Path + ".stale";
+                File.Move(recovery.Path, archivedPath, overwrite: false);
+                try
+                {
+                    reportError?.Invoke(new InvalidDataException($"Skipped an older recovery file. A copy is at {archivedPath}."));
+                }
+                catch
+                {
+                    // Logging shouldn't prevent history from loading.
+                }
+                continue;
+            }
+            else
+            {
+                if (recovery.Revision != store!.Revision)
+                    throw new InvalidDataException($"Recovery file {recovery.Path} belongs to a newer database revision.");
+
+                store.SaveHistory(SqliteHistoryStore.Capture(recovery.Data));
+                data.Records.Clear();
+                data.Records.AddRange(recovery.Data.Records);
+                data.PendingDuty = recovery.Data.PendingDuty;
+                data.SeenPlayers.Clear();
+                data.SeenPlayers.AddRange(recovery.Data.SeenPlayers);
+                data.RecordIds.Clear();
+                foreach (var (record, id) in recovery.Data.RecordIds)
+                    data.RecordIds.Add(record, id);
+            }
+
+            File.Delete(recovery.Path);
+        }
+    }
+
+    private static (string Path, long? Revision, HistoryData Data) ReadRecovery(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+        var root = document.RootElement;
+        var records = root.GetProperty("Records").Deserialize<List<DutyRecord>>()
+            ?? throw new InvalidDataException($"Recovery file {path} has no records array.");
+        var players = root.GetProperty("SeenPlayers").Deserialize<List<SeenPlayer>>()
+            ?? throw new InvalidDataException($"Recovery file {path} has no seen-player array.");
+        var pendingDuty = root.GetProperty("PendingDuty").Deserialize<DutyRecord>();
+        var recovered = new HistoryData { Records = records, SeenPlayers = players, PendingDuty = pendingDuty };
+        if (!root.TryGetProperty("BaseRevision", out var revision))
+            return (path, null, recovered);
+
+        var ids = root.GetProperty("DutyIds").Deserialize<List<string>>()
+            ?? throw new InvalidDataException($"Recovery file {path} has no duty IDs.");
+        if (ids.Count != records.Count)
+            throw new InvalidDataException($"Recovery file {path} has a different number of records and IDs.");
+        for (int i = 0; i < records.Count; i++)
+            recovered.RecordIds.Add(records[i], ids[i]);
+        if (pendingDuty != null)
+            recovered.RecordIds.Add(pendingDuty, root.GetProperty("PendingDutyId").GetString()!);
+        if (recovered.RecordIds.Values.Any(string.IsNullOrWhiteSpace) ||
+            recovered.RecordIds.Values.Distinct(StringComparer.Ordinal).Count() != recovered.RecordIds.Count)
+            throw new InvalidDataException($"Recovery file {path} contains missing or duplicate duty IDs.");
+
+        return (path, revision.GetInt64(), recovered);
     }
 
     public void Save()
@@ -101,6 +182,10 @@ public sealed class HistorySession : IDisposable
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
+            writer.WriteNumber("BaseRevision", store!.Revision);
+            writer.WritePropertyName("DutyIds");
+            JsonSerializer.Serialize(writer, snapshot.Duties.Where(row => !row.Pending).Select(row => row.Id));
+            writer.WriteString("PendingDutyId", snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id);
             writer.WritePropertyName("Records");
             writer.WriteStartArray();
             foreach (var row in snapshot.Duties.Where(row => !row.Pending)) writer.WriteRawValue(row.Json);

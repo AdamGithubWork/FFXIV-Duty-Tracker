@@ -10,6 +10,7 @@ public sealed partial class SqliteHistoryStore
     private Dictionary<string, string> fingerprints = new();
     private string seenFingerprint = "[]";
     private long revision;
+    internal long Revision => revision;
 
     public HistoryData LoadHistory()
     {

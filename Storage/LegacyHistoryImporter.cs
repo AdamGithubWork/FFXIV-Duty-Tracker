@@ -109,15 +109,15 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         {
             ["id"] = id, ["timestamp"] = RequiredString(record, "Timestamp"),
             ["duty_name"] = RequiredString(record, "DutyName"), ["duty_type"] = RequiredString(record, "DutyType"),
-            ["joined_in_progress"] = record.GetProperty("JoinedInProgress").GetBoolean() ? 1L : 0L,
-            ["wipe_count"] = record.GetProperty("WipeCount").GetInt64(),
-            ["lalafell_count"] = record.GetProperty("LalafellCount").GetInt64(),
+            ["joined_in_progress"] = OptionalBoolean(record, "JoinedInProgress") ? 1L : 0L,
+            ["wipe_count"] = OptionalNumber(record, "WipeCount") ?? 0L,
+            ["lalafell_count"] = OptionalNumber(record, "LalafellCount") ?? 0L,
             ["completed"] = record.GetProperty("Completed").GetBoolean() ? 1L : 0L,
-            ["player_job"] = RequiredString(record, "PlayerJob"),
+            ["player_job"] = OptionalString(record, "PlayerJob"),
             ["recorder_name"] = OptionalString(record, "RecorderName"),
             ["recorder_world"] = OptionalString(record, "RecorderWorld"),
             ["duration_ticks"] = TimeSpan.Parse(RequiredString(record, "TimeInDuty"), CultureInfo.InvariantCulture).Ticks,
-            ["note"] = RequiredString(record, "Note"), ["legacy_pvp_deaths"] = OptionalNumber(record, "PvPDeaths"),
+            ["note"] = OptionalString(record, "Note"), ["legacy_pvp_deaths"] = OptionalNumber(record, "PvPDeaths"),
             ["is_pending"] = pending ? 1L : 0L, ["checkpoint_utc"] = checkpointUtc,
             ["legacy_import_id"] = hash, ["legacy_record_index"] = (long)ordinal,
             ["history_order"] = (long)ordinal
@@ -132,8 +132,8 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             {
                 ["duty_id"] = id, ["party_index"] = (long)players.Count,
                 ["name"] = RequiredString(player, "Name"), ["world"] = RequiredString(player, "World"),
-                ["job"] = RequiredString(player, "Job"), ["race"] = RequiredString(player, "Race"),
-                ["gender"] = RequiredString(player, "Gender"), ["status"] = RequiredString(player, "Status"),
+                ["job"] = OptionalString(player, "Job"), ["race"] = RequiredString(player, "Race"),
+                ["gender"] = RequiredString(player, "Gender"), ["status"] = OptionalString(player, "Status"),
                 ["death_count"] = player.GetProperty("DeathCount").GetInt64(),
                 ["pvp_scoreboard_deaths"] = OptionalNumber(player, "PvPScoreboardDeaths")
             });
@@ -145,7 +145,10 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         element.GetProperty(name).GetString() ?? throw new InvalidDataException($"{name} is null.");
 
     private static string OptionalString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out _) ? RequiredString(element, name) : string.Empty;
+        !element.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null ? string.Empty : value.GetString()!;
+
+    private static bool OptionalBoolean(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null && value.GetBoolean();
 
     private static long? OptionalNumber(JsonElement element, string name) =>
         !element.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null ? null : value.GetInt64();
