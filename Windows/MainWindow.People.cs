@@ -32,13 +32,12 @@ namespace MentorRouletteTracker
 
         private void DrawPeopleTab()
         {
-            ImGui.Text("People Seen");
+            ImGui.Text("Players you've met");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
             var now = DateTime.Now;
 
-            // Retain the record associated with each snapshot.
             var encounters = config.History.Records
                 .Where(record => record.Completed)
                 .Where(record =>
@@ -85,11 +84,11 @@ namespace MentorRouletteTracker
                 .ToList();
 
             int uniqueLalafell = people.Count(x => x.Race == "Lalafell");
-            ImGui.Text($"Unique people seen: {people.Count}");
+            ImGui.Text($"Unique players: {people.Count}");
             ImGui.SameLine();
             ImGui.TextDisabled($"({uniqueLalafell} Lalafell)");
             ImGui.Spacing();
-            ImGui.TextDisabled("Click a player to view your shared duties. Click column headers to sort.");
+            ImGui.TextDisabled("Click a player to see your duties together. Click a column to sort.");
             ImGui.Spacing();
 
             if (ImGui.BeginTable(
@@ -172,13 +171,13 @@ namespace MentorRouletteTracker
             if (ImGui.Begin("Player Duty History###DutyTrackerPlayerHistory", ref isOpen))
             {
                 ImGui.TextUnformatted($"{historyPlayerName}@{historyPlayerWorld}");
-                ImGui.TextDisabled("Duties matching the currently active global filters.");
+                ImGui.TextDisabled("Duties that match your filters.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
                 if (selected == null || selected.Encounters.Count == 0)
                 {
-                    ImGui.TextDisabled("No matching encounters.");
+                    ImGui.TextDisabled("No encounters match your filters.");
                 }
                 else
                 {

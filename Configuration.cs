@@ -30,7 +30,6 @@ namespace MentorRouletteTracker
 
         internal HistorySession History => history ?? throw new InvalidOperationException("History is not initialized.");
 
-        // Retain legacy fields for loading old profiles, but omit history from settings after activation.
         public bool ShouldSerializeRecords() => !sqliteHistoryActive;
         public bool ShouldSerializeSeenPlayers() => !sqliteHistoryActive;
         public bool ShouldSerializePendingDuty() => !sqliteHistoryActive;
@@ -46,12 +45,11 @@ namespace MentorRouletteTracker
             {
                 var session = new HistorySession(new SqliteHistoryStore(
                     Path.Combine(pi.GetPluginConfigDirectory(), "history.sqlite")), reportStorageError);
-                // A first activation must match the legacy history still present in the profile.
                 if ((Records.Count > 0 || PendingDuty != null) &&
                     (JsonSerializer.Serialize(Records) != JsonSerializer.Serialize(session.Records) ||
                      JsonSerializer.Serialize(PendingDuty) != JsonSerializer.Serialize(session.PendingDuty) ||
                      JsonSerializer.Serialize(SeenPlayers) != JsonSerializer.Serialize(session.SeenPlayers)))
-                    throw new InvalidDataException("SQLite history does not match this profile. Import and verify the latest backup before activation.");
+                    throw new InvalidDataException("The database history does not match the JSON history. Import the latest backup before switching to SQLite.");
                 history = session;
                 sqliteHistoryActive = true;
                 Records = new();
@@ -77,7 +75,7 @@ namespace MentorRouletteTracker
         {
             if (history == null) { pluginInterface?.SavePluginConfig(this); return; }
             if (UseSqliteHistory != sqliteHistoryActive)
-                throw new InvalidOperationException("Changing storage mode requires a verified migration and plugin restart.");
+                throw new InvalidOperationException("Import your history and restart the plugin to change storage modes.");
             history.Save();
             if (sqliteHistoryActive) pluginInterface?.SavePluginConfig(this);
         }

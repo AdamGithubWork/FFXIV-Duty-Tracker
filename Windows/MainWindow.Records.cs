@@ -10,15 +10,14 @@ namespace MentorRouletteTracker
     {
         private void DrawRecordsTab()
         {
-            // Duty history filter, set by DutyTimerWindow.
             if (!string.IsNullOrWhiteSpace(dutyHistoryFilter))
             {
                 ImGui.TextUnformatted(
-                    $"Showing history for: {dutyHistoryFilter}");
+                    $"Duty history: {dutyHistoryFilter}");
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("Show All Duties"))
+                if (ImGui.Button("Show all duties"))
                 {
                     dutyHistoryFilter = null;
                 }
@@ -29,7 +28,7 @@ namespace MentorRouletteTracker
 
             var armed = tracker.Armed;
 
-            if (ImGui.Checkbox("Tracking armed", ref armed))
+            if (ImGui.Checkbox("Record duties", ref armed))
             {
                 tracker.Armed = armed;
             }
@@ -37,7 +36,7 @@ namespace MentorRouletteTracker
             ImGui.SameLine();
 
             ImGui.TextDisabled(
-                "(pause this before duties you don't want logged)");
+                "Turn this off before duties you don't want recorded.");
 
             ImGui.Spacing();
 
@@ -63,7 +62,7 @@ namespace MentorRouletteTracker
             if (ImGui.BeginPopup("ConfirmClear"))
             {
                 ImGui.Text(
-                    "Delete all recorded runs? This can't be undone.");
+                    "Clear all duty records? You can't undo this.");
 
                 ImGui.Spacing();
 
@@ -101,7 +100,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             ImGui.TextDisabled(
-                "Click a duty name to view full party details. Right-click a record to delete it. Click column headers to sort.");
+                "Click a duty for details. Right-click to delete. Click a column to sort.");
 
             ImGui.Spacing();
 
@@ -168,8 +167,6 @@ namespace MentorRouletteTracker
                         Index = index
                     })
                     .Where(x => x.Record.Completed == completed)
-                    // Show only this duty when opened
-                    // through the floating timer window.
                     .Where(x =>
                         dutyHistoryFilter == null ||
                         string.Equals(
@@ -420,7 +417,7 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 ImGui.TextDisabled(
-                    "This will remove the entire duty record.");
+                    "This deletes the duty and its party details.");
 
                 ImGui.Spacing();
 
@@ -750,19 +747,16 @@ namespace MentorRouletteTracker
         {
             return job switch
             {
-                // Tanks
                 "PLD" => 0,
                 "WAR" => 0,
                 "DRK" => 0,
                 "GNB" => 0,
 
-                // Healers
                 "WHM" => 1,
                 "SCH" => 1,
                 "AST" => 1,
                 "SGE" => 1,
 
-                // Melee DPS
                 "MNK" => 2,
                 "DRG" => 2,
                 "NIN" => 2,
@@ -770,12 +764,10 @@ namespace MentorRouletteTracker
                 "RPR" => 2,
                 "VPR" => 2,
 
-                // Physical Ranged DPS
                 "BRD" => 3,
                 "MCH" => 3,
                 "DNC" => 3,
 
-                // Magical Ranged DPS
                 "BLM" => 4,
                 "SMN" => 4,
                 "RDM" => 4,

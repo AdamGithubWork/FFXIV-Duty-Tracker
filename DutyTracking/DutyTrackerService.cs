@@ -20,9 +20,9 @@ namespace MentorRouletteTracker.DutyTracking
         private readonly IPluginLog log;
         private readonly Configuration config;
         private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan ConfigSaveInterval = TimeSpan.FromSeconds(15);
+        private static readonly TimeSpan HistorySaveInterval = TimeSpan.FromSeconds(15);
         private DateTime nextPartyRefresh = DateTime.MinValue;
-        private DateTime nextConfigSave = DateTime.MinValue;
+        private DateTime nextHistorySave = DateTime.MinValue;
         private DutyRecord? current;
         public DutyRecord? ActiveDuty => current;
         public uint? ActiveContentTypeId { get; private set; }
@@ -120,9 +120,9 @@ namespace MentorRouletteTracker.DutyTracking
                 PopulatePartyDetails();
             }
             UpdateDeathStates();
-            if (now >= nextConfigSave)
+            if (now >= nextHistorySave)
             {
-                nextConfigSave = now + ConfigSaveInterval;
+                nextHistorySave = now + HistorySaveInterval;
                 config.History.Save();
             }
         }
@@ -133,8 +133,6 @@ namespace MentorRouletteTracker.DutyTracking
 
             current = config.History.PendingDuty;
 
-            // Recover the duty type after a plugin reload only if the
-            // player is still in the same duty.
             var cfc = FindContentFinderCondition(clientState.TerritoryType);
             if (cfc != null &&
                 current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
@@ -148,7 +146,7 @@ namespace MentorRouletteTracker.DutyTracking
                 countedPlayersForCurrentRun.Add(playerKey);
             }
 
-            log.Info($"Restored pending duty: {current.DutyName}");
+            log.Information($"Restored pending duty: {current.DutyName}");
         }
         private void StartNewDuty(ContentFinderCondition duty)
         {
@@ -156,7 +154,6 @@ namespace MentorRouletteTracker.DutyTracking
             var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
             var dutyType = duty.ContentType.Value.Name.ExtractText();
 
-            // Manually set duty types
             if (dutyName.Contains("Savage"))
                 dutyType = "Savage Raids";
             else if (dutyName.Contains("(Extreme)") ||
@@ -211,7 +208,6 @@ namespace MentorRouletteTracker.DutyTracking
 
             var localPlayerName = localPlayer.Name.TextValue;
 
-            // for party members
             foreach (var member in partyList)
             {
                 var name = member.Name.TextValue;
@@ -224,7 +220,6 @@ namespace MentorRouletteTracker.DutyTracking
                 ProcessPartyMember(member);
             }
 
-            // for alliance members
             if (config.TrackAllianceMembers && partyList.IsAlliance)
             {
                 for (int i = 0; i < 16; i++)
@@ -247,7 +242,6 @@ namespace MentorRouletteTracker.DutyTracking
                 current.RecorderName = localPlayerName;
                 current.RecorderWorld = localPlayerWorld;
             }
-            // Uses CustomizeIndex enum to get race and gender from the local player's Customize array
             var localPlayerRace = RaceIdToName(localPlayer.Customize[(int)CustomizeIndex.Race]);
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
             var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
@@ -323,7 +317,6 @@ namespace MentorRouletteTracker.DutyTracking
         }
 
 
-        // Death Tracking
         private void UpdateDeathStates()
         {
             if (current == null)
@@ -335,7 +328,6 @@ namespace MentorRouletteTracker.DutyTracking
 
             var localPlayerName = localPlayer.Name.TextValue;
 
-            // Regular party members
             foreach (var member in partyList)
             {
                 var name = member.Name.TextValue;
@@ -350,7 +342,6 @@ namespace MentorRouletteTracker.DutyTracking
                 UpdatePlayerDeath(name, world, member.GameObject.IsDead);
             }
 
-            // Alliance members
             if (config.TrackAllianceMembers && partyList.IsAlliance)
             {
                 for (int i = 0; i < 16; i++)
@@ -372,7 +363,6 @@ namespace MentorRouletteTracker.DutyTracking
                 }
             }
 
-            // Local player
             var localWorld = localPlayer.HomeWorld.Value.Name.ExtractText();
 
             UpdatePlayerDeath(localPlayerName, localWorld, localPlayer.IsDead);
@@ -401,7 +391,6 @@ namespace MentorRouletteTracker.DutyTracking
             previousDeathStates[playerKey] = isDead;
         }
 
-        // Seen player tracking
         private void UpdateSeenPlayer(string name, string race, string gender, string world, string playerKey)
         {
             SeenPlayer? seenPlayer = null;
@@ -428,12 +417,12 @@ namespace MentorRouletteTracker.DutyTracking
                         TimesSeen = 1
                     };
                     config.History.SeenPlayers.Add(seenPlayer);
-                    log.Info($"New player seen: {name}");
+                    log.Information($"New player seen: {name}");
                 }
                 else
                 {
                     seenPlayer.TimesSeen++;
-                    log.Info($"Player seen again: {playerKey} | " +
+                    log.Information($"Player seen again: {playerKey} | " +
                              $"Times Seen: {seenPlayer.TimesSeen}");
                 }
             }
@@ -445,7 +434,6 @@ namespace MentorRouletteTracker.DutyTracking
             }
         }
 
-        // Helpers 
         private static string NormalizePlayerStatus(string status)
         {
             return status switch
@@ -486,7 +474,6 @@ namespace MentorRouletteTracker.DutyTracking
             _ => "Unknown",
         };
 
-        // Finds information regarding the current duty given territory ID
         private ContentFinderCondition? FindContentFinderCondition(uint territoryId)
         {
             var sheet = dataManager.GetExcelSheet<ContentFinderCondition>();

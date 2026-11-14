@@ -4,11 +4,6 @@ using System.Text.Json;
 
 namespace MentorRouletteTracker.Storage;
 
-/// <summary>
-/// Creates and validates the history database schema and supports loading/saving through
-/// HistorySession. It never reads or modifies the legacy Configuration JSON file.
-/// Database operations are synchronous and are run on the session's dedicated writer.
-/// </summary>
 public sealed partial class SqliteHistoryStore
 {
     public const int CurrentSchemaVersion = 3;
@@ -38,14 +33,12 @@ public sealed partial class SqliteHistoryStore
         }.ToString());
         connection.Open();
 
-        // Create the tables and version marker together, or roll back everything.
         using (var transaction = connection.BeginTransaction())
         {
             var applicationId = ReadInteger(connection, transaction, "PRAGMA application_id;");
             var version = ReadInteger(connection, transaction, "PRAGMA user_version;");
             if (applicationId == ApplicationId && version is >= 1 and <= CurrentSchemaVersion)
             {
-                // Reopening an existing supported database must preserve all records.
                 var tableCount = ReadInteger(connection, transaction, """
                     SELECT COUNT(*) FROM sqlite_master
                     WHERE type = 'table' AND name IN ('duty_runs', 'duty_players', 'upload_queue');
@@ -60,7 +53,7 @@ public sealed partial class SqliteHistoryStore
                     WHERE type = 'table' AND name NOT LIKE 'sqlite_%';
                     """);
                 if (applicationId != 0 || version != 0 || existingTables != 0)
-                    throw new InvalidDataException("Unrecognized history database or unsupported schema version. No migration was attempted.");
+                    throw new InvalidDataException("The history database or its schema version is not supported.");
 
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
@@ -83,7 +76,7 @@ public sealed partial class SqliteHistoryStore
             }
 
             if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='legacy_imports';") != 1)
-                throw new InvalidDataException("The legacy import archive is missing. No history was imported.");
+                throw new InvalidDataException("The JSON import archive table is missing.");
 
             if (version == 2)
             {

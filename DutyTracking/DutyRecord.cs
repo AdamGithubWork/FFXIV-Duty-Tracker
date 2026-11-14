@@ -1,6 +1,5 @@
 namespace MentorRouletteTracker.DutyTracking
 {
-    // Defines information stored about a duty
     public class DutyRecord
     {
         public DateTime Timestamp { get; set; } = DateTime.Now;

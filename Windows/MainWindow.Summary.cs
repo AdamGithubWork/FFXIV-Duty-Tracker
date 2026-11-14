@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System;
@@ -10,7 +10,6 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
-        // Kept because MainWindow.Statistics.cs uses it for race/job tables.
         private int? SummaryDeaths(
             PartyMemberSnapshot player,
             Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
@@ -20,24 +19,23 @@ namespace MentorRouletteTracker
                 : null;
         }
 
-        // Recalculate at most once per second, not every ImGui frame.
-        private DateTime nextLifetimeSummaryRefresh = DateTime.MinValue;
-        private string? lifetimeSummaryDutyFilterKey;
-        private string? lifetimeSummaryPlayerName;
-        private bool lifetimeSummaryIncludeSelf;
+        // Refresh once a second to avoid rebuilding milestones every frame.
+        private DateTime nextMilestoneRefresh = DateTime.MinValue;
+        private string? milestoneFilterKey;
+        private string? milestonePlayerName;
+        private bool milestonesIncludeSelf;
 
-        private sealed record LifetimeMilestoneResult(string Text, DutyRecord? Record = null)
+        private sealed record MilestoneResult(string Text, DutyRecord? Record = null)
         {
-            public static implicit operator LifetimeMilestoneResult(string text) => new(text);
+            public static implicit operator MilestoneResult(string text) => new(text);
         }
 
-        private readonly List<(string Title, List<(string Label, LifetimeMilestoneResult Value)> Rows)> lifetimeSummarySections = new();
+        private readonly List<(string Title, List<(string Label, MilestoneResult Value)> Rows)> milestoneSections = new();
 
         private void DrawSummaryTab()
         {
             var localName = objectTable.LocalPlayer?.Name.TextValue;
 
-            // Only DUTY filters affect milestones.
             var dutyFilterKey = string.Join("|",
                 string.Join(",", selectedDutyTypes.OrderBy(x => x, StringComparer.Ordinal)),
                 globalDutySearchText.Trim(),
@@ -45,30 +43,30 @@ namespace MentorRouletteTracker
                 customStartDate.Date.ToString("yyyyMMdd"),
                 customEndDate.Date.ToString("yyyyMMdd"));
 
-            if (DateTime.UtcNow >= nextLifetimeSummaryRefresh ||
-                dutyFilterKey != lifetimeSummaryDutyFilterKey ||
-                localName != lifetimeSummaryPlayerName ||
-                lifetimeSummaryIncludeSelf != config.IncludeSelfInStatistics)
+            if (DateTime.UtcNow >= nextMilestoneRefresh ||
+                dutyFilterKey != milestoneFilterKey ||
+                localName != milestonePlayerName ||
+                milestonesIncludeSelf != config.IncludeSelfInStatistics)
             {
-                RebuildLifetimeSummary(localName);
-                nextLifetimeSummaryRefresh = DateTime.UtcNow.AddSeconds(1);
-                lifetimeSummaryDutyFilterKey = dutyFilterKey;
-                lifetimeSummaryPlayerName = localName;
-                lifetimeSummaryIncludeSelf = config.IncludeSelfInStatistics;
+                RebuildMilestones(localName);
+                nextMilestoneRefresh = DateTime.UtcNow.AddSeconds(1);
+                milestoneFilterKey = dutyFilterKey;
+                milestonePlayerName = localName;
+                milestonesIncludeSelf = config.IncludeSelfInStatistics;
             }
 
             if (ImGui.BeginChild("SummaryContent", Vector2.Zero, false,
                     ImGuiWindowFlags.HorizontalScrollbar))
             {
-                ImGui.Text("Summary Milestones");
-                ImGui.TextDisabled("Completed duties only. Duty type, search and date filters apply; player filters do not.");
+                ImGui.Text("Milestones");
+                ImGui.TextDisabled("Completed duties only. Uses duty type, duty search, and date filters. Player filters don't apply.");
                 ImGui.Separator();
 
-                if (lifetimeSummarySections.Count == 0)
-                    ImGui.TextDisabled("No duties match the selected duty filters.");
+                if (milestoneSections.Count == 0)
+                    ImGui.TextDisabled("No completed duties match your duty filters.");
                 else
                 {
-                    foreach (var section in lifetimeSummarySections)
+                    foreach (var section in milestoneSections)
                     {
                         ImGui.Spacing();
                         if (ImGui.CollapsingHeader($"{section.Title}##Lifetime{section.Title}",
@@ -98,7 +96,7 @@ namespace MentorRouletteTracker
                                             showDetailWindow = true;
                                         }
                                         if (ImGui.IsItemHovered())
-                                            ImGui.SetTooltip("Open this duty's details");
+                                            ImGui.SetTooltip("View duty details");
                                         ImGui.PopID();
                                     }
                                     else
@@ -117,9 +115,9 @@ namespace MentorRouletteTracker
             ImGui.EndChild();
         }
 
-        private void RebuildLifetimeSummary(string? localName)
+        private void RebuildMilestones(string? localName)
         {
-            lifetimeSummarySections.Clear();
+            milestoneSections.Clear();
 
             var now = DateTime.Now;
             var records = config.History.Records
@@ -144,14 +142,14 @@ namespace MentorRouletteTracker
             var encounters = records
                 .SelectMany(r => r.Party
                     .Where(p => config.IncludeSelfInStatistics || !IsRecordingPlayer(r, p, localName))
-                    .Select(p => new LifetimeEncounter(r, p, EffectiveDeaths(r, p) ?? 0)))
+                    .Select(p => new MilestoneEncounter(r, p, EffectiveDeaths(r, p) ?? 0)))
                 .ToList();
 
-            Dictionary<DutyRecord, List<LifetimeEncounter>> byRecord =
+            Dictionary<DutyRecord, List<MilestoneEncounter>> byRecord =
                 new(ReferenceEqualityComparer.Instance);
 
             foreach (var r in records)
-                byRecord[r] = new List<LifetimeEncounter>();
+                byRecord[r] = new List<MilestoneEncounter>();
 
             foreach (var e in encounters)
                 byRecord[e.Record].Add(e);
@@ -162,7 +160,7 @@ namespace MentorRouletteTracker
             var positiveDuration = records.Where(r => r.TimeInDuty.TotalMinutes > 0).ToList();
 
             string Duty(DutyRecord r) => $"{r.DutyName} — {r.Timestamp:yyyy-MM-dd HH:mm}";
-            string Player(LifetimeEncounter e) => $"{e.Player.Name}@{e.Player.World}";
+            string Player(MilestoneEncounter e) => $"{e.Player.Name}@{e.Player.World}";
             string Status(PartyMemberSnapshot p, string value) =>
                 string.Equals(p.Status, value, StringComparison.OrdinalIgnoreCase) ? value : "";
 
@@ -172,12 +170,12 @@ namespace MentorRouletteTracker
             int CountLalafell(DutyRecord r) => byRecord[r].Count(e =>
                 e.Player.Race == "Lalafell");
 
-            void Add(string title, List<(string Label, LifetimeMilestoneResult Value)> rows) =>
-                lifetimeSummarySections.Add((title, rows));
+            void Add(string title, List<(string Label, MilestoneResult Value)> rows) =>
+                milestoneSections.Add((title, rows));
 
             string NoData = "N/A";
 
-            LifetimeMilestoneResult DutyExt(
+            MilestoneResult DutyExt(
                 IEnumerable<DutyRecord> candidates,
                 Func<DutyRecord, double> metric,
                 bool maximum,
@@ -189,27 +187,27 @@ namespace MentorRouletteTracker
 
                 return chosen == null
                     ? NoData
-                    : new LifetimeMilestoneResult($"{metricText(chosen)} — {Duty(chosen)}", chosen);
+                    : new MilestoneResult($"{metricText(chosen)} — {Duty(chosen)}", chosen);
             }
 
-            LifetimeMilestoneResult PlayerExt(
-                IEnumerable<LifetimeEncounter> candidates,
-                Func<LifetimeEncounter, double> metric,
-                Func<LifetimeEncounter, string> value)
+            MilestoneResult PlayerExt(
+                IEnumerable<MilestoneEncounter> candidates,
+                Func<MilestoneEncounter, double> metric,
+                Func<MilestoneEncounter, string> value)
             {
                 var chosen = candidates.MaxBy(metric);
 
                 return chosen == null
                     ? NoData
-                    : new LifetimeMilestoneResult(
+                    : new MilestoneResult(
                         $"{value(chosen)} — {Player(chosen)} — {Duty(chosen.Record)}",
                         chosen.Record);
             }
 
             string NamedGroupExt<TKey>(
-                IEnumerable<IGrouping<TKey, LifetimeEncounter>> groups,
-                Func<IGrouping<TKey, LifetimeEncounter>, double> metric,
-                Func<IGrouping<TKey, LifetimeEncounter>, string> value)
+                IEnumerable<IGrouping<TKey, MilestoneEncounter>> groups,
+                Func<IGrouping<TKey, MilestoneEncounter>, double> metric,
+                Func<IGrouping<TKey, MilestoneEncounter>, string> value)
             {
                 var chosen = groups.MaxBy(metric);
                 return chosen == null ? NoData : value(chosen);
@@ -217,11 +215,11 @@ namespace MentorRouletteTracker
 
             var totalDuration = TimeSpan.FromTicks(records.Sum(r => r.TimeInDuty.Ticks));
 
-            Add("Lifetime Overview", new()
+            Add("Overall stats", new()
             {
                 ("Total duties recorded", records.Count.ToString()),
                 ("Total completed duties", completed.Count.ToString()),
-                ("Total time spent in duties", LifetimeDuration(totalDuration)),
+                ("Total time spent in duties", FormatMilestoneDuration(totalDuration)),
                 ("Total player encounters", encounters.Count.ToString()),
                 ("Total unique players", encounters.Select(e => (e.Player.Name, e.Player.World)).Distinct().Count().ToString()),
                 ("Total unique worlds", encounters.Select(e => e.Player.World)
@@ -229,15 +227,15 @@ namespace MentorRouletteTracker
                 ("Total deaths observed", encounters.Sum(e => e.Deaths).ToString()),
                 ("Total wipes", records.Sum(r => r.WipeCount).ToString()),
                 ("Total duties joined in progress", records.Count(r => r.JoinedInProgress).ToString()),
-                ("Total unique duties encountered", records.Select(r => r.DutyName).Distinct().Count().ToString())
+                ("Different duties completed", records.Select(r => r.DutyName).Distinct().Count().ToString())
             });
 
             Add("Duty Records", new()
             {
                 ("Fastest completed duty", DutyExt(completed, r => r.TimeInDuty.TotalSeconds, false,
-                    r => LifetimeDuration(r.TimeInDuty))),
+                    r => FormatMilestoneDuration(r.TimeInDuty))),
                 ("Longest completed duty", DutyExt(completed, r => r.TimeInDuty.TotalSeconds, true,
-                    r => LifetimeDuration(r.TimeInDuty))),
+                    r => FormatMilestoneDuration(r.TimeInDuty))),
                 ("Most deaths in a single duty", DutyExt(records, r => TotalDeaths(r), true,
                     r => $"{TotalDeaths(r)} deaths")),
                 ("Highest deaths per minute in a duty", DutyExt(positiveDuration,
@@ -256,7 +254,7 @@ namespace MentorRouletteTracker
                         .Where(s => !string.IsNullOrWhiteSpace(s) && s != "Unknown")
                         .Distinct().Count(), true,
                     r => $"{byRecord[r].Select(e => e.Player.Race).Where(s => !string.IsNullOrWhiteSpace(s) && s != "Unknown").Distinct().Count()} races")),
-                ("Most wipes in a successfully completed duty", DutyExt(completed,
+                ("Most wipes in a completed duty", DutyExt(completed,
                     r => r.WipeCount, true, r => $"{r.WipeCount} wipes"))
             });
 
@@ -271,7 +269,7 @@ namespace MentorRouletteTracker
 
             Add("Individual Player Records", new()
             {
-                ("Most frequently encountered player", NamedGroupExt(playersByIdentity,
+                ("Player seen most often", NamedGroupExt(playersByIdentity,
                     g => g.Count(),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Count()} encounters")),
                 ("Most deaths by one player in a duty", PlayerExt(encounters,
@@ -280,13 +278,13 @@ namespace MentorRouletteTracker
                     encounters.Where(e => e.Record.TimeInDuty.TotalMinutes > 0),
                     e => e.Deaths / e.Record.TimeInDuty.TotalMinutes,
                     e => $"{e.Deaths / e.Record.TimeInDuty.TotalMinutes:F2} deaths/min ({e.Deaths} deaths)")),
-                ("Most cumulative deaths by a single player", NamedGroupExt(playersByIdentity,
+                ("Most total deaths by one player", NamedGroupExt(playersByIdentity,
                     g => g.Sum(e => e.Deaths),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Sum(e => e.Deaths)} deaths")),
-                ("Highest average deaths per encounter by a player", NamedGroupExt(playersWithKnownDeaths,
+                ("Highest average deaths per player encounter", NamedGroupExt(playersWithKnownDeaths,
                     g => g.Average(e => e.Deaths),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Average(e => e.Deaths):F2} deaths/encounter ({g.Count()} known encounters)")),
-                ("Most different duties encountered with one player", NamedGroupExt(playersByIdentity,
+                ("Most different duties with one player", NamedGroupExt(playersByIdentity,
                     g => g.Select(e => e.Record.DutyName).Distinct().Count(),
                     g => $"{g.Key.Name}@{g.Key.World} — {g.Select(e => e.Record.DutyName).Distinct().Count()} duties")),
                 ("Most deathless encounters with one player", NamedGroupExt(playersByIdentity,
@@ -366,18 +364,18 @@ namespace MentorRouletteTracker
             Add("Streaks and Droughts", new()
             {
                 ("Longest streak without a wipe", Streak(r => r.WipeCount == 0)),
-                ("Longest streak of duties containing wipes", Streak(r => r.WipeCount > 0)),
+                ("Longest streak with wipes", Streak(r => r.WipeCount > 0)),
                 ("Longest streak without a player death", Streak(r =>
                     byRecord[r].Count > 0 && byRecord[r].All(e => e.IsConfirmedDeathless))),
-                ("Longest streak of duties containing at least one death", Streak(r => TotalDeaths(r) > 0)),
-                ("Longest streak without encountering a Lalafell", Streak(r => CountLalafell(r) == 0)),
-                ("Longest streak of duties containing a Lalafell", Streak(r => CountLalafell(r) > 0)),
-                ("Longest streak without encountering a sprout", Streak(r => CountStatus(r, "Sprout") == 0)),
-                ("Longest streak without encountering a mentor", Streak(r => CountStatus(r, "Mentor") == 0)),
-                ("Longest streak of encountering the same duty", RepeatedDutyStreak()),
-                ("Longest streak of duties completed under 10 minutes",
+                ("Longest streak with deaths", Streak(r => TotalDeaths(r) > 0)),
+                ("Longest streak without a Lalafell", Streak(r => CountLalafell(r) == 0)),
+                ("Longest streak with a Lalafell", Streak(r => CountLalafell(r) > 0)),
+                ("Longest streak without a sprout", Streak(r => CountStatus(r, "Sprout") == 0)),
+                ("Longest streak without a mentor", Streak(r => CountStatus(r, "Mentor") == 0)),
+                ("Longest streak of the same duty", RepeatedDutyStreak()),
+                ("Longest streak of clears under 10 minutes",
                     Streak(r => r.Completed && r.TimeInDuty.TotalMinutes < 10)),
-                ("Longest streak of duties lasting over 30 minutes",
+                ("Longest streak of runs over 30 minutes",
                     Streak(r => r.TimeInDuty.TotalMinutes > 30))
             });
 
@@ -391,7 +389,7 @@ namespace MentorRouletteTracker
             }
 
             var byDay = records.GroupBy(r => r.Timestamp.Date).ToList();
-            var byWeek = records.GroupBy(r => LifetimeWeekStart(r.Timestamp)).ToList();
+            var byWeek = records.GroupBy(r => StartOfWeek(r.Timestamp)).ToList();
             var byMonth = records.GroupBy(r =>
                 new DateTime(r.Timestamp.Year, r.Timestamp.Month, 1)).ToList();
 
@@ -399,7 +397,7 @@ namespace MentorRouletteTracker
                 .GroupBy(e => e.Record.Timestamp.Date)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            List<LifetimeEncounter> DayPlayers(DateTime day) =>
+            List<MilestoneEncounter> DayPlayers(DateTime day) =>
                 playerByDay.TryGetValue(day, out var items) ? items : new();
 
             int DayDeaths(DateTime day) => DayPlayers(day).Sum(e => e.Deaths);
@@ -470,7 +468,7 @@ namespace MentorRouletteTracker
 
                 return before == null || after == null
                     ? NoData
-                    : $"{LifetimeDuration(max)} — {before.Timestamp:yyyy-MM-dd HH:mm} to {after.Timestamp:yyyy-MM-dd HH:mm} (between duty starts)";
+                    : $"{FormatMilestoneDuration(max)} — {before.Timestamp:yyyy-MM-dd HH:mm} to {after.Timestamp:yyyy-MM-dd HH:mm} (between duty starts)";
             }
 
             Add("Activity Records", new()
@@ -483,31 +481,31 @@ namespace MentorRouletteTracker
                     g => g.Count(), g => $"{g.Count()} duties — {g.Key:yyyy-MM}")),
                 ("Most time spent in duties in one day", TopPeriod(byDay,
                     g => g.Sum(r => r.TimeInDuty.Ticks),
-                    g => $"{LifetimeDuration(TimeSpan.FromTicks(g.Sum(r => r.TimeInDuty.Ticks)))} — {g.Key:yyyy-MM-dd}")),
+                    g => $"{FormatMilestoneDuration(TimeSpan.FromTicks(g.Sum(r => r.TimeInDuty.Ticks)))} — {g.Key:yyyy-MM-dd}")),
                 ("Most deaths observed in one day", TopPeriod(byDay,
                     g => DayDeaths(g.Key),
                     g => $"{DayDeaths(g.Key)} deaths — {g.Key:yyyy-MM-dd}")),
-                ("Most wipes experienced in one day", TopPeriod(byDay,
+                ("Most wipes in one day", TopPeriod(byDay,
                     g => g.Sum(r => r.WipeCount),
                     g => $"{g.Sum(r => r.WipeCount)} wipes — {g.Key:yyyy-MM-dd}")),
-                ("Most unique players encountered in one day", TopPeriod(byDay,
+                ("Most unique players in one day", TopPeriod(byDay,
                     g => DayUniquePlayers(g.Key),
                     g => $"{DayUniquePlayers(g.Key)} players — {g.Key:yyyy-MM-dd}")),
-                ("Most Lalafell encountered in one day", TopPeriod(byDay,
+                ("Most Lalafell in one day", TopPeriod(byDay,
                     g => DayLalafell(g.Key),
                     g => $"{DayLalafell(g.Key)} Lalafell — {g.Key:yyyy-MM-dd}")),
-                ("Most sprouts encountered in one day", TopPeriod(byDay,
+                ("Most sprouts in one day", TopPeriod(byDay,
                     g => DayStatus(g.Key, "Sprout"),
                     g => $"{DayStatus(g.Key, "Sprout")} sprouts — {g.Key:yyyy-MM-dd}")),
-                ("Most mentors encountered in one day", TopPeriod(byDay,
+                ("Most mentors in one day", TopPeriod(byDay,
                     g => DayStatus(g.Key, "Mentor"),
                     g => $"{DayStatus(g.Key, "Mentor")} mentors — {g.Key:yyyy-MM-dd}")),
-                ("Longest consecutive streak of days with recorded duties", ConsecutiveDays()),
+                ("Most days in a row recording duties", ConsecutiveDays()),
                 ("Longest break between recorded duties", LongestBreak())
             });
         }
 
-        private sealed record LifetimeEncounter(
+        private sealed record MilestoneEncounter(
             DutyRecord Record,
             PartyMemberSnapshot Player,
             int Deaths)
@@ -515,13 +513,13 @@ namespace MentorRouletteTracker
             public bool IsConfirmedDeathless => EffectiveDeaths(Record, Player) == 0;
         }
 
-        private static DateTime LifetimeWeekStart(DateTime date)
+        private static DateTime StartOfWeek(DateTime date)
         {
             int daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
             return date.Date.AddDays(-daysSinceMonday);
         }
 
-        private static string LifetimeDuration(TimeSpan duration)
+        private static string FormatMilestoneDuration(TimeSpan duration)
         {
             if (duration.TotalDays >= 1)
                 return $"{(int)duration.TotalDays}d {duration.Hours}h {duration.Minutes}m";

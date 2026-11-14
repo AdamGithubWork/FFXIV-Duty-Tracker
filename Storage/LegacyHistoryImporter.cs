@@ -9,10 +9,6 @@ namespace MentorRouletteTracker.Storage;
 public sealed record HistoryImportResult(string SourceSha256, int HistoricalDuties,
     int PendingDuties, int PlayerSnapshots, int VerifiedValues, bool AlreadyImported);
 
-/// <summary>
-/// Explicit, offline import from a checksummed JSON backup into a separate database.
-/// Never called by the plugin and never writes to the source file.
-/// </summary>
 public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
 {
     public HistoryImportResult ImportBackup(string backupPath, string expectedSha256)
@@ -21,12 +17,12 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         if (string.Equals(Path.GetFullPath(backupPath), store.DatabasePath, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("The source backup and target database must be separate files.", nameof(backupPath));
         if (expectedSha256 == null || expectedSha256.Length != 64 || !expectedSha256.All(Uri.IsHexDigit))
-            throw new ArgumentException("Supply the verified backup's SHA-256 checksum.", nameof(expectedSha256));
+            throw new ArgumentException("Enter the backup's SHA-256 checksum.", nameof(expectedSha256));
 
         var bytes = File.ReadAllBytes(backupPath);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
         if (!string.Equals(hash, expectedSha256, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Backup checksum does not match. No import was attempted.");
+            throw new InvalidDataException("The backup checksum does not match.");
 
         var text = new UTF8Encoding(false, true).GetString(bytes).TrimStart('\uFEFF');
         using var document = JsonDocument.Parse(text);
@@ -70,7 +66,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             check.Transaction = transaction;
             check.CommandText = "SELECT (SELECT COUNT(*) FROM legacy_imports) + (SELECT COUNT(*) FROM duty_runs);";
             if ((long)check.ExecuteScalar()! != 0)
-                throw new InvalidDataException("Trial imports require an empty history database or the exact same previously imported backup.");
+                throw new InvalidDataException("This database already contains history from another source.");
 
             Insert(connection, transaction, "legacy_imports", new()
             {
@@ -92,7 +88,6 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             cache.ExecuteNonQuery();
         }
 
-        // Compare every imported value before committing, including on a repeated import.
         int verified = Verify(connection, transaction, hash, bytes, duties, historicalCount, pendingCount, playerCount, seenJson);
         transaction.Commit();
         return new(hash, historicalCount, pendingCount, playerCount, verified, alreadyImported);
@@ -102,7 +97,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
 
     private static ImportDuty ParseDuty(JsonElement record, string hash, int ordinal, bool pending)
     {
-        // Use source position as well as its hash: two identical legacy runs must both survive.
+        // Include the position so identical runs keep separate IDs.
         string id = $"legacy:{hash}:{ordinal}";
         var values = new Dictionary<string, object?>
         {
@@ -141,7 +136,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
     }
 
     private static string RequiredString(JsonElement element, string name) =>
-        element.GetProperty(name).GetString() ?? throw new InvalidDataException($"{name} is null; refusing to silently replace it.");
+        element.GetProperty(name).GetString() ?? throw new InvalidDataException($"{name} is null.");
 
     private static string OptionalString(JsonElement element, string name) =>
         element.TryGetProperty(name, out _) ? RequiredString(element, name) : string.Empty;
@@ -160,7 +155,6 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             command.Parameters.AddWithValue(name, entry.Value ?? DBNull.Value);
             return name;
         }).ToArray();
-        // Table/column names originate solely in the dictionaries above, never in source JSON.
         command.CommandText = $"INSERT INTO {table} ({string.Join(',', values.Keys)}) VALUES ({string.Join(',', parameters)});";
         command.ExecuteNonQuery();
     }
@@ -222,7 +216,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         {
             var actual = reader[column];
             if (!Equals(actual is DBNull ? null : actual, value))
-                throw new InvalidDataException($"Imported value mismatch in {column}. No data was overwritten or repaired.");
+                throw new InvalidDataException($"The imported {column} value does not match the backup.");
         }
         return expected.Count;
     }

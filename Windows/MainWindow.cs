@@ -9,14 +9,12 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow : Window, IDisposable
     {
-        // Dependencies
         private readonly Configuration config;
         private readonly DutyTrackerService tracker;
         private readonly string exportDirectory;
         private readonly IObjectTable objectTable;
         private readonly Dictionary<string, string> worldDatacenters = new(StringComparer.OrdinalIgnoreCase);
 
-        // Global filters
         private readonly HashSet<string> selectedPlayerRaces = new();
         private readonly HashSet<string> selectedPlayerGenders = new();
         private readonly HashSet<string> selectedPlayerStatuses = new();
@@ -28,34 +26,27 @@ namespace MentorRouletteTracker
         private DateTime customStartDate = DateTime.Today.AddDays(-30);
         private DateTime customEndDate = DateTime.Today;
 
-        // Record details
         private DutyRecord? selectedRecord;
         private bool showDetailWindow;
 
-        // Duty history navigation
         private string? dutyHistoryFilter;
         private bool openDutyHistory;
 
-        // Record deletion
         private DutyRecord? recordPendingDeletion;
         private bool openDeleteConfirmation;
 
-        // Record editing
         private DutyRecord? recordToEdit;
         private bool openEditRecord;
         private int editWipeCount;
         private bool editJoinedInProgress;
         private string editError = string.Empty;
 
-        // Record notes
         private DutyRecord? noteRecord = null;
         private bool showNoteWindow = false;
         private string noteDraft = string.Empty;
 
-        // Export
         private string lastExportMessage = string.Empty;
 
-        // Statistics
         private int selectedHeatmapMetric = 0;
 
         public MainWindow(
@@ -70,7 +61,6 @@ namespace MentorRouletteTracker
             this.exportDirectory = exportDirectory;
             this.objectTable = objectTable;
 
-            // Logical home datacenters, using the verified North American server list.
             var datacenters = new (string Name, string[] Worlds)[]
             {
                 ("Aether", ["Adamantoise", "Cactuar", "Faerie", "Gilgamesh", "Jenova", "Midgardsormr", "Sargatanas", "Siren"]),
@@ -91,8 +81,6 @@ namespace MentorRouletteTracker
         {
         }
 
-        // Called by DutyTimerWindow when the average-time
-        // button is clicked.
         public void OpenDutyHistory(string dutyName)
         {
             if (string.IsNullOrWhiteSpace(dutyName))
@@ -101,8 +89,7 @@ namespace MentorRouletteTracker
             dutyHistoryFilter = dutyName;
             openDutyHistory = true;
 
-            // Show all historical runs for this duty,
-            // regardless of previously selected global filters.
+            // Opening a duty from the timer resets unrelated filters.
             globalPlayerSearchText = string.Empty;
             globalDutySearchText = string.Empty;
             selectedDutyTypes.Clear();
@@ -126,15 +113,14 @@ namespace MentorRouletteTracker
                 (selectedTimeRange == 0 ? 0 : 1);
 
             string filterHeader = activeFilterCount == 0
-                ? "Global Filters"
-                : $"Global Filters ({activeFilterCount} active)";
+                ? "Filters"
+                : $"Filters ({activeFilterCount} active)";
 
             if (ImGui.CollapsingHeader(filterHeader + "###GlobalFilters"))
             {
                 ImGui.Spacing();
 
-                // Player search
-                ImGui.Text("Search Players");
+                ImGui.Text("Find players");
 
                 ImGui.SetNextItemWidth(
                     Math.Min(300f, ImGui.GetContentRegionAvail().X));
@@ -144,10 +130,10 @@ namespace MentorRouletteTracker
                     ref globalPlayerSearchText,
                     100);
 
-                ImGui.TextDisabled("Search by player name or world.");
+                ImGui.TextDisabled("Player name or home world.");
                 ImGui.Spacing();
 
-                ImGui.Text("Search Duties");
+                ImGui.Text("Find duties");
 
                 ImGui.SetNextItemWidth(
                     Math.Min(300f, ImGui.GetContentRegionAvail().X));
@@ -157,12 +143,11 @@ namespace MentorRouletteTracker
                     ref globalDutySearchText,
                     100);
 
-                ImGui.TextDisabled("Search by duty name.");
+                ImGui.TextDisabled("Duty name.");
                 ImGui.Spacing();
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                // Duty Types
                 ImGui.Text("Duty Types");
 
                 ImGui.SameLine();
@@ -190,13 +175,12 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                // Player Filters
                 int activePlayerFilters =
                     selectedPlayerRaces.Count +
                     selectedPlayerGenders.Count +
                     selectedPlayerStatuses.Count;
 
-                ImGui.Text("Player Filters");
+                ImGui.Text("Player filters");
                 ImGui.SameLine();
 
                 ImGui.TextDisabled(
@@ -206,7 +190,6 @@ namespace MentorRouletteTracker
 
                 ImGui.Spacing();
 
-                // Race
                 ImGui.Text("Race");
                 ImGui.SameLine();
 
@@ -233,7 +216,6 @@ namespace MentorRouletteTracker
 
                 ImGui.Spacing();
 
-                // Gender
                 ImGui.Text("Gender");
                 ImGui.SameLine();
 
@@ -254,7 +236,6 @@ namespace MentorRouletteTracker
 
                 ImGui.Spacing();
 
-                // Status
                 ImGui.Text("Status");
                 ImGui.SameLine();
 
@@ -280,7 +261,6 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                // Time Range
                 ImGui.Text("Time Range");
 
                 string[] timeRanges =
@@ -352,7 +332,7 @@ namespace MentorRouletteTracker
                     if (customStartDate > customEndDate)
                     {
                         ImGui.TextDisabled(
-                            "Start date must be before end date.");
+                            "The start date can't be after the end date.");
                     }
                 }
 
@@ -360,8 +340,7 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                // Clear filters
-                if (ImGui.Button("Clear All Filters"))
+                if (ImGui.Button("Clear filters"))
                 {
                     globalPlayerSearchText = string.Empty;
                     globalDutySearchText = string.Empty;
@@ -371,7 +350,6 @@ namespace MentorRouletteTracker
                     selectedPlayerStatuses.Clear();
                     selectedTimeRange = 0;
 
-                    // Also clear the duty history filter.
                     dutyHistoryFilter = null;
                 }
 
@@ -382,7 +360,6 @@ namespace MentorRouletteTracker
 
             ImGui.Spacing();
 
-            // Main Tabs
             if (ImGui.BeginTabBar("MainTabs"))
             {
                 var recordsTabFlags = openDutyHistory
@@ -430,7 +407,6 @@ namespace MentorRouletteTracker
                 ImGui.EndTabBar();
             }
 
-            // Detail and popup windows
             DrawDetailWindow();
             DrawNoteWindow();
 

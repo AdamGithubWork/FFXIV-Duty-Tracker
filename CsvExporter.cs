@@ -8,27 +8,27 @@ namespace MentorRouletteTracker
     {
         public static void Export(IEnumerable<DutyRecord> records, string filePath)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("Timestamp,DutyName,DutyType,JoinedInProgress,WipeCount,LalafellCount,PlayerJob,TimeInDuty,Completed,Party");
+            var csv = new StringBuilder();
+            csv.AppendLine("Timestamp,DutyName,DutyType,JoinedInProgress,WipeCount,LalafellCount,PlayerJob,TimeInDuty,Completed,Party");
 
-            foreach (var r in records)
+            foreach (var record in records)
             {
-                var partySummary = string.Join(" | ", r.Party.ConvertAll(m => $"{m.Name} ({m.Job}, {m.Race})"));
+                var partySummary = string.Join(" | ", record.Party.ConvertAll(player => $"{player.Name} ({player.Job}, {player.Race})"));
 
-                sb.AppendLine(string.Join(",",
-                    r.Timestamp.ToString("s", CultureInfo.InvariantCulture),
-                    Escape(r.DutyName),
-                    Escape(r.DutyType),
-                    r.JoinedInProgress,
-                    r.WipeCount,
-                    r.LalafellCount,
-                    Escape(r.PlayerJob),
-                    Escape(r.TimeInDuty.ToString(@"hh\:mm\:ss")),
-                    r.Completed,
+                csv.AppendLine(string.Join(",",
+                    record.Timestamp.ToString("s", CultureInfo.InvariantCulture),
+                    Escape(record.DutyName),
+                    Escape(record.DutyType),
+                    record.JoinedInProgress,
+                    record.WipeCount,
+                    record.LalafellCount,
+                    Escape(record.PlayerJob),
+                    Escape(record.TimeInDuty.ToString(@"hh\:mm\:ss")),
+                    record.Completed,
                     Escape(partySummary)));
             }
 
-            File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+            File.WriteAllText(filePath, csv.ToString(), Encoding.UTF8);
         }
 
         private static string Escape(string value)

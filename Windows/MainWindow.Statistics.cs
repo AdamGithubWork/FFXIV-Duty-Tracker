@@ -36,16 +36,16 @@ namespace MentorRouletteTracker
                 false,
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
-                ImGui.Text("Player Analysis");
+                ImGui.Text("Player stats");
                 ImGui.TextDisabled(
-                    "Player statistics from completed duties matching global filters.");
-                ImGui.TextDisabled("Death averages use encounters with known death counts only.");
+                    "Players from completed duties that match your filters.");
+                ImGui.TextDisabled("Unknown death counts are left out of averages.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
                 if (records.Count == 0)
                 {
-                    ImGui.TextDisabled("No completed duties match the selected filters.");
+                    ImGui.TextDisabled("No completed duties match your filters.");
                     ImGui.EndChild();
                     return;
                 }
@@ -97,7 +97,7 @@ namespace MentorRouletteTracker
         {
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
 
-            ImGui.Text("Players in Matching Duties");
+            ImGui.Text("Players in these duties");
             ImGui.Spacing();
 
             var matchingPlayers = records
@@ -227,7 +227,7 @@ namespace MentorRouletteTracker
                     x.Race != "Unknown")
                 .ToList();
 
-            ImGui.Text("Race Statistics");
+            ImGui.Text("Players by race");
             ImGui.Spacing();
 
             var raceStats = characters
@@ -244,7 +244,7 @@ namespace MentorRouletteTracker
 
             if (raceStats.Count == 0)
             {
-                ImGui.TextDisabled("No race data has been recorded yet.");
+                ImGui.TextDisabled("No race data yet.");
             }
             else if (ImGui.BeginTable(
                 "raceStats",
@@ -329,7 +329,7 @@ namespace MentorRouletteTracker
             ImGui.Separator();
             ImGui.Spacing();
 
-            ImGui.Text("Race / Gender Statistics");
+            ImGui.Text("Players by race and gender");
             ImGui.Spacing();
 
             var raceGenderStats = characters
@@ -355,7 +355,7 @@ namespace MentorRouletteTracker
 
             if (raceGenderStats.Count == 0)
             {
-                ImGui.TextDisabled("No race or gender data has been recorded yet.");
+                ImGui.TextDisabled("No race or gender data yet.");
                 return;
             }
 
@@ -459,7 +459,7 @@ namespace MentorRouletteTracker
 
         private void DrawGenderStatistics(List<DutyRecord> records)
         {
-            ImGui.Text("Gender Statistics");
+            ImGui.Text("Players by gender");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
@@ -488,7 +488,7 @@ namespace MentorRouletteTracker
 
             if (stats.Count == 0)
             {
-                ImGui.TextDisabled("No gender data matches the current filters.");
+                ImGui.TextDisabled("No gender data matches your filters.");
                 return;
             }
 
@@ -566,7 +566,7 @@ namespace MentorRouletteTracker
             Dictionary<PartyMemberSnapshot, DutyRecord>? playerRecords = null,
             bool applyPlayerFilters = false)
         {
-            ImGui.Text("Job Statistics");
+            ImGui.Text("Players by job");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
@@ -587,7 +587,7 @@ namespace MentorRouletteTracker
 
             if (jobStats.Count == 0)
             {
-                ImGui.TextDisabled("No job data has been recorded yet.");
+                ImGui.TextDisabled("No job data yet.");
                 return;
             }
 
@@ -679,7 +679,7 @@ namespace MentorRouletteTracker
 
         private void DrawStatusStatistics(List<DutyRecord> records)
         {
-            ImGui.Text("Player Status Distribution");
+            ImGui.Text("Players by status");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
@@ -712,7 +712,7 @@ namespace MentorRouletteTracker
 
             if (stats.Count == 0)
             {
-                ImGui.TextDisabled("No player status data matches the current filters.");
+                ImGui.TextDisabled("No player statuses match your filters.");
                 return;
             }
 
@@ -785,8 +785,8 @@ namespace MentorRouletteTracker
         private void DrawWorldStatistics(List<DutyRecord> records, bool groupByDatacenter = false)
         {
             ImGui.Text(groupByDatacenter
-                ? "Player World Distribution by Datacenter"
-                : "Player World Distribution");
+                ? "Players by datacenter"
+                : "Players by home world");
             ImGui.Spacing();
 
             var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
@@ -820,7 +820,7 @@ namespace MentorRouletteTracker
 
             if (stats.Count == 0)
             {
-                ImGui.TextDisabled("No player world data matches the current filters.");
+                ImGui.TextDisabled("No home worlds match your filters.");
                 return;
             }
 

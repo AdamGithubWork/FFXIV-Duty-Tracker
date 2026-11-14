@@ -14,7 +14,7 @@ public sealed partial class SqliteHistoryStore
     public HistoryData LoadHistory()
     {
         if (!File.Exists(DatabasePath))
-            throw new FileNotFoundException("The SQLite history database is missing. Refusing to start with empty history.", DatabasePath);
+            throw new FileNotFoundException("The history database is missing.", DatabasePath);
         Initialize();
         using var connection = OpenExisting();
         using var transaction = connection.BeginTransaction(deferred: true);
@@ -106,7 +106,6 @@ public sealed partial class SqliteHistoryStore
         return new(rows, JsonSerializer.Serialize(data.SeenPlayers));
     }
 
-    // Only the session's single writer calls this; snapshots contain no live game objects.
     internal void SaveHistory(HistoryWrite snapshot)
     {
         using var connection = OpenExisting();
@@ -115,7 +114,7 @@ public sealed partial class SqliteHistoryStore
         command.Transaction = transaction;
         command.CommandText = "SELECT revision FROM history_state WHERE id=1;";
         if ((long?)command.ExecuteScalar() != revision)
-            throw new IOException("History changed through another database session. Refusing to overwrite it.");
+            throw new IOException("Another database session changed the history.");
 
         var desired = snapshot.Duties.ToDictionary(row => row.Id, row => row.Fingerprint);
         var deleted = fingerprints.Keys.Except(desired.Keys).ToArray();

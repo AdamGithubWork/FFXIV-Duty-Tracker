@@ -50,7 +50,7 @@ namespace MentorRouletteTracker
 
             if (completedRuns.Count == 0)
             {
-                averageText = "No previous data";
+                averageText = "No completed runs yet";
             }
             else
             {
@@ -68,7 +68,7 @@ namespace MentorRouletteTracker
             ImGui.TextUnformatted(duty.DutyName);
             ImGui.Separator();
 
-            ImGui.TextUnformatted("Average completion time:");
+            ImGui.TextUnformatted("Average clear time:");
 
             if (ImGui.Button(averageText, new Vector2(180, 0)))
             {
@@ -78,7 +78,7 @@ namespace MentorRouletteTracker
             if (ImGui.IsItemHovered())
             {
                 ImGui.SetTooltip(
-                    "Open the history of this duty");
+                    "View previous runs");
             }
 
             ImGui.TextDisabled(

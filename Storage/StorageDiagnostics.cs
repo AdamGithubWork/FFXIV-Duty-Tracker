@@ -2,7 +2,6 @@ using MentorRouletteTracker.DutyTracking;
 
 namespace MentorRouletteTracker.Storage;
 
-/// <summary>Checks SQLite loading and CRUD inside Dalamud using only a uniquely named disposable database.</summary>
 public static class StorageDiagnostics
 {
     public static void Run(string directory)
@@ -33,7 +32,6 @@ public static class StorageDiagnostics
         }
         finally
         {
-            // These exact paths were generated above; never delete a live database or recovery file.
             foreach (var suffix in new[] { "", "-wal", "-shm" })
                 if (File.Exists(path + suffix)) File.Delete(path + suffix);
         }

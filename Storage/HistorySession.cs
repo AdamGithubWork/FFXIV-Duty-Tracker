@@ -3,7 +3,6 @@ using MentorRouletteTracker.DutyTracking;
 
 namespace MentorRouletteTracker.Storage;
 
-/// <summary>Owns the in-memory history and serializes immutable snapshots through one database writer.</summary>
 public sealed class HistorySession : IDisposable
 {
     private readonly HistoryData data;
@@ -35,7 +34,7 @@ public sealed class HistorySession : IDisposable
         var directory = Path.GetDirectoryName(store.DatabasePath)!;
         var prefix = Path.GetFileNameWithoutExtension(store.DatabasePath) + "-recovery-";
         if (Directory.Exists(directory) && Directory.EnumerateFiles(directory, prefix + "*.json").Any())
-            throw new InvalidDataException("A recovery history file needs review before SQLite history can be loaded.");
+            throw new InvalidDataException("A recovery file needs to be reviewed before loading history.");
         recoveryPath = Path.Combine(directory, prefix + Guid.NewGuid().ToString("N") + ".json");
         data = Task.Run(store.LoadHistory).GetAwaiter().GetResult();
     }
@@ -49,7 +48,7 @@ public sealed class HistorySession : IDisposable
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            // A newer complete snapshot includes older unsaved edits; bound the queue to one.
+            // The latest snapshot includes earlier edits, so only keep one queued save.
             pending = snapshot;
             if (!running)
             {
@@ -86,7 +85,7 @@ public sealed class HistorySession : IDisposable
                 }
                 catch (Exception backupError)
                 {
-                    failure = new AggregateException("Neither SQLite history nor its recovery copy could be saved.", ex, backupError);
+                    failure = new AggregateException("Could not save history or its recovery copy.", ex, backupError);
                 }
                 lock (gate) lastError = failure;
                 try { reportError?.Invoke(failure); }
@@ -130,7 +129,7 @@ public sealed class HistorySession : IDisposable
             lock (gate)
             {
                 if (running || pending != null) continue;
-                if (lastError != null) throw new IOException("History flush failed; see the recovery file and plugin log.", lastError);
+                if (lastError != null) throw new IOException("Could not finish saving history. Check the recovery file and plugin log.", lastError);
                 return;
             }
         }

@@ -1,7 +1,6 @@
 ﻿namespace MentorRouletteTracker.DutyTracking
 {
     [Serializable]
-    // Information about a party member from a specific duty
     public class PartyMemberSnapshot
     {
         public string Name { get; set; } = string.Empty;

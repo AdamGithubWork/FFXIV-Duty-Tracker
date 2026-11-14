@@ -2,11 +2,11 @@
 
 ## PvP Tracker
 
-Original project: https://github.com/wrath16/PvpStats
+PvP Tracker: https://github.com/wrath16/PvpStats
 
-API 15 fork used as reference: https://github.com/Originaljsx/PvpStats-api15
+API 15 reference: https://github.com/Originaljsx/PvpStats-api15
 
-Portions of the Frontline scoreboard implementation are derived from PvP Tracker, including `FrontlineResultsPacket.cs` and the match-end hook implementation.
+The Frontline scoreboard code is based on PvP Tracker, including `FrontlineResultsPacket.cs` and the match-end hook implementation.
 
 Licensed under the MIT License.
 

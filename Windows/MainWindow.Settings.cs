@@ -20,10 +20,9 @@ namespace MentorRouletteTracker
                 (37, "Chaotic Alliance Raid")
             };
 
-            // Duty Tracking Options
-            ImGui.Text("Duty Tracking Options");
+            ImGui.Text("Duty recording");
             ImGui.TextDisabled(
-                "Check each duty type you would like recorded.");
+                "Choose which duties to record.");
 
             ImGui.Spacing();
             ImGui.Separator();
@@ -51,10 +50,9 @@ namespace MentorRouletteTracker
             ImGui.Separator();
             ImGui.Spacing();
 
-            // Duty Timer Visibility
-            ImGui.Text("Duty Timer Visibility");
+            ImGui.Text("Duty timer");
             ImGui.TextDisabled(
-                "Choose which duty types display the floating timer.");
+                "Choose which duties show the timer.");
 
             ImGui.Spacing();
 
@@ -80,8 +78,7 @@ namespace MentorRouletteTracker
             ImGui.Separator();
             ImGui.Spacing();
 
-            // Player Tracking Options
-            ImGui.Text("Player Tracking Options");
+            ImGui.Text("Player tracking");
 
             ImGui.Spacing();
             ImGui.Separator();

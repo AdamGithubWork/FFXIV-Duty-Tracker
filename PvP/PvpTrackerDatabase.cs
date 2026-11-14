@@ -74,7 +74,7 @@ public static class PvpTrackerDatabase
                 if (result.PlayerDeaths.Count == 0)
                 {
                     log.Warning(
-                        $"{collectionName}: no player deaths extracted.");
+                        $"{collectionName}: no player death counts found.");
                     return null;
                 }
 
@@ -89,7 +89,7 @@ public static class PvpTrackerDatabase
         }
         catch (Exception ex)
         {
-            log.Error(ex, "Could not retrieve PvP match results.");
+            log.Error(ex, "Could not read PvP match results.");
             return null;
         }
     }

@@ -99,10 +99,8 @@ namespace MentorRouletteTracker
                 new Dalamud.Game.Command.CommandInfo(OnCommand)
                 {
                     HelpMessage =
-                        "Open the Duty Tracker window. " +
-                        "Use '/dt arm' or '/dt disarm' " +
-                        "to toggle logging. Use '/dt storagecheck' " +
-                        "to verify SQLite support without changing history.",
+                        "Open Duty Tracker. Use '/dt arm' to record duties or '/dt disarm' to stop recording. " +
+                        "Use '/dt storagecheck' to check SQLite support.",
                 });
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -116,8 +114,6 @@ namespace MentorRouletteTracker
 
         private void OnFrameworkUpdate(IFramework framework)
         {
-            // The timer is only visible when an active duty's actual
-            // ContentType ID has been enabled in Settings.
             var contentTypeId = tracker.ActiveContentTypeId;
 
             dutyTimerWindow.IsOpen =
@@ -134,12 +130,12 @@ namespace MentorRouletteTracker
             {
                 case "arm":
                     tracker.Armed = true;
-                    log.Info("Duty Tracker: armed.");
+                    log.Information("Duty Tracker: recording enabled.");
                     break;
 
                 case "disarm":
                     tracker.Armed = false;
-                    log.Info("Duty Tracker: disarmed.");
+                    log.Information("Duty Tracker: recording disabled.");
                     break;
 
                 case "storagecheck":
@@ -159,11 +155,11 @@ namespace MentorRouletteTracker
             try
             {
                 await Task.Run(() => StorageDiagnostics.Run(pluginInterface.GetPluginConfigDirectory()));
-                log.Info("Duty Tracker: SQLite storage check passed. Live history was not changed.");
+                log.Information("Duty Tracker: SQLite check passed.");
             }
             catch (Exception ex)
             {
-                log.Error(ex, "Duty Tracker: SQLite storage check failed. Keep the current storage mode.");
+                log.Error(ex, "Duty Tracker: SQLite check failed.");
             }
             finally { storageCheckRunning = false; }
         }
@@ -179,7 +175,7 @@ namespace MentorRouletteTracker
             mainWindow.Dispose();
             tracker.Dispose();
             try { config.DisposeHistory(); }
-            catch (Exception ex) { log.Error(ex, "Duty Tracker history flush failed; check the recovery copy before restarting."); }
+            catch (Exception ex) { log.Error(ex, "Could not finish saving Duty Tracker history. Check the recovery file before restarting."); }
         }
     }
 }

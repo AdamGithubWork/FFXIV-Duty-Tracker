@@ -9,18 +9,14 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>MentorRouletteTracker</AssemblyName>
     <Version>1.0.0.0</Version>
-	  <Description>Tracks FFXIV duty history, player encounters, deaths, wipes, PvP statistics, and lifetime milestones.</Description>
+	  <Description>Tracks your duties, the players you meet, deaths, wipes, and milestones.</Description>
 	  <Company>Adalith</Company>
 	  <Authors>Adalith</Authors>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <!--
-    This assumes the standard Dalamud dev environment where DALAMUD_HOME
-    points at your installed Dalamud "dev" folder (XIVLauncher sets this
-    automatically for most people; if not, set the env var yourself).
-  -->
+  <!-- Use DALAMUD_HOME if set; otherwise use XIVLauncher's dev folder. -->
   <PropertyGroup>
     <DalamudLibPath>$(DALAMUD_HOME)\</DalamudLibPath>
     <DalamudLibPath Condition="'$(DALAMUD_HOME)' == ''">$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>

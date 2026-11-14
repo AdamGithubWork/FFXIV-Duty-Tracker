@@ -1,206 +1,113 @@
 # Duty Tracker
 
-A Dalamud plugin for **Final Fantasy XIV** that records your duty history, tracks player encounters and deaths, and provides detailed statistics about the duties you've completed and the players you've encountered.
+Keep track of your FFXIV duties and the players you meet.
 
-Originally developed as Mentor Roulette Tracker, Duty Tracker has expanded into a general-purpose duty tracking and analysis plugin supporting dungeons, trials, raids, PvP, and other content.
+Duty Tracker records your runs, party members, deaths, and wipes. Look through old
+runs, see who you've played with before, or check your stats over time.
 
-## Features
+The plugin started as Mentor Roulette Tracker. It now tracks other duty types too.
 
-### Duty Tracking
+## What's recorded
 
-Automatically records information about your duties, including:
+- Duty name, type, start time, and duration
+- Whether you finished or joined in progress
+- Wipes and Lalafell count
+- Your job
+- Party members: name, home world, job, race, gender, status, and recorded deaths
 
-- Duty name and type
-- Start time and time spent in duty
-- Completion status
-- Whether you joined in progress
-- Number of wipes
-- Number of Lalafell encountered
-- Your selected job
-- Party members and their information
+You can choose which duty types to record and whether to track alliance members.
+PvP scoreboard deaths come from PvP Tracker.
 
-Party member information includes:
-
-- Character name and home world
-- Job
-- Race and gender
-- Player status (mentor, sprout, returner, etc.)
-- Recorded deaths
-
-PvP support includes death statistics obtained from match scoreboards.
+## Tabs
 
 ### Records
 
-Browse your complete duty history in a sortable table.
-
-- Sort by duty, type, job, date, duration, wipes, and more
-- Click a duty to view detailed party information
-- Add notes to individual duties
-- Edit recorded wipe counts and join-in-progress status
-- Delete individual records
-- Export your history to CSV
+Browse completed and incomplete runs. Click a duty to see the party, add a note,
+or edit the wipe count and joined-in-progress flag. You can delete records and
+export your history to CSV.
 
 ### Statistics
 
-Analyze the players you've encountered across your duties.
-
-Available breakdowns include:
-
-- Race statistics
-- Gender statistics
-- Combined race and gender statistics
-- Job statistics
-- World statistics
-- Player status statistics
-- Total encounters and unique players
-- Death totals and deaths per encounter
-
-Statistics can be filtered by duty type, date range, and player characteristics.
+See players grouped by race, gender, job, status, home world, and datacenter.
+Tables show encounters, unique players, and death stats. Datacenter grouping
+currently covers North American home worlds; other worlds show as Unknown.
 
 ### Duty Analysis
 
-Explore your duty history through aggregated statistics.
+See completion times, wipes, duties by type, and your most common duty.
+The day-and-time heatmap shows when you run duties or how long those runs take.
 
-Includes:
+### Summary
 
-- Total completed duties
-- Average completion time
-- Average wipes per duty
-- Duties joined in progress
-- Duties completed by content type
-- Most frequently encountered duty
-- Detailed comparisons between individual duties
-
-**Duties by Day and Time** provides a heatmap showing when you complete duties, with options to display duty counts or average completion times.
-
-### Summary & Milestones
-
-Track up to **50 milestones and records** across your duty history.
-
-Milestone categories include:
-
-**Duty Records**
-- Fastest and longest completed duty
-- Most deaths and wipes in a duty
-- Highest deaths per minute
-- Most Lalafell, sprouts, and mentors encountered
-- Most different races in a single duty
-
-**Player Records**
-- Most frequently encountered player
-- Most deaths by an individual player in one duty
-- Highest deaths per minute by one player
-- Most cumulative deaths by a player
-- Most deathless encounters
-
-**Streaks & Droughts**
-- Longest streak without a wipe
-- Longest streak without an observed death
-- Longest streak without encountering a Lalafell
-- Consecutive duties containing wipes or deaths
-- Consecutive duties below or above certain durations
-
-**Activity Records**
-- Most duties completed in a day, week, or month
-- Most time spent in duties in one day
-- Most player deaths or wipes observed in one day
-- Most unique players encountered in one day
-- Longest streak of active days
-
-Duty-related filters allow you to view milestones for specific content, such as PvP-only duties.
-
-Milestones associated with individual duty records can be clicked to open their full details.
+See milestones across your completed duties: fastest clears, most wipes, player
+records, streaks, and busy days. Click a linked result to open that duty.
+Milestones use duty type, duty search, and date filters. Player filters don't apply.
 
 ### People
 
-Browse individual players you've encountered throughout your duty history.
+See who you've met, how often, and their recorded deaths. Click a player to see
+your duties together.
 
-- Character name, world, race, and gender
-- Total encounters
-- Total recorded deaths
-- Average deaths per encounter
-- Sortable player statistics
-- Click a player to view your shared duty history
-- Open individual duty records directly from player history
+### Settings
 
-### Duty Timer Overlay
+Choose what to record, when to show the duty timer, whether to track alliance
+members, and whether to include yourself in stats.
 
-An optional floating window appears during selected duty types.
+## Duty timer
 
-- Displays the current duty name
-- Shows your historical average completion time
-- Uses completed duty records to calculate averages
-- Click the average time to open previous runs of that duty
-- Configure which duty types display the timer
+The optional timer window shows your current duty and its average completion
+time from previous completed runs. Click the time to see those runs.
+Choose which duty types show the window in Settings.
 
-### Filtering & Configuration
+## Filters
 
-Global filters include:
+Filter by duty type, duty name, player name or home world, race, gender, status,
+and date. You can use a preset date range or enter your own dates.
 
-- Duty type
-- Duty name search
-- Player name or world search
-- Race
-- Gender
-- Player status
-- Date range, including custom dates
+## Supported duties
 
-Additional settings allow you to:
-
-- Choose which duty types to record
-- Configure duty timer visibility by content type
-- Include or exclude your own character from statistics
-- Enable or disable alliance member tracking
-
-## Supported Content
-
-Duty Tracker supports recording configured content types, including:
-
-- Dungeons
-- Guildhests
-- Trials
-- Raids
-- PvP
-- Deep Dungeons
-- Ultimate Raids
-- Variant and Criterion content through V&C Dungeon Finder
-- Chaotic Alliance Raids
-
-Some duty categories, including Extreme Trials, Savage Raids, and Alliance Raids, receive additional classification.
+Dungeons, guildhests, trials, raids, PvP, Deep Dungeons, Ultimates, V&C Dungeon
+Finder content, and Chaotic Alliance Raids. Extreme Trials, Savage Raids, and
+Alliance Raids have their own categories.
 
 ## Commands
 
-| Command | Description |
+| Command | What it does |
 |---|---|
 | `/dt` | Open or close Duty Tracker |
-| `/dt arm` | Enable duty recording |
-| `/dt disarm` | Disable duty recording |
+| `/dt arm` | Start recording duties |
+| `/dt disarm` | Stop recording new duties |
+| `/dt storagecheck` | Check SQLite support using a temporary database |
 
-## Technical Details
+## Saved data
 
-Duty Tracker is developed in **C# and .NET 10** using the Dalamud plugin framework and ImGui.
+Settings are saved in the plugin's JSON config. History uses JSON or SQLite,
+depending on the profile's storage setting. SQLite profiles use `history.sqlite`
+in the plugin's config folder. Existing JSON profiles aren't migrated automatically
+yet. See [Storage](Storage/README.md) for details.
 
-It uses Dalamud events and game-state information to monitor duty activity, player encounters, and death-state transitions.
+There are no uploads.
 
-Historical records and settings are persisted between sessions. Statistical calculations use filtering, grouping, and indexed lookups to support analysis of recorded encounters.
+## Things to know
 
-## Limitations
-
-- Death tracking depends on the availability of party and character state information. Some deaths may not be captured, particularly for players outside your immediate party.
-- Historical statistics reflect only duties recorded while tracking was enabled.
-- Player status and other character information depend on what was available when the encounter was recorded.
-- Results should be treated as observational statistics rather than definitive measurements of player skill.
+- Death tracking can miss deaths when party or character data isn't available,
+  especially outside your own party.
+- Unknown death counts are left out of the player death averages that support them.
+  Some other views still treat missing counts as zero.
+- Your history only includes duties recorded while tracking was on.
+- Jobs, statuses, and other player details reflect what the plugin saw during the run.
 
 ## Development
 
-Duty Tracker is an ongoing personal project. Additional improvements and features may be added over time.
+Built with C#, .NET 10, Dalamud, and ImGui. This is still a personal project in
+development.
 
-## Disclaimer
+## Credits
 
-Duty Tracker is an unofficial third-party plugin for Final Fantasy XIV. It is not affiliated with or endorsed by Square Enix.
+By **Adalith**. See [third-party notices](THIRD_PARTY_NOTICES.md) for dependencies
+and borrowed code.
+
+Duty Tracker is an unofficial plugin for Final Fantasy XIV. It is not affiliated
+with or endorsed by Square Enix.
 
 FINAL FANTASY XIV © SQUARE ENIX CO., LTD.
-
-## Author
-
-**Adalith**

@@ -36,13 +36,13 @@ namespace MentorRouletteTracker
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Duty Analysis");
-                ImGui.TextDisabled("Completed duties matching global filters.");
+                ImGui.TextDisabled("Completed duties that match your filters.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
                 if (records.Count == 0)
                 {
-                    ImGui.TextDisabled("No completed duties match the selected filters.");
+                    ImGui.TextDisabled("No completed duties match your filters.");
                 }
                 else
                 {
@@ -75,7 +75,7 @@ namespace MentorRouletteTracker
 
         private void DrawDutyOverview(List<DutyRecord> records)
         {
-            ImGui.Text("Duty Overview");
+            ImGui.Text("Overview");
             ImGui.Spacing();
 
             if (ImGui.BeginTable(
@@ -355,8 +355,8 @@ namespace MentorRouletteTracker
 
         private void DrawDutySpecificDetails(List<DutyRecord> records)
         {
-            ImGui.Text("Duty Specific Details");
-            ImGui.TextDisabled("Deaths / Run uses runs with known deaths for every included player.");
+            ImGui.Text("Stats by duty");
+            ImGui.TextDisabled("Deaths / Run leaves out runs where an included player has an unknown death count.");
 
             ImGui.Spacing();
 

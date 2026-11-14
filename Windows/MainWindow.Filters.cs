@@ -13,7 +13,7 @@ namespace MentorRouletteTracker
 
             if (items.Count == 0)
             {
-                ImGui.TextDisabled("No options available.");
+                ImGui.TextDisabled("No options yet.");
                 return;
             }
 

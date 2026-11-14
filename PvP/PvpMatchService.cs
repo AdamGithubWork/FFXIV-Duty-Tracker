@@ -48,7 +48,6 @@ namespace MentorRouletteTracker.PvP
 
             var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
 
-            // If match is frontlines, delay the first check for 5 minutes, otherwise delay it for 1 minute.
             var delay = isFrontline == true ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1);
 
             pvpQueuedAt[matchId] = now;
@@ -60,7 +59,7 @@ namespace MentorRouletteTracker.PvP
             log.Information(
                 $"PvP Tracker match queued: {matchId} | " +
                 $"Mode: {(isFrontline == true ? "Frontline" : isFrontline == false ? "CC" : "Unknown")} | " +
-                $"First check in {delay.TotalMinutes:0} minute(s).");
+                $"Checking in {delay.TotalMinutes:0} min.");
         }
 
         private bool ApplyPvpMatch(string matchId)
@@ -127,8 +126,6 @@ namespace MentorRouletteTracker.PvP
                 return false;
             }
 
-            // Remove players absent from the final Frontline scoreboard.
-            // Never perform this cleanup for CC or PvE.
             if (result.IsFrontline)
             {
                 var unmatchedPlayers = matchingRecord.Party
@@ -137,8 +134,7 @@ namespace MentorRouletteTracker.PvP
                             $"{player.Name}@{player.World}"))
                     .ToList();
 
-                // Only clean up when nearly all tracked players matched.
-                // This protects against an incomplete or incompatible scoreboard.
+                // A partial scoreboard may be missing players who were actually there.
                 if (unmatchedPlayers.Count > 0 &&
                     updatedPlayers >= matchingRecord.Party.Count * 0.8)
                 {
@@ -180,7 +176,6 @@ namespace MentorRouletteTracker.PvP
             if (now < nextPvpCheck || pendingPvpMatches.Count == 0)
                 return;
 
-            // Check due times once per second, without opening the database.
             nextPvpCheck = now.AddSeconds(1);
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
@@ -201,8 +196,6 @@ namespace MentorRouletteTracker.PvP
 
                 try
                 {
-                    // If the mode wasn't available when the IPC arrived,
-                    // resolve it now so Frontline still gets its 5-minute delay.
                     if (unknownPvpModes.Contains(matchId))
                     {
                         var isFrontline =
