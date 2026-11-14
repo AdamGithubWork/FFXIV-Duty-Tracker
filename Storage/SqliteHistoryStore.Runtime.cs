@@ -107,7 +107,7 @@ public sealed partial class SqliteHistoryStore
             Add(data.PendingDuty, true);
         if (rows.Select(row => row.Id).Distinct().Count() != rows.Count)
             throw new InvalidDataException("The same duty object is present more than once.");
-        var retained = data.Records.ToHashSet();
+        var retained = new HashSet<DutyRecord>(data.Records, ReferenceEqualityComparer.Instance);
         if (data.PendingDuty != null) retained.Add(data.PendingDuty);
         foreach (var removed in data.RecordIds.Keys.Where(record => !retained.Contains(record)).ToArray())
             data.RecordIds.Remove(removed);

@@ -7,7 +7,7 @@ public sealed class HistoryData
     public List<DutyRecord> Records { get; init; } = new();
     public List<SeenPlayer> SeenPlayers { get; init; } = new();
     public DutyRecord? PendingDuty { get; set; }
-    internal Dictionary<DutyRecord, string> RecordIds { get; } = new();
+    internal Dictionary<DutyRecord, string> RecordIds { get; } = new(ReferenceEqualityComparer.Instance);
 }
 
 internal readonly record struct DutyRow(
