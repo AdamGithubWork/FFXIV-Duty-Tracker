@@ -26,7 +26,6 @@ public sealed class HistorySession : IDisposable
     private Exception? lastError;
 
     public List<DutyRecord> Records => data.Records;
-    public List<SeenPlayer> SeenPlayers => data.SeenPlayers;
     public DutyRecord? PendingDuty { get => data.PendingDuty; set => data.PendingDuty = value; }
 
     public HistorySession(HistoryData data, Action<HistoryData> legacySave)
@@ -90,8 +89,6 @@ public sealed class HistorySession : IDisposable
                 data.Records.Clear();
                 data.Records.AddRange(recovery.Data.Records);
                 data.PendingDuty = recovery.Data.PendingDuty;
-                data.SeenPlayers.Clear();
-                data.SeenPlayers.AddRange(recovery.Data.SeenPlayers);
                 data.RecordIds.Clear();
                 foreach (var (record, id) in recovery.Data.RecordIds)
                     data.RecordIds.Add(record, id);
@@ -107,10 +104,8 @@ public sealed class HistorySession : IDisposable
         var root = document.RootElement;
         var records = root.GetProperty("Records").Deserialize<List<DutyRecord>>()
             ?? throw new InvalidDataException($"Recovery file {path} has no records array.");
-        var players = root.GetProperty("SeenPlayers").Deserialize<List<SeenPlayer>>()
-            ?? throw new InvalidDataException($"Recovery file {path} has no seen-player array.");
         var pendingDuty = root.GetProperty("PendingDuty").Deserialize<DutyRecord>();
-        var recovered = new HistoryData { Records = records, SeenPlayers = players, PendingDuty = pendingDuty };
+        var recovered = new HistoryData { Records = records, PendingDuty = pendingDuty };
         foreach (var record in records.Concat(pendingDuty == null ? Enumerable.Empty<DutyRecord>() : new[] { pendingDuty }))
         {
             record.Timestamp = record.Timestamp.ToUniversalTime().ToLocalTime();
@@ -204,8 +199,7 @@ public sealed class HistorySession : IDisposable
             {
                 // Merge on the worker so the game thread only copies the active duty.
                 recoverySnapshot = new HistoryWrite(
-                    recoverySnapshot!.Duties.Where(row => !row.Pending).Concat(active.Duties).ToList(),
-                    recoverySnapshot.SeenPlayersJson);
+                    recoverySnapshot!.Duties.Where(row => !row.Pending).Concat(active.Duties).ToList());
             }
             snapshot = full != null || retryFullSave ? recoverySnapshot! : active!;
             try
@@ -291,8 +285,6 @@ public sealed class HistorySession : IDisposable
                 writer.WriteNullValue();
             else
                 JsonSerializer.Serialize(writer, active.ToRecord());
-            writer.WritePropertyName("SeenPlayers");
-            writer.WriteRawValue(snapshot.SeenPlayersJson);
             writer.WriteEndObject();
             writer.Flush();
             stream.Flush(flushToDisk: true);

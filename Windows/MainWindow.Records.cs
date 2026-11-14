@@ -69,7 +69,6 @@ namespace MentorRouletteTracker
                 if (ImGui.Button("Yes, clear"))
                 {
                     config.History.Records.Clear();
-                    config.History.SeenPlayers.Clear();
                     config.History.Save();
 
                     selectedRecord = null;
@@ -427,8 +426,6 @@ namespace MentorRouletteTracker
 
                     config.History.Records.Remove(record);
 
-                    RebuildSeenPlayers();
-
                     config.History.Save();
 
                     if (selectedRecord == record)
@@ -453,37 +450,6 @@ namespace MentorRouletteTracker
             }
 
             ImGui.EndPopup();
-        }
-
-        private void RebuildSeenPlayers()
-        {
-            config.History.SeenPlayers.Clear();
-
-            var people = config.History.Records
-                .SelectMany(x => x.Party)
-                .GroupBy(x => new { x.Name, x.World });
-
-            foreach (var group in people)
-            {
-                var race = group
-                    .Select(x => x.Race)
-                    .FirstOrDefault(x => x != "Unknown")
-                    ?? "Unknown";
-
-                var gender = group
-                    .Select(x => x.Gender)
-                    .FirstOrDefault(x => x != "Unknown")
-                    ?? "Unknown";
-
-                config.History.SeenPlayers.Add(new SeenPlayer
-                {
-                    Name = group.Key.Name,
-                    World = group.Key.World,
-                    Race = race,
-                    Gender = gender,
-                    TimesSeen = group.Count()
-                });
-            }
         }
 
         private void DrawDetailWindow()

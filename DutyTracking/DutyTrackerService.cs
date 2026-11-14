@@ -27,7 +27,6 @@ namespace MentorRouletteTracker.DutyTracking
         private bool pendingRestoreNeeded;
         public DutyRecord? ActiveDuty => current;
         public uint? ActiveContentTypeId { get; private set; }
-        private readonly HashSet<string> countedPlayersForCurrentRun = new();
         private readonly Dictionary<string, bool> previousDeathStates = new();
         public bool Armed { get; set; } = true;
 
@@ -182,12 +181,6 @@ namespace MentorRouletteTracker.DutyTracking
                 return;
             }
 
-            foreach (var player in current.Party)
-            {
-                string playerKey = $"{player.Name}@{player.World}";
-                countedPlayersForCurrentRun.Add(playerKey);
-            }
-
             log.Information($"Restored pending duty: {current.DutyName}");
         }
         private void StartNewDuty(ContentFinderCondition duty)
@@ -215,7 +208,6 @@ namespace MentorRouletteTracker.DutyTracking
                 CheckpointUtc = DateTime.UtcNow
             };
 
-            countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
             nextPartyRefresh = DateTime.MinValue;
             config.History.PendingDuty = current;
@@ -239,7 +231,6 @@ namespace MentorRouletteTracker.DutyTracking
             current = null;
             ActiveContentTypeId = null;
 
-            countedPlayersForCurrentRun.Clear();
             previousDeathStates.Clear();
         }
         private void PopulatePartyDetails()
@@ -321,9 +312,7 @@ namespace MentorRouletteTracker.DutyTracking
         private void ProcessPlayer(string name, string job, string race, string gender, string world, string status)
         {
             status = NormalizePlayerStatus(status);
-            var playerKey = $"{name}@{world}";
             GetOrCreatePlayerSnapshot(name, job, race, gender, world, status);
-            UpdateSeenPlayer(name, race, gender, world, playerKey);
         }
 
         private void GetOrCreatePlayerSnapshot(string name, string job, string race, string gender, string world, string status)
@@ -434,49 +423,6 @@ namespace MentorRouletteTracker.DutyTracking
             }
 
             previousDeathStates[playerKey] = isDead;
-        }
-
-        private void UpdateSeenPlayer(string name, string race, string gender, string world, string playerKey)
-        {
-            SeenPlayer? seenPlayer = null;
-
-            foreach (var player in config.History.SeenPlayers)
-            {
-                if (player.Name == name && player.World == world)
-                {
-                    seenPlayer = player;
-                    break;
-                }
-            }
-
-            if (countedPlayersForCurrentRun.Add(playerKey))
-            {
-                if (seenPlayer == null)
-                {
-                    seenPlayer = new SeenPlayer
-                    {
-                        Name = name,
-                        Race = race,
-                        Gender = gender,
-                        World = world,
-                        TimesSeen = 1
-                    };
-                    config.History.SeenPlayers.Add(seenPlayer);
-                    log.Information($"New player seen: {name}");
-                }
-                else
-                {
-                    seenPlayer.TimesSeen++;
-                    log.Information($"Player seen again: {playerKey} | " +
-                             $"Times Seen: {seenPlayer.TimesSeen}");
-                }
-            }
-
-            if (seenPlayer != null)
-            {
-                seenPlayer.Race = UpdateIfUnknown(seenPlayer.Race, race);
-                seenPlayer.Gender = UpdateIfUnknown(seenPlayer.Gender, gender);
-            }
         }
 
         private static string NormalizePlayerStatus(string status)

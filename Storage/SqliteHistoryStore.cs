@@ -1,13 +1,11 @@
 using Microsoft.Data.Sqlite;
 using System.Globalization;
-using System.Text;
-using System.Text.Json;
 
 namespace MentorRouletteTracker.Storage;
 
 public sealed partial class SqliteHistoryStore
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     private const int ApplicationId = 0x44555459; // DUTY
 
     public string DatabasePath { get; }
@@ -95,14 +93,6 @@ public sealed partial class SqliteHistoryStore
                     INSERT INTO history_state(id) VALUES (1);
                     """;
                 migration.ExecuteNonQuery();
-                migration.CommandText = "SELECT source_bytes FROM legacy_imports LIMIT 1;";
-                if (migration.ExecuteScalar() is byte[] source)
-                {
-                    using var archive = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(source).TrimStart('\uFEFF'));
-                    migration.CommandText = "UPDATE history_state SET seen_players_json=$seen WHERE id=1;";
-                    migration.Parameters.AddWithValue("$seen", LegacySeenJson(archive.RootElement));
-                    migration.ExecuteNonQuery();
-                }
                 migration.CommandText = "PRAGMA user_version = 3;";
                 migration.ExecuteNonQuery();
                 version = 3;
@@ -141,6 +131,14 @@ public sealed partial class SqliteHistoryStore
                 migration.Parameters.Clear();
                 migration.CommandText = "PRAGMA user_version = 5;";
                 migration.ExecuteNonQuery();
+                version = 5;
+            }
+            if (version == 5)
+            {
+                using var migration = connection.CreateCommand();
+                migration.Transaction = transaction;
+                migration.CommandText = "ALTER TABLE history_state DROP COLUMN seen_players_json; PRAGMA user_version = 6;";
+                migration.ExecuteNonQuery();
             }
             if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)
                 throw new InvalidDataException("The database history state is missing.");
@@ -155,14 +153,6 @@ public sealed partial class SqliteHistoryStore
     internal static string UtcTimestamp(string value) =>
         DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
             .ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-    internal static string LegacySeenJson(JsonElement root)
-    {
-        if (!root.TryGetProperty("SeenPlayers", out var seen)) return "[]";
-        if (seen.ValueKind != JsonValueKind.Array)
-            throw new InvalidDataException("The legacy seen-player cache must be an array.");
-        return seen.GetRawText();
-    }
 
     private static int ReadInteger(SqliteConnection connection, SqliteTransaction transaction, string sql)
     {

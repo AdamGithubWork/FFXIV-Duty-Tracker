@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using MentorRouletteTracker.DutyTracking;
 
@@ -8,7 +7,6 @@ namespace MentorRouletteTracker.Storage;
 public sealed partial class SqliteHistoryStore
 {
     private Dictionary<string, DutyWrite> savedDuties = new();
-    private string seenFingerprint = "[]";
     private long revision;
     private string? pendingDutyId;
     internal long Revision => revision;
@@ -24,16 +22,13 @@ public sealed partial class SqliteHistoryStore
         command.Transaction = transaction;
         command.CommandText = "PRAGMA quick_check;";
         if (!Equals(command.ExecuteScalar(), "ok")) throw new InvalidDataException("SQLite history integrity check failed.");
-        command.CommandText = "SELECT seen_players_json, revision FROM history_state WHERE id=1;";
-        List<SeenPlayer> seen;
+        command.CommandText = "SELECT revision FROM history_state WHERE id=1;";
         using (var reader = command.ExecuteReader())
         {
             if (!reader.Read()) throw new InvalidDataException("History state is missing.");
-            seen = JsonSerializer.Deserialize<List<SeenPlayer>>(reader.GetString(0))
-                ?? throw new InvalidDataException("Seen-player cache is invalid.");
-            revision = reader.GetInt64(1);
+            revision = reader.GetInt64(0);
         }
-        var data = new HistoryData { SeenPlayers = seen };
+        var data = new HistoryData();
         var identities = new Dictionary<string, DutyRecord>();
         var pendingIds = new HashSet<string>();
         command.CommandText = "SELECT * FROM duty_runs ORDER BY rowid;";
@@ -87,7 +82,6 @@ public sealed partial class SqliteHistoryStore
         transaction.Commit();
         savedDuties = identities.ToDictionary(entry => entry.Key, entry =>
             DutyWrite.Capture(entry.Key, entry.Value, pendingIds.Contains(entry.Key)));
-        seenFingerprint = JsonSerializer.Serialize(data.SeenPlayers);
         pendingDutyId = data.PendingDuty == null ? null : data.RecordIds[data.PendingDuty];
         return data;
     }
@@ -111,7 +105,7 @@ public sealed partial class SqliteHistoryStore
         if (data.PendingDuty != null) retained.Add(data.PendingDuty);
         foreach (var removed in data.RecordIds.Keys.Where(record => !retained.Contains(record)).ToArray())
             data.RecordIds.Remove(removed);
-        return new(rows, JsonSerializer.Serialize(data.SeenPlayers));
+        return new(rows);
     }
 
     internal static HistoryWrite CapturePending(HistoryData data)
@@ -126,7 +120,7 @@ public sealed partial class SqliteHistoryStore
             }
             rows.Add(DutyWrite.Capture(id, data.PendingDuty, true));
         }
-        return new HistoryWrite(rows, string.Empty, PendingOnly: true);
+        return new HistoryWrite(rows, PendingOnly: true);
     }
 
     internal void SaveHistory(HistoryWrite snapshot, CancellationToken cancellationToken = default)
@@ -150,9 +144,7 @@ public sealed partial class SqliteHistoryStore
             desired.Add(row.Id, row);
         var deleted = savedDuties.Keys.Except(desired.Keys).ToArray();
         var changed = snapshot.Duties.Where(row => !savedDuties.TryGetValue(row.Id, out var previous) || !row.SameValues(previous)).ToArray();
-        var seenJson = snapshot.PendingOnly ? seenFingerprint : snapshot.SeenPlayersJson;
-        bool seenChanged = seenFingerprint != seenJson;
-        if (deleted.Length == 0 && changed.Length == 0 && !seenChanged) { transaction.Commit(); return; }
+        if (deleted.Length == 0 && changed.Length == 0) { transaction.Commit(); return; }
 
         foreach (string id in deleted)
         {
@@ -196,13 +188,11 @@ public sealed partial class SqliteHistoryStore
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        Execute(connection, transaction, "UPDATE history_state SET revision=revision+1,seen_players_json=$seen WHERE id=1;",
-            new() { ["seen"] = seenJson });
+        Execute(connection, transaction, "UPDATE history_state SET revision=revision+1 WHERE id=1;", new());
         cancellationToken.ThrowIfCancellationRequested();
         transaction.Commit();
         revision++;
         savedDuties = desired;
-        seenFingerprint = seenJson;
         pendingDutyId = snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id;
     }
 

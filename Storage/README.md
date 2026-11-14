@@ -7,7 +7,7 @@ updates. `SqliteHistoryStore` reads and writes the database.
 
 JSON is still the default. Existing profiles aren't switched to SQLite automatically.
 With `UseSqliteHistory` enabled, history loads from `history.sqlite` in the plugin's
-config folder. Settings stay in JSON, without Records, SeenPlayers, or PendingDuty.
+config folder. Settings stay in JSON, without Records or PendingDuty.
 
 SQLite loading fails if the database is missing, a recovery file can't be applied, or
 the first load doesn't match history still in the JSON config. There is no automatic
@@ -17,7 +17,7 @@ migration or fallback yet.
 
 - `duty_runs`: duty records, including the pending duty and its last checkpoint.
 - `duty_players`: party members for each duty, kept in their original order.
-- `history_state`: the seen-player cache and write revision.
+- `history_state`: the write revision used to detect another database writer.
 - `legacy_imports`: the original JSON backup, its checksum, and import counts.
 - `upload_queue`: unused. No uploader is implemented.
 
@@ -25,7 +25,8 @@ Schema v2 added the import archive and source-record IDs. Version 3 added
 `history_state` and `history_order`. Version 4 removes `history_order` and loads
 duties in SQLite row order. Updating a duty keeps its row ID, so deleting an early
 record doesn't make later records look changed. Version 5 converts duty timestamps
-and checkpoints to UTC round-trip strings. `PRAGMA user_version` tracks the version.
+and checkpoints to UTC round-trip strings. Version 6 removes the separate seen-player
+cache. Encounter counts come from duty records. `PRAGMA user_version` tracks the version.
 
 Timestamps use UTC round-trip strings and load as local time for display. Checkpoints
 stay in UTC; durations use .NET ticks. Older timestamps without an offset are treated
@@ -49,8 +50,8 @@ The current code requires this manual step.
 
 The session copies duty and player fields into typed rows on the calling thread,
 then writes them on one background worker. Rows are compared by value to find
-changes. JSON is used for recovery files and the seen-player cache, rather than
-as an intermediate copy of each duty during saves.
+changes. JSON is used for recovery files, rather than as an intermediate copy of
+each duty during saves.
 If another save is queued, the newer snapshot replaces it.
 Changed duties are updated in a transaction. Deleting a duty also deletes its party
 rows. A revision check catches writes from another database session.
@@ -79,8 +80,7 @@ match the database, they're removed; otherwise, their edits need review too.
 
 All history is loaded into memory. Full saves capture the whole history after
 completed runs, edits, notes, deletions, and PvP updates. In SQLite mode, the
-15-second save captures only the pending duty and leaves historical rows and the
-seen-player cache alone. The cache is saved with the next full save.
+15-second save captures only the pending duty and leaves historical rows alone.
 
 The worker keeps a full snapshot for recovery and merges pending-duty updates into
 it. A failed full save is retried in full, even if the next request only updates
@@ -88,6 +88,10 @@ the pending duty. JSON mode still saves through the configuration callback.
 
 Clearing records doesn't remove the original JSON archive in `legacy_imports`.
 That needs to be addressed before public release.
+
+Older JSON configs and recovery files may contain a `SeenPlayers` cache. That field
+is ignored; party snapshots in duty records still provide encounter history. The
+original import archive may also contain the old cache until archive removal is handled.
 
 ## SQLite check
 

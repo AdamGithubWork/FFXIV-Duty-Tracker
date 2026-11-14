@@ -19,7 +19,6 @@ namespace MentorRouletteTracker
         public bool IncludeSelfInStatistics { get; set; } = false;
 
         public List<DutyRecord> Records { get; set; } = new();
-        public List<SeenPlayer> SeenPlayers { get; set; } = new();
         public DutyRecord? PendingDuty { get; set; }
         public bool UseSqliteHistory { get; set; } = false;
 
@@ -31,7 +30,6 @@ namespace MentorRouletteTracker
         internal HistorySession History => history ?? throw new InvalidOperationException("History is not initialized.");
 
         public bool ShouldSerializeRecords() => !sqliteHistoryActive;
-        public bool ShouldSerializeSeenPlayers() => !sqliteHistoryActive;
         public bool ShouldSerializePendingDuty() => !sqliteHistoryActive;
 
         [NonSerialized]
@@ -52,24 +50,21 @@ namespace MentorRouletteTracker
                 }
                 if ((Records.Count > 0 || PendingDuty != null) &&
                     (JsonSerializer.Serialize(Records) != JsonSerializer.Serialize(session.Records) ||
-                     JsonSerializer.Serialize(PendingDuty) != JsonSerializer.Serialize(session.PendingDuty) ||
-                     JsonSerializer.Serialize(SeenPlayers) != JsonSerializer.Serialize(session.SeenPlayers)))
+                     JsonSerializer.Serialize(PendingDuty) != JsonSerializer.Serialize(session.PendingDuty)))
                     throw new InvalidDataException("The database history does not match the JSON history. Import the latest backup before switching to SQLite.");
                 history = session;
                 sqliteHistoryActive = true;
                 Records = new();
-                SeenPlayers = new();
                 PendingDuty = null;
             }
             else
             {
                 history = new HistorySession(new HistoryData
                 {
-                    Records = Records, SeenPlayers = SeenPlayers, PendingDuty = PendingDuty
+                    Records = Records, PendingDuty = PendingDuty
                 }, state =>
                 {
                     Records = state.Records;
-                    SeenPlayers = state.SeenPlayers;
                     PendingDuty = state.PendingDuty;
                     pluginInterface.SavePluginConfig(this);
                 });

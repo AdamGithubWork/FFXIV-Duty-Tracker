@@ -40,7 +40,6 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
             duties.Add(ParseDuty(pending, hash, -1, pending: true));
         int pendingCount = duties.Count - historicalCount;
         int playerCount = duties.Sum(duty => duty.Players.Count);
-        var seenJson = SqliteHistoryStore.LegacySeenJson(root);
 
         store.Initialize();
         using var connection = store.OpenExisting();
@@ -76,14 +75,9 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
                 foreach (var player in duty.Players)
                     Insert(connection, transaction, "duty_players", player);
             }
-            using var cache = connection.CreateCommand();
-            cache.Transaction = transaction;
-            cache.CommandText = "UPDATE history_state SET seen_players_json=$seen WHERE id=1;";
-            cache.Parameters.AddWithValue("$seen", seenJson);
-            cache.ExecuteNonQuery();
         }
 
-        int verified = Verify(connection, transaction, hash, bytes, duties, historicalCount, pendingCount, playerCount, seenJson);
+        int verified = Verify(connection, transaction, hash, bytes, duties, historicalCount, pendingCount, playerCount);
         transaction.Commit();
         return new(hash, historicalCount, pendingCount, playerCount, verified, alreadyImported);
     }
@@ -163,7 +157,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
     }
 
     private static int Verify(SqliteConnection connection, SqliteTransaction transaction,
-        string hash, byte[] sourceBytes, List<ImportDuty> duties, int historicalCount, int pendingCount, int playerCount, string seenJson)
+        string hash, byte[] sourceBytes, List<ImportDuty> duties, int historicalCount, int pendingCount, int playerCount)
     {
         using var archive = connection.CreateCommand();
         archive.Transaction = transaction;
@@ -183,12 +177,7 @@ public sealed class LegacyHistoryImporter(SqliteHistoryStore store)
         if ((long)count.ExecuteScalar()! != duties.Count)
             throw new InvalidDataException("The imported duty count does not match the backup.");
 
-        using var cache = connection.CreateCommand();
-        cache.Transaction = transaction;
-        cache.CommandText = "SELECT seen_players_json FROM history_state WHERE id=1;";
-        if (!Equals(cache.ExecuteScalar(), seenJson))
-            throw new InvalidDataException("The stored seen-player cache differs from the backup.");
-        int verified = 5;
+        int verified = 4;
         foreach (var duty in duties)
         {
             using var select = connection.CreateCommand();
