@@ -54,7 +54,7 @@ namespace MentorRouletteTracker
                     [2, 3, 4, 5, 6, 21, 28, 30, 37]);
             }
 
-            config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history could not be saved."));
+            config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history could not be saved."), createDatabase: savedConfig == null);
             config.TrackedContentTypeIds = config.TrackedContentTypeIds.Distinct().ToList();
             config.TimerVisibleContentTypeIds = config.TimerVisibleContentTypeIds.Distinct().ToList();
             config.Save();

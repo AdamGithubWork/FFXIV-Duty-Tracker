@@ -7,8 +7,7 @@ namespace MentorRouletteTracker.Storage;
 public sealed class HistorySession : IDisposable
 {
     private readonly HistoryData data;
-    private readonly SqliteHistoryStore? store;
-    private readonly Action<HistoryData>? legacySave;
+    private readonly SqliteHistoryStore store;
     private readonly Action<Exception>? reportError;
     private readonly object gate = new();
     private readonly CancellationTokenSource writeCancellation = new();
@@ -28,12 +27,6 @@ public sealed class HistorySession : IDisposable
     public List<DutyRecord> Records => data.Records;
     public DutyRecord? PendingDuty { get => data.PendingDuty; set => data.PendingDuty = value; }
 
-    public HistorySession(HistoryData data, Action<HistoryData> legacySave)
-    {
-        this.data = data;
-        this.legacySave = legacySave;
-    }
-
     public HistorySession(SqliteHistoryStore store, Action<Exception>? reportError = null)
     {
         this.store = store;
@@ -49,7 +42,7 @@ public sealed class HistorySession : IDisposable
     private void RecoverHistory(string[] paths)
     {
         var recoveries = paths.Select(ReadRecovery).OrderBy(recovery => recovery.Revision).ToList();
-        foreach (var group in recoveries.Where(recovery => recovery.Revision >= store!.Revision)
+        foreach (var group in recoveries.Where(recovery => recovery.Revision >= store.Revision)
                      .GroupBy(recovery => recovery.Revision))
         {
             if (group.Select(recovery => JsonSerializer.Serialize(SqliteHistoryStore.Capture(recovery.Data)))
@@ -63,9 +56,9 @@ public sealed class HistorySession : IDisposable
             {
                 if (JsonSerializer.Serialize(recovery.Data) != JsonSerializer.Serialize(data))
                     throw new InvalidDataException($"Recovery file {recovery.Path} has no database revision. Its edits need review.");
-                store!.SaveHistory(SqliteHistoryStore.Capture(data));
+                store.SaveHistory(SqliteHistoryStore.Capture(data));
             }
-            else if (recovery.Revision < store!.Revision)
+            else if (recovery.Revision < store.Revision)
             {
                 // Keep older edits available for review without replacing newer history.
                 var archivedPath = recovery.Path + ".stale";
@@ -82,7 +75,7 @@ public sealed class HistorySession : IDisposable
             }
             else
             {
-                if (recovery.Revision != store!.Revision)
+                if (recovery.Revision != store.Revision)
                     throw new InvalidDataException($"Recovery file {recovery.Path} belongs to a newer database revision.");
 
                 store.SaveHistory(SqliteHistoryStore.Capture(recovery.Data));
@@ -133,7 +126,6 @@ public sealed class HistorySession : IDisposable
     {
         lock (gate)
             ObjectDisposedException.ThrowIf(disposed, this);
-        if (legacySave != null) { legacySave(data); return; }
         var snapshot = SqliteHistoryStore.Capture(data);
         lock (gate)
         {
@@ -153,11 +145,6 @@ public sealed class HistorySession : IDisposable
     {
         lock (gate)
             ObjectDisposedException.ThrowIf(disposed, this);
-        if (legacySave != null)
-        {
-            Save();
-            return;
-        }
         var snapshot = SqliteHistoryStore.CapturePending(data);
         lock (gate)
         {
@@ -204,7 +191,7 @@ public sealed class HistorySession : IDisposable
             snapshot = full != null || retryFullSave ? recoverySnapshot! : active!;
             try
             {
-                store!.SaveHistory(snapshot, writeCancellation.Token);
+                store.SaveHistory(snapshot, writeCancellation.Token);
                 lock (gate)
                 {
                     if (shutdownTimedOut)
@@ -270,7 +257,7 @@ public sealed class HistorySession : IDisposable
         {
             writer.WriteStartObject();
             if (includeRevision)
-                writer.WriteNumber("BaseRevision", store!.Revision);
+                writer.WriteNumber("BaseRevision", store.Revision);
             writer.WritePropertyName("DutyIds");
             JsonSerializer.Serialize(writer, snapshot.Duties.Where(row => !row.Pending).Select(row => row.Id));
             writer.WriteString("PendingDutyId", snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id);
@@ -300,7 +287,6 @@ public sealed class HistorySession : IDisposable
     private void Flush(TimeSpan timeout)
     {
         Save();
-        if (legacySave != null) return;
         var elapsed = Stopwatch.StartNew();
         while (true)
         {

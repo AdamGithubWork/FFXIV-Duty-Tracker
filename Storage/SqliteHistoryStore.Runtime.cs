@@ -196,7 +196,7 @@ public sealed partial class SqliteHistoryStore
         pendingDutyId = snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id;
     }
 
-    internal SqliteConnection OpenExisting()
+    private SqliteConnection OpenExisting()
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {

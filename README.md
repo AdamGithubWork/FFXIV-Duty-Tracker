@@ -81,10 +81,9 @@ Alliance Raids have their own categories.
 
 ## Saved data
 
-Settings are saved in the plugin's JSON config. History uses JSON or SQLite,
-depending on the profile's storage setting. SQLite profiles use `history.sqlite`
-in the plugin's config folder. Existing JSON profiles aren't migrated automatically
-yet. See [Storage](Storage/README.md) for details.
+Settings are saved in the plugin's JSON config. Duty history is saved in
+`history.sqlite` in the plugin's config folder. New installs create the database
+automatically. See [Storage](Storage/README.md) for backup and storage details.
 
 There are no uploads.
 

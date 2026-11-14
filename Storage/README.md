@@ -1,102 +1,70 @@
 # History storage
 
-`HistorySession` holds the history used by the tracker, UI, CSV export, and PvP
-updates. `SqliteHistoryStore` reads and writes the database.
+Duty history lives in `history.sqlite` in the plugin's config folder. Settings stay
+in the JSON config. New installs create SQLite history automatically.
 
-## Storage modes
+`HistorySession` owns the in-memory records used by the tracker, windows, exports,
+and PvP updates. `SqliteHistoryStore` loads and saves them. There is one storage
+backend; JSON is used for settings and recovery files.
 
-JSON is still the default. Existing profiles aren't switched to SQLite automatically.
-With `UseSqliteHistory` enabled, history loads from `history.sqlite` in the plugin's
-config folder. Settings stay in JSON, without Records or PendingDuty.
+## Schema
 
-SQLite loading fails if the database is missing, a recovery file can't be applied, or
-the first load doesn't match history still in the JSON config. There is no automatic
-migration or fallback yet.
+New databases create schema 8 directly:
 
-## Tables
-
-- `duty_runs`: duty records, including the pending duty and its last checkpoint.
-- `duty_players`: party members for each duty, kept in their original order.
+- `duty_runs`: duty records, including the pending duty and its checkpoint.
+- `duty_players`: party snapshots in their recorded order.
 - `history_state`: the write revision used to detect another database writer.
-- `legacy_imports`: the original JSON backup, its checksum, and import counts.
 
-Schema v2 added the import archive and source-record IDs. Version 3 added
-`history_state` and `history_order`. Version 4 removes `history_order` and loads
-duties in SQLite row order. Updating a duty keeps its row ID, so deleting an early
-record doesn't make later records look changed. Version 5 converts duty timestamps
-and checkpoints to UTC round-trip strings. Version 6 removes the separate seen-player
-cache. Encounter counts come from duty records. Version 7 removes the unused upload
-queue and its indexes. Uploads are postponed until after public release.
-`PRAGMA user_version` tracks the version.
+Duty IDs stay stable. Updating a duty keeps its row ID, and deleting a duty removes
+its party rows. Timestamps are stored in UTC and loaded as local time for display.
+Checkpoints stay in UTC. Durations use .NET ticks, and unknown scoreboard deaths
+stay null rather than becoming zero.
 
-Timestamps use UTC round-trip strings and load as local time for display. Checkpoints
-stay in UTC; durations use .NET ticks. Older timestamps without an offset are treated
-as local time. Missing scoreboard death counts are stored as null, separate from zero.
+## Development database transition
 
-## Importing JSON
+There is one transition for the owner's existing schema-6 or schema-7 database.
+Before changing it, the plugin writes a complete SQLite backup to the `backups`
+subfolder. If that backup fails, the transition stops.
 
-The offline importer takes a backup and its expected SHA-256 checksum. Duty IDs
-include the backup's checksum and record position, so identical-looking runs stay
-separate. It checks the imported values before committing the transaction.
+The transition removes the embedded JSON archive, import-origin columns, and any
+unused upload queue. It keeps duty/player values, IDs, row order, and the write
+revision. The backup retains the original database, including the old JSON archive.
+Older development schemas and JSON history imports aren't supported by this build.
+Once the owner's database is verified on schema 8, this transition can be retired.
 
-Importing the same backup again checks the existing rows without adding duplicates.
-A different backup, missing imported rows, or edited imported values cause the
-import to fail. The original JSON bytes are also stored, including settings and
-fields the importer doesn't use.
+Backups are separate files. Clearing records leaves those backup files in place.
 
-Before switching a JSON profile to SQLite, import a current backup and check it.
-The current code requires this manual step.
+## Loading and settings
 
-## Saving
+An existing profile requires its history database. A missing database causes an
+error instead of creating empty replacement history. Only a new profile can create
+a new database automatically.
 
-The session copies duty and player fields into typed rows on the calling thread,
-then writes them on one background worker. Rows are compared by value to find
-changes. JSON is used for recovery files, rather than as an intermediate copy of
-each duty during saves.
-If another save is queued, the newer snapshot replaces it.
-Changed duties are updated in a transaction. Deleting a duty also deletes its party
-rows. A revision check catches writes from another database session.
+Settings saves write only the JSON settings. Duty edits and tracking events save
+through the history session.
 
-SQLite connections enable foreign keys and use `synchronous=FULL`. History loads
-directly during initialization.
+## Saving and recovery
 
-Shutdown waits up to five seconds for queued SQLite saves. If the wait expires,
-the session writes a full recovery copy and cancels further database work. A write
-already in progress finishes or rolls back before the worker records its final
-revision in that recovery file. Until then, changed recovery contents need review.
-The five seconds limits the wait for the worker; writing the recovery copy also
-takes disk time. JSON mode still uses its synchronous configuration save.
+The session copies duty/player fields into typed rows, then writes them on one
+background worker. Rows are compared by value. Full saves follow completed runs,
+edits, notes, deletions, and PvP updates. The 15-second save copies only the pending
+duty. Queued pending updates are merged into the worker's full recovery snapshot.
 
-If a database save fails, the session logs the
-error and writes a recovery JSON file with the duty IDs and database revision.
-A successful retry removes that file. On startup, a recovery from the current
-database revision is saved back to SQLite before its file is removed.
+Writes use transactions, foreign keys, and `synchronous=FULL`. A revision check
+catches writes from another database session. History loads directly during startup.
 
-Older recoveries are kept as `.json.stale` files and reported in the log. Conflicting
-recoveries, invalid files, or files from a newer database revision need review.
-Recovery files from older plugin versions have no revision or IDs. If their contents
-match the database, they're removed; otherwise, their edits need review too.
+Shutdown waits up to five seconds for queued saves. If that wait expires, the
+session writes a full recovery copy and cancels further database work. An in-flight
+transaction finishes or rolls back before the worker records its final revision
+in that copy. Writing recovery data also takes disk time.
 
-## Current limits
-
-All history is loaded into memory. Full saves capture the whole history after
-completed runs, edits, notes, deletions, and PvP updates. In SQLite mode, the
-15-second save captures only the pending duty and leaves historical rows alone.
-
-The worker keeps a full snapshot for recovery and merges pending-duty updates into
-it. A failed full save is retried in full, even if the next request only updates
-the pending duty. JSON mode still saves through the configuration callback.
-
-Clearing records doesn't remove the original JSON archive in `legacy_imports`.
-That needs to be addressed before public release.
-
-Older JSON configs and recovery files may contain a `SeenPlayers` cache. That field
-is ignored; party snapshots in duty records still provide encounter history. The
-original import archive may also contain the old cache until archive removal is handled.
+Failed saves are logged and leave a recovery JSON file. A recovery from the current
+database revision is applied at startup and removed after a successful save. Older
+copies are kept as `.json.stale` files. Conflicting or unreadable recoveries need
+review. A copy without a revision is removed if it matches the database; changed
+contents need review until its revision is known.
 
 ## SQLite check
 
-Run `/dt storagecheck` in game. It checks loading, saving, editing, and deleting
-using a temporary database, then removes the temporary files. It doesn't use your
-history database or change storage modes. Look for `Duty Tracker: SQLite check passed.`
-in Dalamud's log.
+`/dt storagecheck` checks SQLite with a temporary database. It doesn't open your
+history database. Look for `Duty Tracker: SQLite check passed.` in Dalamud's log.

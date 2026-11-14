@@ -1,229 +1,159 @@
 using Microsoft.Data.Sqlite;
-using System.Globalization;
 
-namespace MentorRouletteTracker.Storage;
-
-public sealed partial class SqliteHistoryStore
+namespace MentorRouletteTracker.Storage
 {
-    public const int CurrentSchemaVersion = 7;
-    private const int ApplicationId = 0x44555459; // DUTY
-
-    public string DatabasePath { get; }
-
-    public SqliteHistoryStore(string databasePath)
+    public sealed partial class SqliteHistoryStore
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        DatabasePath = Path.GetFullPath(databasePath);
-        var extension = Path.GetExtension(DatabasePath).ToLowerInvariant();
-        if (extension is not (".db" or ".sqlite" or ".sqlite3"))
-            throw new ArgumentException("Choose a database file, not an existing configuration or export.", nameof(databasePath));
-    }
+        public const int CurrentSchemaVersion = 8;
+        private const int ApplicationId = 0x44555459;
 
-    public void Initialize()
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        public string DatabasePath { get; }
+
+        public SqliteHistoryStore(string databasePath)
         {
-            DataSource = DatabasePath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            ForeignKeys = true,
-            Pooling = false,
-            DefaultTimeout = 5
-        }.ToString());
-        connection.Open();
-        ConfigureConnection(connection);
-
-        using (var transaction = connection.BeginTransaction())
-        {
-            var applicationId = ReadInteger(connection, transaction, "PRAGMA application_id;");
-            var version = ReadInteger(connection, transaction, "PRAGMA user_version;");
-            if (applicationId == ApplicationId && version is >= 1 and <= CurrentSchemaVersion)
-            {
-                var tableCount = ReadInteger(connection, transaction, """
-                    SELECT COUNT(*) FROM sqlite_master
-                    WHERE type = 'table' AND name IN ('duty_runs', 'duty_players');
-                    """);
-                if (tableCount != 2)
-                    throw new InvalidDataException("History database tables are missing. Restore a backup before proceeding.");
-            }
-            else
-            {
-                var existingTables = ReadInteger(connection, transaction, """
-                    SELECT COUNT(*) FROM sqlite_master
-                    WHERE type = 'table' AND name NOT LIKE 'sqlite_%';
-                    """);
-                if (applicationId != 0 || version != 0 || existingTables != 0)
-                    throw new InvalidDataException("The history database or its schema version is not supported.");
-
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = InitialSchema;
-                command.ExecuteNonQuery();
-                command.CommandText = $"PRAGMA application_id = {ApplicationId}; PRAGMA user_version = 1;";
-                command.ExecuteNonQuery();
-                version = 1;
-            }
-
-            if (version == 1)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = ImportSchema;
-                migration.ExecuteNonQuery();
-                migration.CommandText = "PRAGMA user_version = 2;";
-                migration.ExecuteNonQuery();
-                version = 2;
-            }
-
-            if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='legacy_imports';") != 1)
-                throw new InvalidDataException("The JSON import archive table is missing.");
-
-            if (version == 2)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = """
-                    ALTER TABLE duty_runs ADD COLUMN history_order INTEGER NOT NULL DEFAULT 0;
-                    UPDATE duty_runs SET history_order = COALESCE(legacy_record_index, rowid);
-                    CREATE TABLE history_state (
-                        id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
-                        revision INTEGER NOT NULL DEFAULT 0,
-                        seen_players_json TEXT NOT NULL DEFAULT '[]'
-                    ) STRICT;
-                    INSERT INTO history_state(id) VALUES (1);
-                    """;
-                migration.ExecuteNonQuery();
-                migration.CommandText = "PRAGMA user_version = 3;";
-                migration.ExecuteNonQuery();
-                version = 3;
-            }
-            if (version == 3)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = "ALTER TABLE duty_runs DROP COLUMN history_order; PRAGMA user_version = 4;";
-                migration.ExecuteNonQuery();
-                version = 4;
-            }
-            if (version == 4)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = "SELECT id, timestamp, checkpoint_utc FROM duty_runs;";
-                var timestamps = new List<(string Id, string Timestamp, string? Checkpoint)>();
-                using (var reader = migration.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        timestamps.Add((reader.GetString(0), UtcTimestamp(reader.GetString(1)),
-                            reader.IsDBNull(2) ? null : UtcTimestamp(reader.GetString(2))));
-                    }
-                }
-                migration.CommandText = "UPDATE duty_runs SET timestamp=$timestamp, checkpoint_utc=$checkpoint WHERE id=$id;";
-                foreach (var timestamp in timestamps)
-                {
-                    migration.Parameters.Clear();
-                    migration.Parameters.AddWithValue("$id", timestamp.Id);
-                    migration.Parameters.AddWithValue("$timestamp", timestamp.Timestamp);
-                    migration.Parameters.AddWithValue("$checkpoint", (object?)timestamp.Checkpoint ?? DBNull.Value);
-                    migration.ExecuteNonQuery();
-                }
-                migration.Parameters.Clear();
-                migration.CommandText = "PRAGMA user_version = 5;";
-                migration.ExecuteNonQuery();
-                version = 5;
-            }
-            if (version == 5)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = "ALTER TABLE history_state DROP COLUMN seen_players_json; PRAGMA user_version = 6;";
-                migration.ExecuteNonQuery();
-                version = 6;
-            }
-            if (version == 6)
-            {
-                using var migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = "DROP TABLE IF EXISTS upload_queue; PRAGMA user_version = 7;";
-                migration.ExecuteNonQuery();
-            }
-            if (ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)
-                throw new InvalidDataException("The database history state is missing.");
-            transaction.Commit();
+            ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+            DatabasePath = Path.GetFullPath(databasePath);
         }
 
-        using var settings = connection.CreateCommand();
-        settings.CommandText = "PRAGMA journal_mode = WAL;";
-        settings.ExecuteNonQuery();
+        public void Initialize()
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
+            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = DatabasePath,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                ForeignKeys = true,
+                Pooling = false,
+                DefaultTimeout = 5
+            }.ToString());
+            connection.Open();
+            ConfigureConnection(connection);
+
+            var applicationId = ReadInteger(connection, null, "PRAGMA application_id;");
+            var version = ReadInteger(connection, null, "PRAGMA user_version;");
+            if (applicationId == ApplicationId && version is 6 or 7)
+                BackupBeforeUpgrade(connection);
+
+            using (var transaction = connection.BeginTransaction())
+            {
+                applicationId = ReadInteger(connection, transaction, "PRAGMA application_id;");
+                version = ReadInteger(connection, transaction, "PRAGMA user_version;");
+                if (applicationId == 0 && version == 0 &&
+                    ReadInteger(connection, transaction, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';") == 0)
+                {
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = Schema;
+                    command.ExecuteNonQuery();
+                    command.CommandText = $"PRAGMA application_id = {ApplicationId}; PRAGMA user_version = {CurrentSchemaVersion};";
+                    command.ExecuteNonQuery();
+                }
+                else
+                {
+                    if (applicationId != ApplicationId || version is not (6 or 7 or CurrentSchemaVersion))
+                        throw new InvalidDataException("The history database version is not supported.");
+
+                    if (version is 6 or 7)
+                    {
+                        using var migration = connection.CreateCommand();
+                        migration.Transaction = transaction;
+                        migration.CommandText = """
+                            DROP INDEX idx_legacy_record;
+                            ALTER TABLE duty_runs DROP COLUMN legacy_import_id;
+                            ALTER TABLE duty_runs DROP COLUMN legacy_record_index;
+                            DROP TABLE legacy_imports;
+                            DROP TABLE IF EXISTS upload_queue;
+                            PRAGMA user_version = 8;
+                            """;
+                        migration.ExecuteNonQuery();
+                    }
+                }
+
+                var tableCount = ReadInteger(connection, transaction, """
+                    SELECT COUNT(*) FROM sqlite_master
+                    WHERE type='table' AND name IN ('duty_runs','duty_players','history_state');
+                    """);
+                if (tableCount != 3 || ReadInteger(connection, transaction, "SELECT COUNT(*) FROM history_state WHERE id=1;") != 1)
+                    throw new InvalidDataException("History database tables or state are missing.");
+                transaction.Commit();
+            }
+
+            using var settings = connection.CreateCommand();
+            settings.CommandText = "PRAGMA journal_mode = WAL;";
+            settings.ExecuteNonQuery();
+        }
+
+        private void BackupBeforeUpgrade(SqliteConnection connection)
+        {
+            var directory = Path.Combine(Path.GetDirectoryName(DatabasePath)!, "backups");
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, $"history-before-v8-{DateTime.UtcNow:yyyyMMddTHHmmssfffffffZ}-{Guid.NewGuid():N}.sqlite");
+            using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                ForeignKeys = true,
+                Pooling = false,
+                DefaultTimeout = 5
+            }.ToString());
+            backup.Open();
+            ConfigureConnection(backup);
+            connection.BackupDatabase(backup);
+        }
+
+        private static int ReadInteger(SqliteConnection connection, SqliteTransaction? transaction, string sql)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            return Convert.ToInt32(command.ExecuteScalar());
+        }
+
+        private const string Schema = """
+            CREATE TABLE duty_runs (
+                id TEXT NOT NULL PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                duty_name TEXT NOT NULL,
+                duty_type TEXT NOT NULL DEFAULT '',
+                joined_in_progress INTEGER NOT NULL DEFAULT 0 CHECK (joined_in_progress IN (0, 1)),
+                wipe_count INTEGER NOT NULL DEFAULT 0,
+                lalafell_count INTEGER NOT NULL DEFAULT 0,
+                completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+                player_job TEXT NOT NULL DEFAULT '',
+                recorder_name TEXT NOT NULL DEFAULT '',
+                recorder_world TEXT NOT NULL DEFAULT '',
+                duration_ticks INTEGER NOT NULL DEFAULT 0,
+                note TEXT NOT NULL DEFAULT '',
+                legacy_pvp_deaths INTEGER,
+                is_pending INTEGER NOT NULL DEFAULT 0 CHECK (is_pending IN (0, 1)),
+                checkpoint_utc TEXT,
+                CHECK (is_pending = 0 OR completed = 0)
+            ) STRICT;
+
+            CREATE TABLE duty_players (
+                duty_id TEXT NOT NULL REFERENCES duty_runs(id) ON DELETE CASCADE,
+                party_index INTEGER NOT NULL CHECK (party_index >= 0),
+                name TEXT NOT NULL,
+                world TEXT NOT NULL DEFAULT '',
+                job TEXT NOT NULL DEFAULT '',
+                race TEXT NOT NULL DEFAULT '',
+                gender TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                death_count INTEGER NOT NULL DEFAULT 0,
+                pvp_scoreboard_deaths INTEGER,
+                PRIMARY KEY (duty_id, party_index)
+            ) STRICT;
+
+            CREATE TABLE history_state (
+                id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+                revision INTEGER NOT NULL DEFAULT 0
+            ) STRICT;
+            INSERT INTO history_state(id) VALUES(1);
+
+            CREATE INDEX idx_duty_runs_timestamp ON duty_runs(timestamp);
+            CREATE INDEX idx_duty_runs_type_completed ON duty_runs(duty_type, completed);
+            CREATE UNIQUE INDEX idx_single_pending_duty ON duty_runs(is_pending) WHERE is_pending = 1;
+            CREATE INDEX idx_duty_players_identity ON duty_players(name, world);
+            """;
     }
-
-    internal static string UtcTimestamp(string value) =>
-        DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
-            .ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-    private static int ReadInteger(SqliteConnection connection, SqliteTransaction transaction, string sql)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = sql;
-        return Convert.ToInt32(command.ExecuteScalar());
-    }
-
-    private const string InitialSchema = """
-        CREATE TABLE duty_runs (
-            id TEXT NOT NULL PRIMARY KEY,
-            timestamp TEXT NOT NULL,
-            duty_name TEXT NOT NULL,
-            duty_type TEXT NOT NULL DEFAULT '',
-            joined_in_progress INTEGER NOT NULL DEFAULT 0 CHECK (joined_in_progress IN (0, 1)),
-            wipe_count INTEGER NOT NULL DEFAULT 0,
-            lalafell_count INTEGER NOT NULL DEFAULT 0,
-            completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
-            player_job TEXT NOT NULL DEFAULT '',
-            recorder_name TEXT NOT NULL DEFAULT '',
-            recorder_world TEXT NOT NULL DEFAULT '',
-            duration_ticks INTEGER NOT NULL DEFAULT 0,
-            note TEXT NOT NULL DEFAULT '',
-            legacy_pvp_deaths INTEGER,
-            is_pending INTEGER NOT NULL DEFAULT 0 CHECK (is_pending IN (0, 1)),
-            checkpoint_utc TEXT,
-            CHECK (is_pending = 0 OR completed = 0)
-        ) STRICT;
-
-        CREATE TABLE duty_players (
-            duty_id TEXT NOT NULL REFERENCES duty_runs(id) ON DELETE CASCADE,
-            party_index INTEGER NOT NULL CHECK (party_index >= 0),
-            name TEXT NOT NULL,
-            world TEXT NOT NULL DEFAULT '',
-            job TEXT NOT NULL DEFAULT '',
-            race TEXT NOT NULL DEFAULT '',
-            gender TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT '',
-            death_count INTEGER NOT NULL DEFAULT 0,
-            pvp_scoreboard_deaths INTEGER,
-            PRIMARY KEY (duty_id, party_index)
-        ) STRICT;
-
-        CREATE INDEX idx_duty_runs_timestamp ON duty_runs(timestamp);
-        CREATE INDEX idx_duty_runs_type_completed ON duty_runs(duty_type, completed);
-        CREATE UNIQUE INDEX idx_single_pending_duty ON duty_runs(is_pending) WHERE is_pending = 1;
-        CREATE INDEX idx_duty_players_identity ON duty_players(name, world);
-        """;
-
-    private const string ImportSchema = """
-        CREATE TABLE legacy_imports (
-            source_sha256 TEXT NOT NULL PRIMARY KEY,
-            source_bytes BLOB NOT NULL,
-            imported_at_utc TEXT NOT NULL,
-            historical_duties INTEGER NOT NULL,
-            pending_duties INTEGER NOT NULL,
-            player_snapshots INTEGER NOT NULL
-        ) STRICT;
-
-        ALTER TABLE duty_runs ADD COLUMN legacy_import_id TEXT REFERENCES legacy_imports(source_sha256);
-        ALTER TABLE duty_runs ADD COLUMN legacy_record_index INTEGER;
-        CREATE UNIQUE INDEX idx_legacy_record ON duty_runs(legacy_import_id, legacy_record_index)
-            WHERE legacy_import_id IS NOT NULL;
-        """;
 }
