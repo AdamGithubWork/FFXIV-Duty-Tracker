@@ -89,9 +89,12 @@ namespace MentorRouletteTracker
                 ImGui.TableSetupColumn("Value");
 
                 DrawStatisticRow("Completed Duties", records.Count.ToString());
-                DrawStatisticRow("Average Duty Length",
-                    FormatDuration(TimeSpan.FromSeconds(
-                        records.Average(x => x.TimeInDuty.TotalSeconds))));
+                var fullRuns = records.Where(record => !record.JoinedInProgress).ToList();
+                DrawStatisticRow("Average Duty Length (full runs)",
+                    fullRuns.Count == 0
+                        ? "N/A"
+                        : FormatDuration(TimeSpan.FromSeconds(
+                            fullRuns.Average(record => record.TimeInDuty.TotalSeconds))));
                 DrawStatisticRow("Average Wipes / Duty",
                     records.Average(x => x.WipeCount).ToString("F2"));
                 DrawStatisticRow("Joined In Progress",

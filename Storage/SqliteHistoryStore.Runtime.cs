@@ -42,6 +42,9 @@ public sealed partial class SqliteHistoryStore
                 var record = new DutyRecord
                 {
                     Timestamp = DateTime.Parse((string)reader["timestamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                    CheckpointUtc = reader["checkpoint_utc"] is DBNull
+                        ? null
+                        : DateTime.Parse((string)reader["checkpoint_utc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                     DutyName = (string)reader["duty_name"], DutyType = (string)reader["duty_type"],
                     JoinedInProgress = (long)reader["joined_in_progress"] != 0,
                     WipeCount = checked((int)(long)reader["wipe_count"]), LalafellCount = checked((int)(long)reader["lalafell_count"]),
@@ -130,13 +133,14 @@ public sealed partial class SqliteHistoryStore
             var fields = new Dictionary<string, object?>
             {
                 ["id"] = row.Id, ["timestamp"] = record.Timestamp.ToString("O", CultureInfo.InvariantCulture),
-                ["duty_name"] = record.DutyName, ["duty_type"] = record.DutyType,
+                ["duty_name"] = record.DutyName ?? string.Empty, ["duty_type"] = record.DutyType ?? string.Empty,
                 ["joined_in_progress"] = record.JoinedInProgress ? 1 : 0, ["wipe_count"] = record.WipeCount,
                 ["lalafell_count"] = record.LalafellCount, ["completed"] = record.Completed ? 1 : 0,
-                ["player_job"] = record.PlayerJob, ["recorder_name"] = record.RecorderName,
-                ["recorder_world"] = record.RecorderWorld, ["duration_ticks"] = record.TimeInDuty.Ticks,
-                ["note"] = record.Note, ["legacy_pvp_deaths"] = record.PvPDeaths,
-                ["is_pending"] = row.Pending ? 1 : 0, ["history_order"] = row.Order
+                ["player_job"] = record.PlayerJob ?? string.Empty, ["recorder_name"] = record.RecorderName ?? string.Empty,
+                ["recorder_world"] = record.RecorderWorld ?? string.Empty, ["duration_ticks"] = record.TimeInDuty.Ticks,
+                ["note"] = record.Note ?? string.Empty, ["legacy_pvp_deaths"] = record.PvPDeaths,
+                ["is_pending"] = row.Pending ? 1 : 0, ["history_order"] = row.Order,
+                ["checkpoint_utc"] = record.CheckpointUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
             };
             var columns = fields.Keys.ToArray();
             Execute(connection, transaction,
@@ -151,9 +155,9 @@ public sealed partial class SqliteHistoryStore
                     VALUES ($duty,$idx,$name,$world,$job,$race,$gender,$status,$deaths,$scoreboard);
                     """, new()
                 {
-                    ["duty"] = row.Id, ["idx"] = index, ["name"] = player.Name, ["world"] = player.World,
-                    ["job"] = player.Job, ["race"] = player.Race, ["gender"] = player.Gender,
-                    ["status"] = player.Status, ["deaths"] = player.DeathCount, ["scoreboard"] = player.PvPScoreboardDeaths
+                    ["duty"] = row.Id, ["idx"] = index, ["name"] = player.Name ?? string.Empty, ["world"] = player.World ?? string.Empty,
+                    ["job"] = player.Job ?? string.Empty, ["race"] = player.Race ?? string.Empty, ["gender"] = player.Gender ?? string.Empty,
+                    ["status"] = player.Status ?? string.Empty, ["deaths"] = player.DeathCount, ["scoreboard"] = player.PvPScoreboardDeaths
                 });
             }
         }

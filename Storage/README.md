@@ -15,8 +15,7 @@ migration or fallback yet.
 
 ## Tables
 
-- `duty_runs`: duty records, including the pending duty and a checkpoint column.
-  The tracker doesn't write checkpoints yet.
+- `duty_runs`: duty records, including the pending duty and its last checkpoint.
 - `duty_players`: party members for each duty, kept in their original order.
 - `history_state`: the seen-player cache and write revision.
 - `legacy_imports`: the original JSON backup, its checksum, and import counts.

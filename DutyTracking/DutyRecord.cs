@@ -3,6 +3,7 @@ namespace MentorRouletteTracker.DutyTracking
     public class DutyRecord
     {
         public DateTime Timestamp { get; set; } = DateTime.Now;
+        public DateTime? CheckpointUtc { get; set; }
         public string DutyName { get; set; } = string.Empty;
         public string DutyType { get; set; } = string.Empty;
         public bool JoinedInProgress { get; set; }

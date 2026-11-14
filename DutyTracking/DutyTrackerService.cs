@@ -24,6 +24,7 @@ namespace MentorRouletteTracker.DutyTracking
         private DateTime nextPartyRefresh = DateTime.MinValue;
         private DateTime nextHistorySave = DateTime.MinValue;
         private DutyRecord? current;
+        private bool pendingRestoreNeeded;
         public DutyRecord? ActiveDuty => current;
         public uint? ActiveContentTypeId { get; private set; }
         private readonly HashSet<string> countedPlayersForCurrentRun = new();
@@ -56,11 +57,19 @@ namespace MentorRouletteTracker.DutyTracking
             this.dutyState.DutyWiped += OnDutyWiped;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
+            pendingRestoreNeeded = config.History.PendingDuty != null;
             RestorePendingDuty();
         }
 
         private void OnTerritoryChanged(uint territoryId)
         {
+            if (pendingRestoreNeeded)
+            {
+                RestorePendingDuty();
+                if (pendingRestoreNeeded)
+                    return;
+            }
+
             var cfc = FindContentFinderCondition(territoryId);
 
             if (current != null)
@@ -97,6 +106,16 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void OnFrameworkUpdate(IFramework fw)
         {
+            if (pendingRestoreNeeded)
+            {
+                RestorePendingDuty();
+                if (pendingRestoreNeeded)
+                    return;
+
+                if (current == null)
+                    OnTerritoryChanged(clientState.TerritoryType);
+            }
+
             if (current == null)
                 return;
 
@@ -123,21 +142,45 @@ namespace MentorRouletteTracker.DutyTracking
             if (now >= nextHistorySave)
             {
                 nextHistorySave = now + HistorySaveInterval;
+                current.CheckpointUtc = now;
                 config.History.Save();
             }
         }
         private void RestorePendingDuty()
         {
-            if (config.History.PendingDuty == null)
+            if (!pendingRestoreNeeded)
                 return;
 
+            // Login and loading screens can report a temporary territory.
+            if (!clientState.IsLoggedIn || objectTable.LocalPlayer == null ||
+                clientState.TerritoryType == 0 ||
+                condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
+                return;
+
+            pendingRestoreNeeded = false;
             current = config.History.PendingDuty;
+            if (current == null)
+                return;
 
             var cfc = FindContentFinderCondition(clientState.TerritoryType);
-            if (cfc != null &&
+            if (condition[ConditionFlag.BoundByDuty] && cfc != null &&
                 current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
             {
                 ActiveContentTypeId = cfc.Value.ContentType.RowId;
+            }
+            else
+            {
+                var checkpoint = current.CheckpointUtc;
+                if (checkpoint == null)
+                {
+                    // Older records have no checkpoint, so use their last saved duration.
+                    checkpoint = current.Timestamp.ToUniversalTime() + current.TimeInDuty;
+                    log.Warning($"Pending duty {current.DutyName} has no checkpoint. Using its saved duration.");
+                }
+
+                log.Information($"Recovered incomplete duty: {current.DutyName}");
+                FinalizeCurrent(completed: false, endedAtUtc: checkpoint);
+                return;
             }
 
             foreach (var player in current.Party)
@@ -169,7 +212,8 @@ namespace MentorRouletteTracker.DutyTracking
                 DutyType = dutyType,
                 RecorderName = localPlayer?.Name.TextValue ?? string.Empty,
                 RecorderWorld = localPlayer?.HomeWorld.Value.Name.ExtractText() ?? string.Empty,
-                JoinedInProgress = true
+                JoinedInProgress = true,
+                CheckpointUtc = DateTime.UtcNow
             };
 
             countedPlayersForCurrentRun.Clear();
@@ -179,13 +223,15 @@ namespace MentorRouletteTracker.DutyTracking
             config.History.Save();
         }
 
-        private void FinalizeCurrent(bool completed)
+        private void FinalizeCurrent(bool completed, DateTime? endedAtUtc = null)
         {
             if (current == null)
                 return;
 
             current.Completed = completed;
-            current.TimeInDuty = DateTime.Now - current.Timestamp;
+            var end = (endedAtUtc ?? DateTime.UtcNow).ToUniversalTime();
+            var duration = end - current.Timestamp.ToUniversalTime();
+            current.TimeInDuty = duration < TimeSpan.Zero ? TimeSpan.Zero : duration;
 
             config.History.Records.Add(current);
             config.History.PendingDuty = null;

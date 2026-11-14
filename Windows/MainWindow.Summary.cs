@@ -161,11 +161,13 @@ namespace MentorRouletteTracker
 
             string Duty(DutyRecord r) => $"{r.DutyName} — {r.Timestamp:yyyy-MM-dd HH:mm}";
             string Player(MilestoneEncounter e) => $"{e.Player.Name}@{e.Player.World}";
-            string Status(PartyMemberSnapshot p, string value) =>
-                string.Equals(p.Status, value, StringComparison.OrdinalIgnoreCase) ? value : "";
+            bool MatchesStatus(PartyMemberSnapshot player, string status) =>
+                status == "Mentor"
+                    ? player.Status?.EndsWith("Mentor", StringComparison.OrdinalIgnoreCase) == true
+                    : string.Equals(player.Status, status, StringComparison.OrdinalIgnoreCase);
 
             int CountStatus(DutyRecord r, string value) => byRecord[r].Count(e =>
-                Status(e.Player, value) == value);
+                MatchesStatus(e.Player, value));
 
             int CountLalafell(DutyRecord r) => byRecord[r].Count(e =>
                 e.Player.Race == "Lalafell");
@@ -406,8 +408,7 @@ namespace MentorRouletteTracker
 
             int DayStatus(DateTime day, string status) =>
                 DayPlayers(day).Count(e =>
-                    string.Equals(e.Player.Status, status,
-                        StringComparison.OrdinalIgnoreCase));
+                    MatchesStatus(e.Player, status));
 
             int DayUniquePlayers(DateTime day) =>
                 DayPlayers(day).Select(e => (e.Player.Name, e.Player.World)).Distinct().Count();
