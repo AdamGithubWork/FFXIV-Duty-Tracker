@@ -143,7 +143,7 @@ namespace MentorRouletteTracker.DutyTracking
             {
                 nextHistorySave = now + HistorySaveInterval;
                 current.CheckpointUtc = now;
-                config.History.Save();
+                config.History.SavePending();
             }
         }
         private void RestorePendingDuty()

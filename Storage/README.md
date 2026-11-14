@@ -60,8 +60,14 @@ match the database, they're removed; otherwise, their edits need review too.
 
 ## Current limits
 
-All history is loaded into memory, and each save captures the whole history.
-The pending-duty save runs every 15 seconds. Reducing that work is still on the list.
+All history is loaded into memory. Full saves capture the whole history after
+completed runs, edits, notes, deletions, and PvP updates. In SQLite mode, the
+15-second save captures only the pending duty and leaves historical rows and the
+seen-player cache alone. The cache is saved with the next full save.
+
+The worker keeps a full snapshot for recovery and merges pending-duty updates into
+it. A failed full save is retried in full, even if the next request only updates
+the pending duty. JSON mode still saves through the configuration callback.
 
 Clearing records doesn't remove the original JSON archive in `legacy_imports`.
 That needs to be addressed before public release.

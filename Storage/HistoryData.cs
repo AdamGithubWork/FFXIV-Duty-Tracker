@@ -15,4 +15,4 @@ internal sealed record DutyWrite(string Id, string Json, bool Pending, int Order
     public string Fingerprint => $"{Pending}:{Order}:{Json}";
 }
 
-internal sealed record HistoryWrite(List<DutyWrite> Duties, string SeenPlayersJson);
+internal sealed record HistoryWrite(List<DutyWrite> Duties, string SeenPlayersJson, bool PendingOnly = false);

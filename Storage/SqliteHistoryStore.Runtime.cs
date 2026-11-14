@@ -10,6 +10,7 @@ public sealed partial class SqliteHistoryStore
     private Dictionary<string, string> fingerprints = new();
     private string seenFingerprint = "[]";
     private long revision;
+    private string? pendingDutyId;
     internal long Revision => revision;
 
     public HistoryData LoadHistory()
@@ -87,6 +88,7 @@ public sealed partial class SqliteHistoryStore
         fingerprints = identities.ToDictionary(entry => entry.Key, entry =>
             new DutyWrite(entry.Key, JsonSerializer.Serialize(entry.Value), orders[entry.Key].Pending, orders[entry.Key].Order).Fingerprint);
         seenFingerprint = JsonSerializer.Serialize(data.SeenPlayers);
+        pendingDutyId = data.PendingDuty == null ? null : data.RecordIds[data.PendingDuty];
         return data;
     }
 
@@ -110,6 +112,21 @@ public sealed partial class SqliteHistoryStore
         return new(rows, JsonSerializer.Serialize(data.SeenPlayers));
     }
 
+    internal static HistoryWrite CapturePending(HistoryData data)
+    {
+        var rows = new List<DutyWrite>();
+        if (data.PendingDuty != null)
+        {
+            if (!data.RecordIds.TryGetValue(data.PendingDuty, out var id))
+            {
+                id = Guid.NewGuid().ToString("N");
+                data.RecordIds.Add(data.PendingDuty, id);
+            }
+            rows.Add(new DutyWrite(id, JsonSerializer.Serialize(data.PendingDuty), true, -1));
+        }
+        return new HistoryWrite(rows, string.Empty, PendingOnly: true);
+    }
+
     internal void SaveHistory(HistoryWrite snapshot)
     {
         using var connection = OpenExisting();
@@ -120,10 +137,17 @@ public sealed partial class SqliteHistoryStore
         if ((long?)command.ExecuteScalar() != revision)
             throw new IOException("Another database session changed the history.");
 
-        var desired = snapshot.Duties.ToDictionary(row => row.Id, row => row.Fingerprint);
+        var desired = snapshot.PendingOnly
+            ? new Dictionary<string, string>(fingerprints)
+            : new Dictionary<string, string>();
+        if (snapshot.PendingOnly && pendingDutyId != null)
+            desired.Remove(pendingDutyId);
+        foreach (var row in snapshot.Duties)
+            desired.Add(row.Id, row.Fingerprint);
         var deleted = fingerprints.Keys.Except(desired.Keys).ToArray();
         var changed = snapshot.Duties.Where(row => !fingerprints.TryGetValue(row.Id, out var previous) || previous != row.Fingerprint).ToArray();
-        bool seenChanged = seenFingerprint != snapshot.SeenPlayersJson;
+        var seenJson = snapshot.PendingOnly ? seenFingerprint : snapshot.SeenPlayersJson;
+        bool seenChanged = seenFingerprint != seenJson;
         if (deleted.Length == 0 && changed.Length == 0 && !seenChanged) { transaction.Commit(); return; }
 
         foreach (string id in deleted)
@@ -163,11 +187,12 @@ public sealed partial class SqliteHistoryStore
             }
         }
         Execute(connection, transaction, "UPDATE history_state SET revision=revision+1,seen_players_json=$seen WHERE id=1;",
-            new() { ["seen"] = snapshot.SeenPlayersJson });
+            new() { ["seen"] = seenJson });
         transaction.Commit();
         revision++;
         fingerprints = desired;
-        seenFingerprint = snapshot.SeenPlayersJson;
+        seenFingerprint = seenJson;
+        pendingDutyId = snapshot.Duties.SingleOrDefault(row => row.Pending)?.Id;
     }
 
     private SqliteConnection OpenExisting()

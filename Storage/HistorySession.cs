@@ -12,6 +12,9 @@ public sealed class HistorySession : IDisposable
     private readonly object gate = new();
     private readonly string? recoveryPath;
     private HistoryWrite? pending;
+    private HistoryWrite? pendingDuty;
+    private HistoryWrite? recoverySnapshot;
+    private bool retryFullSave;
     private Task worker = Task.CompletedTask;
     private bool running;
     private bool disposed;
@@ -36,6 +39,7 @@ public sealed class HistorySession : IDisposable
         recoveryPath = Path.Combine(directory, prefix + Guid.NewGuid().ToString("N") + ".json");
         data = Task.Run(store.LoadHistory).GetAwaiter().GetResult();
         RecoverHistory(Directory.EnumerateFiles(directory, prefix + "*.json").ToArray());
+        recoverySnapshot = SqliteHistoryStore.Capture(data);
     }
 
     private void RecoverHistory(string[] paths)
@@ -131,6 +135,29 @@ public sealed class HistorySession : IDisposable
             ObjectDisposedException.ThrowIf(disposed, this);
             // The latest snapshot includes earlier edits, so only keep one queued save.
             pending = snapshot;
+            pendingDuty = null;
+            if (!running)
+            {
+                running = true;
+                worker = Task.Run(WritePending);
+            }
+        }
+    }
+
+    public void SavePending()
+    {
+        lock (gate)
+            ObjectDisposedException.ThrowIf(disposed, this);
+        if (legacySave != null)
+        {
+            Save();
+            return;
+        }
+        var snapshot = SqliteHistoryStore.CapturePending(data);
+        lock (gate)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            pendingDuty = snapshot;
             if (!running)
             {
                 running = true;
@@ -144,24 +171,44 @@ public sealed class HistorySession : IDisposable
         while (true)
         {
             HistoryWrite snapshot;
+            HistoryWrite? full;
+            HistoryWrite? active;
             lock (gate)
             {
-                if (pending == null) { running = false; return; }
-                snapshot = pending;
+                if (pending == null && pendingDuty == null)
+                {
+                    running = false;
+                    return;
+                }
+                full = pending;
+                active = pendingDuty;
                 pending = null;
+                pendingDuty = null;
             }
+            if (full != null)
+                recoverySnapshot = full;
+            if (active != null)
+            {
+                // Merge on the worker so the game thread only copies the active duty.
+                recoverySnapshot = new HistoryWrite(
+                    recoverySnapshot!.Duties.Where(row => !row.Pending).Concat(active.Duties).ToList(),
+                    recoverySnapshot.SeenPlayersJson);
+            }
+            snapshot = full != null || retryFullSave ? recoverySnapshot! : active!;
             try
             {
                 store!.SaveHistory(snapshot);
                 if (File.Exists(recoveryPath)) File.Delete(recoveryPath!);
+                retryFullSave = false;
                 lock (gate) lastError = null;
             }
             catch (Exception ex)
             {
+                retryFullSave = true;
                 Exception failure;
                 try
                 {
-                    WriteRecovery(snapshot);
+                    WriteRecovery(recoverySnapshot!);
                     failure = new IOException($"SQLite history was not saved. A recovery copy is at {recoveryPath}.", ex);
                 }
                 catch (Exception backupError)
@@ -213,7 +260,7 @@ public sealed class HistorySession : IDisposable
             current.GetAwaiter().GetResult();
             lock (gate)
             {
-                if (running || pending != null) continue;
+                if (running || pending != null || pendingDuty != null) continue;
                 if (lastError != null) throw new IOException("Could not finish saving history. Check the recovery file and plugin log.", lastError);
                 return;
             }
