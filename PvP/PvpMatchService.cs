@@ -2,6 +2,7 @@
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
+using System.Collections.Concurrent;
 
 namespace MentorRouletteTracker.PvP
 {
@@ -11,11 +12,18 @@ namespace MentorRouletteTracker.PvP
         private readonly IFramework framework;
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
         private readonly Configuration config;
+        private readonly Func<string, bool?> readMode;
+        private readonly Func<string, PvpMatchResult?> readScoreboard;
         private readonly Dictionary<string, DateTime> pendingPvpMatches = new();
         private readonly HashSet<string> processedPvpMatches = new();
         private readonly Dictionary<string, DateTime> pvpQueuedAt = new();
         private readonly HashSet<string> unknownPvpModes = new();
         private readonly HashSet<string> restoredPvpMatches = new();
+        private readonly ConcurrentQueue<(string MatchId, DateTime QueuedAt)> savedMatches = new();
+        private readonly Dictionary<string, Task<bool?>> modeReads = new();
+        private readonly Dictionary<string, Task<PvpMatchResult?>> scoreboardReads = new();
+        private readonly object lifecycleGate = new();
+        private volatile bool disposed;
         private Task<List<PvpMatchReference>?>? restoreTask;
         private DateTime[]? restoreTimes;
         private bool restoreNeeded = true;
@@ -35,6 +43,8 @@ namespace MentorRouletteTracker.PvP
             this.framework = framework;
             this.log = log;
             this.config = config;
+            readMode = matchId => PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+            readScoreboard = matchId => PvpTrackerDatabase.GetMatch(matchId, log);
 
             pvpMatchSaved =
                 pluginInterface.GetIpcSubscriber<string, bool>(
@@ -122,54 +132,89 @@ namespace MentorRouletteTracker.PvP
 
         private void OnPvpMatchSaved(string matchId)
         {
-            if (!config.StorageAvailable)
+            if (disposed || !config.StorageAvailable || string.IsNullOrWhiteSpace(matchId))
                 return;
+            savedMatches.Enqueue((matchId, DateTime.UtcNow));
+        }
 
-            if (string.IsNullOrWhiteSpace(matchId) ||
-                processedPvpMatches.Contains(matchId) ||
+        private void QueueSavedMatch(string matchId, DateTime queuedAt)
+        {
+            if (processedPvpMatches.Contains(matchId) ||
                 pendingPvpMatches.ContainsKey(matchId))
                 return;
 
-            var now = DateTime.UtcNow;
-
-            var isFrontline = PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
-
-            var delay = isFrontline == true ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1);
-
-            pvpQueuedAt[matchId] = now;
-            pendingPvpMatches[matchId] = now.Add(delay);
-
-            if (isFrontline == null)
-                unknownPvpModes.Add(matchId);
-
-            log.Information(
-                $"PvP Tracker match queued: {matchId} | " +
-                $"Mode: {(isFrontline == true ? "Frontline" : isFrontline == false ? "CC" : "Unknown")} | " +
-                $"Checking in {delay.TotalMinutes:0} min.");
+            pvpQueuedAt[matchId] = queuedAt;
+            pendingPvpMatches[matchId] = queuedAt.AddMinutes(1);
+            unknownPvpModes.Add(matchId);
+            modeReads[matchId] = Task.Run(() => readMode(matchId));
+            log.Information($"PvP Tracker match queued: {matchId}. Identifying mode.");
         }
 
-        private bool ApplyPvpMatch(string matchId)
+        private void CollectReadResults(DateTime now)
         {
-            if (!config.StorageAvailable)
-                return false;
-
-            var result =
-                PvpTrackerDatabase.GetMatch(matchId, log);
-
-            if (result == null)
+            foreach (var (matchId, task) in modeReads.Where(pair => pair.Value.IsCompleted).ToArray())
             {
-                log.Warning(
-                    $"PvP scoreboard {matchId}: " +
-                    "match results not available.");
-
-                return false;
+                modeReads.Remove(matchId);
+                if (!pendingPvpMatches.ContainsKey(matchId))
+                    continue;
+                try
+                {
+                    var isFrontline = task.GetAwaiter().GetResult();
+                    if (isFrontline.HasValue)
+                    {
+                        unknownPvpModes.Remove(matchId);
+                        var firstCheck = pvpQueuedAt[matchId].AddMinutes(isFrontline.Value ? 5 : 1);
+                        pendingPvpMatches[matchId] = firstCheck > now ? firstCheck : now;
+                        log.Information($"PvP scoreboard {matchId}: mode identified as {(isFrontline.Value ? "Frontline" : "CC")}.");
+                    }
+                    else
+                    {
+                        var retryAt = now.Add(PvpRetryInterval);
+                        if (pendingPvpMatches[matchId] < retryAt)
+                            pendingPvpMatches[matchId] = retryAt;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.Error(ex, $"Failed to identify PvP match {matchId}.");
+                    pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                }
             }
 
-            return ApplyPvpMatchResult(result);
+            foreach (var (matchId, task) in scoreboardReads.Where(pair => pair.Value.IsCompleted).ToArray())
+            {
+                scoreboardReads.Remove(matchId);
+                if (!pendingPvpMatches.ContainsKey(matchId))
+                    continue;
+                try
+                {
+                    var result = task.GetAwaiter().GetResult();
+                    if (result != null && ApplyPvpMatchResult(result))
+                    {
+                        processedPvpMatches.Add(matchId);
+                        pendingPvpMatches.Remove(matchId);
+                        pvpQueuedAt.Remove(matchId);
+                        unknownPvpModes.Remove(matchId);
+                    }
+                    else
+                    {
+                        if (result == null)
+                            log.Warning($"PvP scoreboard {matchId}: match results not available.");
+                        pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.Error(ex, $"Failed to process PvP match {matchId}.");
+                    pendingPvpMatches[matchId] = now.Add(PvpRetryInterval);
+                }
+            }
         }
 
         private bool ApplyPvpMatchResult(PvpMatchResult result)
         {
+            if (disposed || !config.StorageAvailable)
+                return false;
             var matchId = result.MatchId;
             var matchingRecord = FindMatchingRecord(result.DutyStartTime);
 
@@ -254,12 +299,21 @@ namespace MentorRouletteTracker.PvP
         }
         private void OnFrameworkUpdate(IFramework framework)
         {
-            if (!config.StorageAvailable)
+            lock (lifecycleGate)
+                UpdatePendingMatches();
+        }
+
+        private void UpdatePendingMatches()
+        {
+            if (disposed || !config.StorageAvailable)
                 return;
 
             var now = DateTime.UtcNow;
 
+            while (savedMatches.TryDequeue(out var saved))
+                QueueSavedMatch(saved.MatchId, saved.QueuedAt);
             RestorePendingPvpMatches(now);
+            CollectReadResults(now);
 
             if (now < nextPvpCheck || pendingPvpMatches.Count == 0)
                 return;
@@ -268,6 +322,8 @@ namespace MentorRouletteTracker.PvP
 
             foreach (var matchId in pendingPvpMatches.Keys.ToList())
             {
+                if (modeReads.ContainsKey(matchId) || scoreboardReads.ContainsKey(matchId))
+                    continue;
                 if (now - pvpQueuedAt[matchId] >= PvpRetryLimit && !restoredPvpMatches.Contains(matchId))
                 {
                     pendingPvpMatches.Remove(matchId);
@@ -284,63 +340,22 @@ namespace MentorRouletteTracker.PvP
 
                 restoredPvpMatches.Remove(matchId);
 
-                try
-                {
-                    if (unknownPvpModes.Contains(matchId))
-                    {
-                        var isFrontline =
-                            PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
-
-                        if (isFrontline == null)
-                        {
-                            pendingPvpMatches[matchId] =
-                                now.Add(PvpRetryInterval);
-
-                            continue;
-                        }
-
-                        unknownPvpModes.Remove(matchId);
-
-                        if (isFrontline.Value)
-                        {
-                            var firstCheck =
-                                pvpQueuedAt[matchId].AddMinutes(5);
-
-                            if (now < firstCheck)
-                            {
-                                pendingPvpMatches[matchId] = firstCheck;
-                                continue;
-                            }
-                        }
-                    }
-
-                    if (ApplyPvpMatch(matchId))
-                    {
-                        processedPvpMatches.Add(matchId);
-                        pendingPvpMatches.Remove(matchId);
-                        pvpQueuedAt.Remove(matchId);
-                        unknownPvpModes.Remove(matchId);
-                    }
-                    else
-                    {
-                        pendingPvpMatches[matchId] =
-                            now.Add(PvpRetryInterval);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.Error(
-                        $"Failed to process PvP match {matchId}: {ex}");
-
-                    pendingPvpMatches[matchId] =
-                        now.Add(PvpRetryInterval);
-                }
+                if (unknownPvpModes.Contains(matchId))
+                    modeReads[matchId] = Task.Run(() => readMode(matchId));
+                else
+                    scoreboardReads[matchId] = Task.Run(() => readScoreboard(matchId));
             }
         }
         public void Dispose()
         {
-            framework.Update -= OnFrameworkUpdate;
-            pvpMatchSaved.Unsubscribe(OnPvpMatchSaved);
+            lock (lifecycleGate)
+            {
+                if (disposed)
+                    return;
+                disposed = true;
+                framework.Update -= OnFrameworkUpdate;
+                pvpMatchSaved.Unsubscribe(OnPvpMatchSaved);
+            }
         }
     }
 
