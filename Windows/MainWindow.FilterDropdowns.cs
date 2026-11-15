@@ -20,12 +20,18 @@ public partial class MainWindow
                 .Where(pair => pair.Value == datacenter).Select(pair => pair.Key).Order().ToArray()))
             .ToArray();
         var players = config.History.Records.SelectMany(record => record.Party);
-        var width = Math.Min(260f, (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) / 2);
+        var availableWidth = ImGui.GetContentRegionAvail().X;
+        var preferredWidth = ImGui.GetFontSize() * 16f;
+        var sideBySide = availableWidth >= preferredWidth * 2 + ImGui.GetStyle().ItemSpacing.X;
+        var width = Math.Max(1f, Math.Min(preferredWidth, availableWidth));
 
         ImGui.SetNextItemWidth(width);
         DrawGroupedFilter("Jobs", "All Jobs", selectedPlayerJobs, JobFilterGroups,
             players.Select(player => player.Job));
-        ImGui.SameLine();
+        if (sideBySide)
+            ImGui.SameLine();
+        else
+            ImGui.Spacing();
         ImGui.SetNextItemWidth(width);
         DrawGroupedFilter("Worlds", "All Worlds", selectedPlayerWorlds, worlds,
             players.Select(player => player.World));
