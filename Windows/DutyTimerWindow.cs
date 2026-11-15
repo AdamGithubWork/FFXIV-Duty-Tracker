@@ -30,8 +30,15 @@ namespace MentorRouletteTracker
             this.mainWindow = mainWindow;
             this.config = config;
 
-            IsOpen = false;
-            SizeCondition = ImGuiCond.FirstUseEver;
+            IsOpen = true;
+        }
+
+        public override bool DrawConditions()
+        {
+            var contentTypeId = tracker.ActiveContentTypeId;
+            return tracker.ActiveDuty != null &&
+                contentTypeId.HasValue &&
+                config.TimerVisibleContentTypeIds.Contains(contentTypeId.Value);
         }
 
         public override void Draw()

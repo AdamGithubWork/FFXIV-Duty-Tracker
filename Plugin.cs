@@ -13,7 +13,6 @@ namespace MentorRouletteTracker
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
-        private readonly IFramework framework;
         private readonly IClientState clientState;
         private readonly Configuration config;
         private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
@@ -36,7 +35,6 @@ namespace MentorRouletteTracker
         {
             this.pluginInterface = pluginInterface;
             this.commandManager = commandManager;
-            this.framework = framework;
             this.log = log;
             this.clientState = clientState;
 
@@ -108,22 +106,11 @@ namespace MentorRouletteTracker
 
             pluginInterface.UiBuilder.Draw += windowSystem.Draw;
             pluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
-            framework.Update += OnFrameworkUpdate;
         }
 
         private void OnOpenMainUi()
         {
             mainWindow.IsOpen = true;
-        }
-
-        private void OnFrameworkUpdate(IFramework framework)
-        {
-            var contentTypeId = tracker.ActiveContentTypeId;
-
-            dutyTimerWindow.IsOpen =
-                tracker.ActiveDuty != null &&
-                contentTypeId.HasValue &&
-                config.TimerVisibleContentTypeIds.Contains(contentTypeId.Value);
         }
 
         private void OnCommand(string command, string args)
@@ -156,7 +143,6 @@ namespace MentorRouletteTracker
 
         public void Dispose()
         {
-            framework.Update -= OnFrameworkUpdate;
             pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
             pluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi;
             commandManager.RemoveHandler(CommandName);
