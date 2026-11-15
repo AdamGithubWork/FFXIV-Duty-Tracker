@@ -196,7 +196,11 @@ namespace MentorRouletteTracker
             foreach (var e in encounters)
                 byRecord[e.Record].Add(e);
 
-            int? TotalDeaths(DutyRecord r) => TotalKnownDeaths(byRecord[r].Select(e => e.KnownDeaths));
+            Dictionary<DutyRecord, int?> deathsByRecord = new(ReferenceEqualityComparer.Instance);
+            foreach (var r in records)
+                deathsByRecord[r] = TotalKnownDeaths(byRecord[r].Select(e => e.KnownDeaths));
+
+            int? TotalDeaths(DutyRecord r) => deathsByRecord[r];
 
             var knownDeathEncounters = encounters.Where(e => e.KnownDeaths.HasValue).ToList();
             var dutiesWithKnownDeaths = records.Where(r =>
