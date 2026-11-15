@@ -19,6 +19,8 @@ namespace MentorRouletteTracker.DutyTracking
         private readonly IFramework framework;
         private readonly IPluginLog log;
         private readonly Configuration config;
+        private static readonly TimeSpan InitialPartyRefreshPeriod = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan InitialPartyRefreshInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan HistorySaveInterval = TimeSpan.FromSeconds(15);
         private DateTime nextPartyRefresh = DateTime.MinValue;
@@ -179,8 +181,8 @@ namespace MentorRouletteTracker.DutyTracking
             if (now >= nextPartyRefresh)
             {
                 var refreshInterval =
-                    now - current.Timestamp.ToUniversalTime() < TimeSpan.FromSeconds(10)
-                        ? PartyRefreshInterval / 30
+                    now - current.Timestamp.ToUniversalTime() < InitialPartyRefreshPeriod
+                        ? InitialPartyRefreshInterval
                         : PartyRefreshInterval;
 
                 nextPartyRefresh = now + refreshInterval;
@@ -444,7 +446,7 @@ namespace MentorRouletteTracker.DutyTracking
 
                 if (string.IsNullOrWhiteSpace(name) ||
                     (name == localPlayerName &&
-                     member.World.Value.RowId == localPlayer.HomeWorld.RowId) ||
+                     member.World.RowId == localPlayer.HomeWorld.RowId) ||
                     member.GameObject == null)
                     continue;
 

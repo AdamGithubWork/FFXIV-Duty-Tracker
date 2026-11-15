@@ -13,7 +13,6 @@ namespace MentorRouletteTracker
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
-        private readonly IClientState clientState;
         private readonly Configuration config;
         private readonly WindowSystem windowSystem = new("MentorRouletteTracker");
         private readonly DutyTrackerService tracker;
@@ -36,7 +35,6 @@ namespace MentorRouletteTracker
             this.pluginInterface = pluginInterface;
             this.commandManager = commandManager;
             this.log = log;
-            this.clientState = clientState;
 
             var savedConfig = pluginInterface.GetPluginConfig() as Configuration;
             config = savedConfig ?? new Configuration();
