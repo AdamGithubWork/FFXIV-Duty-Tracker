@@ -134,7 +134,7 @@ namespace MentorRouletteTracker
                     var player = people[i];
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0);
-                    if (ImGui.Selectable($"{player.Name}##person{i}"))
+                    if (ImGui.Selectable($"{player.Name}###person{player.Name}@{player.World}"))
                     {
                         historyPlayerName = player.Name;
                         historyPlayerWorld = player.World;
@@ -208,7 +208,7 @@ namespace MentorRouletteTracker
                             var entry = history[i];
                             ImGui.TableNextRow();
                             ImGui.TableSetColumnIndex(0);
-                            if (ImGui.Selectable($"{entry.Record.DutyName}##history{i}"))
+                            if (ImGui.Selectable($"{entry.Record.DutyName}###history{GetRecordUiId(entry.Record)}"))
                             {
                                 selectedRecord = entry.Record;
                                 showDetailWindow = true;

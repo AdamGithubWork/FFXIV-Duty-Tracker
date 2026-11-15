@@ -3,11 +3,17 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
+        private readonly ConditionalWeakTable<DutyRecord, string> recordUiIds = new();
+
+        private string GetRecordUiId(DutyRecord record) =>
+            recordUiIds.GetValue(record, _ => Guid.NewGuid().ToString("N"));
+
         private void DrawRecordsTab()
         {
             if (!string.IsNullOrWhiteSpace(dutyHistoryFilter))
@@ -161,15 +167,10 @@ namespace MentorRouletteTracker
                 var now = DateTime.Now;
 
                 var records = config.History.Records
-                    .Select((record, index) => new
-                    {
-                        Record = record,
-                        Index = index
-                    })
-                    .Where(x => x.Record.Completed == completed)
-                    .Where(x => MatchesDutyHistory(x.Record))
-                    .Where(x => MatchesDutyFilters(x.Record, now))
-                    .Where(x => MatchesDutyPlayerFilters(x.Record))
+                    .Where(x => x.Completed == completed)
+                    .Where(x => MatchesDutyHistory(x))
+                    .Where(x => MatchesDutyFilters(x, now))
+                    .Where(x => MatchesDutyPlayerFilters(x))
                     .ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
@@ -181,40 +182,40 @@ namespace MentorRouletteTracker
                     records = spec.ColumnIndex switch
                     {
                         0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.DutyName).ToList()
-                            : records.OrderByDescending(x => x.Record.DutyName).ToList(),
+                            ? records.OrderBy(x => x.DutyName).ToList()
+                            : records.OrderByDescending(x => x.DutyName).ToList(),
 
                         1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.DutyType).ToList()
-                            : records.OrderByDescending(x => x.Record.DutyType).ToList(),
+                            ? records.OrderBy(x => x.DutyType).ToList()
+                            : records.OrderByDescending(x => x.DutyType).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.PlayerJob).ToList()
-                            : records.OrderByDescending(x => x.Record.PlayerJob).ToList(),
+                            ? records.OrderBy(x => x.PlayerJob).ToList()
+                            : records.OrderByDescending(x => x.PlayerJob).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.Timestamp).ToList()
-                            : records.OrderByDescending(x => x.Record.Timestamp).ToList(),
+                            ? records.OrderBy(x => x.Timestamp).ToList()
+                            : records.OrderByDescending(x => x.Timestamp).ToList(),
 
                         4 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.TimeInDuty).ToList()
-                            : records.OrderByDescending(x => x.Record.TimeInDuty).ToList(),
+                            ? records.OrderBy(x => x.TimeInDuty).ToList()
+                            : records.OrderByDescending(x => x.TimeInDuty).ToList(),
 
                         5 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.JoinedInProgress).ToList()
-                            : records.OrderByDescending(x => x.Record.JoinedInProgress).ToList(),
+                            ? records.OrderBy(x => x.JoinedInProgress).ToList()
+                            : records.OrderByDescending(x => x.JoinedInProgress).ToList(),
 
                         6 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.WipeCount).ToList()
-                            : records.OrderByDescending(x => x.Record.WipeCount).ToList(),
+                            ? records.OrderBy(x => x.WipeCount).ToList()
+                            : records.OrderByDescending(x => x.WipeCount).ToList(),
 
                         7 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.LalafellCount).ToList()
-                            : records.OrderByDescending(x => x.Record.LalafellCount).ToList(),
+                            ? records.OrderBy(x => x.LalafellCount).ToList()
+                            : records.OrderByDescending(x => x.LalafellCount).ToList(),
 
                         8 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Record.Completed).ToList()
-                            : records.OrderByDescending(x => x.Record.Completed).ToList(),
+                            ? records.OrderBy(x => x.Completed).ToList()
+                            : records.OrderByDescending(x => x.Completed).ToList(),
 
                         _ => records
                     };
@@ -224,21 +225,20 @@ namespace MentorRouletteTracker
                 else
                 {
                     records = records
-                        .OrderByDescending(x => x.Record.Timestamp)
+                        .OrderByDescending(x => x.Timestamp)
                         .ToList();
                 }
 
-                foreach (var item in records)
+                foreach (var r in records)
                 {
-                    var r = item.Record;
-                    var i = item.Index;
+                    var id = GetRecordUiId(r);
 
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
 
                     if (ImGui.Selectable(
-                            $"{r.DutyName}##record{i}",
+                            $"{r.DutyName}###record{id}",
                             false,
                             ImGuiSelectableFlags.SpanAllColumns))
                     {
@@ -246,7 +246,7 @@ namespace MentorRouletteTracker
                         showDetailWindow = true;
                     }
 
-                    if (ImGui.BeginPopupContextItem($"RecordContext{i}"))
+                    if (ImGui.BeginPopupContextItem($"RecordContext{id}"))
                     {
                         ImGui.TextUnformatted(r.DutyName);
 
@@ -618,7 +618,7 @@ namespace MentorRouletteTracker
 
                 ImGui.PushFont(UiBuilder.IconFont);
 
-                if (ImGui.Button(FontAwesomeIcon.Edit.ToIconString()))
+                if (ImGui.Button(FontAwesomeIcon.Edit.ToIconString() + "###EditDutyNote"))
                 {
                     noteRecord = r;
                     noteDraft = r.Note ?? string.Empty;

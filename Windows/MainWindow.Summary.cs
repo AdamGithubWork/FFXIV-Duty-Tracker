@@ -99,7 +99,7 @@ namespace MentorRouletteTracker
                                     if (row.Value.Record is DutyRecord record)
                                     {
                                         ImGui.PushID(row.Label);
-                                        if (ImGui.Selectable(row.Value.Text))
+                                        if (ImGui.Selectable(row.Value.Text + "###ViewDuty"))
                                         {
                                             selectedRecord = record;
                                             showDetailWindow = true;
