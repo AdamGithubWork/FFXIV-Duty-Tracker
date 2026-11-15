@@ -135,6 +135,23 @@ namespace MentorRouletteTracker
 
         private void DrawRecordsTable(bool completed)
         {
+            var now = DateTime.Now;
+
+            var records = config.History.Records
+                .Where(x => x.Completed == completed)
+                .Where(x => MatchesDutyHistory(x))
+                .Where(x => MatchesDutyFilters(x, now))
+                .Where(x => MatchesDutyPlayerFilters(x))
+                .ToList();
+
+            if (records.Count == 0)
+            {
+                ImGui.TextDisabled(completed
+                    ? "No completed duties match your filters."
+                    : "No incomplete duties match your filters.");
+                return;
+            }
+
             if (ImGui.BeginTable(
                     completed ? "completedRecords" : "incompleteRecords",
                     9,
@@ -147,7 +164,8 @@ namespace MentorRouletteTracker
             {
                 ImGui.TableSetupColumn(
                     "Duty",
-                    ImGuiTableColumnFlags.PreferSortAscending);
+                    ImGuiTableColumnFlags.PreferSortAscending | ImGuiTableColumnFlags.WidthStretch,
+                    2f);
 
                 ImGui.TableSetupColumn("Type");
                 ImGui.TableSetupColumn("Job");
@@ -164,15 +182,6 @@ namespace MentorRouletteTracker
                 ImGui.TableSetupColumn("Completed");
 
                 ImGui.TableHeadersRow();
-
-                var now = DateTime.Now;
-
-                var records = config.History.Records
-                    .Where(x => x.Completed == completed)
-                    .Where(x => MatchesDutyHistory(x))
-                    .Where(x => MatchesDutyFilters(x, now))
-                    .Where(x => MatchesDutyPlayerFilters(x))
-                    .ToList();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
 

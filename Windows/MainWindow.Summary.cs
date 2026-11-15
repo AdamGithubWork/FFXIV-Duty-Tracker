@@ -10,15 +10,6 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
-        private int? SummaryDeaths(
-            PartyMemberSnapshot player,
-            Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
-        {
-            return playerRecords.TryGetValue(player, out var record)
-                ? EffectiveDeaths(record, player)
-                : null;
-        }
-
         // Rolling date filters can change even when no history is saved.
         private DateTime nextMilestoneRefresh = DateTime.MinValue;
         private long milestoneHistoryVersion = -1;

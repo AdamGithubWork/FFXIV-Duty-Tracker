@@ -9,9 +9,8 @@ namespace MentorRouletteTracker
     {
         private void DrawStatisticsTab()
         {
-            var records = FilterDutyRecords(applyPlayerFilters: false)
-                .OrderBy(x => x.Timestamp)
-                .ToList();
+            var data = GetPlayerViewData();
+            var records = data.Records;
 
             if (ImGui.BeginChild(
                 "StatisticsContent",
@@ -21,10 +20,12 @@ namespace MentorRouletteTracker
             {
                 ImGui.Text("Player stats");
                 DrawStatisticsCustomization();
+                ImGui.PushTextWrapPos();
                 ImGui.TextDisabled(
                     "Players from completed duties that match your filters.");
                 ImGui.TextDisabled("Droughts count duties where no players match your filters.");
                 ImGui.TextDisabled("Death totals include known counts only. Averages skip unknown counts. '-' means no known counts.");
+                ImGui.PopTextWrapPos();
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -35,7 +36,6 @@ namespace MentorRouletteTracker
                     return;
                 }
 
-                var playerRecords = BuildStatisticsPlayerRecords(records);
                 var anyVisible = false;
                 void Section(bool visible, Action draw)
                 {
@@ -51,13 +51,13 @@ namespace MentorRouletteTracker
                     anyVisible = true;
                 }
 
-                Section(config.ShowStatisticsOverview, () => DrawSelectedPlayerStatistics(records, playerRecords));
-                Section(config.ShowRaceStatistics, () => DrawRaceStatistics(records, playerRecords, true));
-                Section(config.ShowGenderStatistics, () => DrawGenderStatistics(records, playerRecords));
-                Section(config.ShowJobStatistics, () => DrawJobStatistics(records, playerRecords, true));
-                Section(config.ShowStatusStatistics, () => DrawStatusStatistics(records, playerRecords));
-                Section(config.ShowWorldStatistics, () => DrawWorldStatistics(records, playerRecords));
-                Section(config.ShowDatacenterStatistics, () => DrawWorldStatistics(records, playerRecords, groupByDatacenter: true));
+                Section(config.ShowStatisticsOverview, () => DrawSelectedPlayerStatistics(data));
+                Section(config.ShowRaceStatistics, () => DrawRaceStatistics(data));
+                Section(config.ShowGenderStatistics, () => DrawGenderStatistics(data));
+                Section(config.ShowJobStatistics, () => DrawJobStatistics(data));
+                Section(config.ShowStatusStatistics, () => DrawStatusStatistics(data));
+                Section(config.ShowWorldStatistics, () => DrawWorldStatistics(data));
+                Section(config.ShowDatacenterStatistics, () => DrawWorldStatistics(data, groupByDatacenter: true));
 
                 if (!anyVisible)
                     ImGui.TextDisabled("No statistics selected. Choose sections in Customize statistics.");
@@ -95,55 +95,11 @@ namespace MentorRouletteTracker
             ImGui.EndCombo();
         }
 
-        private void DrawSelectedPlayerStatistics(
-            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
+        private void DrawSelectedPlayerStatistics(PlayerViewData data)
         {
             ImGui.Text("Players in these duties");
             ImGui.Spacing();
-
-            var matchingPlayers = records
-                .SelectMany(record => record.Party.Where(playerRecords.ContainsKey))
-                .ToList();
-
-            var matchingCounts = records
-                .Select(record => record.Party.Count(playerRecords.ContainsKey))
-                .ToList();
-
-            var currentDrought = 0;
-
-            for (var i = matchingCounts.Count - 1; i >= 0; i--)
-            {
-                if (matchingCounts[i] > 0)
-                    break;
-
-                currentDrought++;
-            }
-
-            var longestDrought = 0;
-            var drought = 0;
-
-            foreach (var count in matchingCounts)
-            {
-                if (count == 0)
-                {
-                    drought++;
-                    longestDrought = Math.Max(longestDrought, drought);
-                }
-                else
-                {
-                    drought = 0;
-                }
-            }
-
-            var totalEncounters = matchingCounts.Sum();
-
-            var dutiesWithMatchingPlayers =
-                matchingCounts.Count(count => count > 0);
-
-            var uniquePlayers = matchingPlayers
-                .Select(x => (x.Name, x.World))
-                .Distinct()
-                .Count();
+            var overview = data.Overview;
 
             if (ImGui.BeginTable(
                 "lalaStats",
@@ -157,23 +113,23 @@ namespace MentorRouletteTracker
 
                 DrawStatisticRow(
                     "Unique Players Seen",
-                    uniquePlayers.ToString());
+                    overview.UniquePlayers.ToString());
 
                 DrawStatisticRow(
                     "Total Encounters",
-                    totalEncounters.ToString());
+                    overview.TotalEncounters.ToString());
 
                 DrawStatisticRow(
                     "Duties With Matching Players",
-                    dutiesWithMatchingPlayers.ToString());
+                    overview.DutiesWithPlayers.ToString());
 
                 DrawStatisticRow(
                     "Duties Since Last Encounter",
-                    currentDrought.ToString());
+                    overview.CurrentDrought.ToString());
 
                 DrawStatisticRow(
                     "Longest Encounter Drought",
-                    $"{longestDrought} duties");
+                    $"{overview.LongestDrought} duties");
 
                 ImGui.EndTable();
             }
@@ -194,55 +150,15 @@ namespace MentorRouletteTracker
             return known.Count == 0 ? null : known.Sum(count => count.GetValueOrDefault());
         }
 
-        private Dictionary<PartyMemberSnapshot, DutyRecord>
-            BuildStatisticsPlayerRecords(List<DutyRecord> records)
+        private void DrawRaceStatistics(PlayerViewData data)
         {
-            var lookup = new Dictionary<PartyMemberSnapshot, DutyRecord>(
-                ReferenceEqualityComparer.Instance);
-
-            foreach (var encounter in GetMatchingPlayerEncounters(records))
-                lookup.TryAdd(encounter.Player, encounter.Record);
-
-            return lookup;
-        }
-
-        private void DrawRaceStatistics(
-            List<DutyRecord> records,
-            Dictionary<PartyMemberSnapshot, DutyRecord>? playerRecords = null,
-            bool applyPlayerFilters = false)
-        {
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
-            playerRecords ??= BuildStatisticsPlayerRecords(records);
-
-            var characters = records
-                .SelectMany(record => record.Party.Where(player =>
-                    config.IncludeSelfInStatistics ||
-                    !IsRecordingPlayer(record, player, localPlayerName)))
-                .Where(x =>
-                    (!applyPlayerFilters || playerRecords.ContainsKey(x)) &&
-                    !string.IsNullOrWhiteSpace(x.Race) &&
-                    x.Race != "Unknown")
-                .ToList();
-
             ImGui.Text("Players by race");
             ImGui.Spacing();
-
-            var raceStats = characters
-                .GroupBy(x => x.Race)
-                .Select(x => new
-                {
-                    Race = x.Key,
-                    Seen = x.Count(),
-                    Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
-                    AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
-                })
-                .OrderBy(x => x.Race)
-                .ToList();
+            var raceStats = GetPlayerStatistics(data, PlayerStatistic.Race);
 
             if (raceStats.Count == 0)
             {
-                ImGui.TextDisabled("No race data yet.");
+                ImGui.TextDisabled("No races match your filters.");
             }
             else if (ImGui.BeginTable(
                 "raceStats",
@@ -272,26 +188,26 @@ namespace MentorRouletteTracker
                     raceStats = spec.ColumnIndex switch
                     {
                         0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceStats.OrderBy(x => x.Race).ToList()
-                            : raceStats.OrderByDescending(x => x.Race).ToList(),
+                            ? raceStats.OrderBy(x => x.Name).ToList()
+                            : raceStats.OrderByDescending(x => x.Name).ToList(),
 
                         1 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceStats.OrderBy(x => x.Seen)
-                                .ThenBy(x => x.Race).ToList()
+                                .ThenBy(x => x.Name).ToList()
                             : raceStats.OrderByDescending(x => x.Seen)
-                                .ThenBy(x => x.Race).ToList(),
+                                .ThenBy(x => x.Name).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceStats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths)
-                                .ThenBy(x => x.Race).ToList()
+                                .ThenBy(x => x.Name).ToList()
                             : raceStats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths)
-                                .ThenBy(x => x.Race).ToList(),
+                                .ThenBy(x => x.Name).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
-                                .ThenBy(x => x.Race).ToList()
+                                .ThenBy(x => x.Name).ToList()
                             : raceStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
-                                .ThenBy(x => x.Race).ToList(),
+                                .ThenBy(x => x.Name).ToList(),
 
                         _ => raceStats
                     };
@@ -306,7 +222,7 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Race);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
                     ImGui.TextUnformatted(stat.Seen.ToString());
@@ -328,30 +244,11 @@ namespace MentorRouletteTracker
             ImGui.Text("Players by race and gender");
             ImGui.Spacing();
 
-            var raceGenderStats = characters
-                .Where(x =>
-                    !string.IsNullOrWhiteSpace(x.Gender) &&
-                    x.Gender != "Unknown")
-                .GroupBy(x => new
-                {
-                    x.Race,
-                    x.Gender
-                })
-                .Select(x => new
-                {
-                    Race = x.Key.Race,
-                    Gender = x.Key.Gender,
-                    Seen = x.Count(),
-                    Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
-                    AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
-                })
-                .OrderBy(x => x.Race)
-                .ThenBy(x => x.Gender)
-                .ToList();
+            var raceGenderStats = GetPlayerStatistics(data, PlayerStatistic.RaceAndGender);
 
             if (raceGenderStats.Count == 0)
             {
-                ImGui.TextDisabled("No race or gender data yet.");
+                ImGui.TextDisabled("No race and gender data matches your filters.");
                 return;
             }
 
@@ -384,40 +281,40 @@ namespace MentorRouletteTracker
                     raceGenderStats = spec.ColumnIndex switch
                     {
                         0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceGenderStats.OrderBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList()
-                            : raceGenderStats.OrderByDescending(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList(),
+                            ? raceGenderStats.OrderBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList()
+                            : raceGenderStats.OrderByDescending(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList(),
 
                         1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? raceGenderStats.OrderBy(x => x.Gender)
-                                .ThenBy(x => x.Race).ToList()
-                            : raceGenderStats.OrderByDescending(x => x.Gender)
-                                .ThenBy(x => x.Race).ToList(),
+                            ? raceGenderStats.OrderBy(x => x.Detail)
+                                .ThenBy(x => x.Name).ToList()
+                            : raceGenderStats.OrderByDescending(x => x.Detail)
+                                .ThenBy(x => x.Name).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceGenderStats.OrderBy(x => x.Seen)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList()
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList()
                             : raceGenderStats.OrderByDescending(x => x.Seen)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList(),
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceGenderStats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList()
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList()
                             : raceGenderStats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList(),
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList(),
 
                         4 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? raceGenderStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList()
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList()
                             : raceGenderStats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
-                                .ThenBy(x => x.Race)
-                                .ThenBy(x => x.Gender).ToList(),
+                                .ThenBy(x => x.Name)
+                                .ThenBy(x => x.Detail).ToList(),
 
                         _ => raceGenderStats
                     };
@@ -432,10 +329,10 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Race);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(stat.Gender);
+                    ImGui.TextUnformatted(stat.Detail);
 
                     ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted(stat.Seen.ToString());
@@ -451,35 +348,11 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawGenderStatistics(
-            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
+        private void DrawGenderStatistics(PlayerViewData data)
         {
             ImGui.Text("Players by gender");
             ImGui.Spacing();
-
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
-            var stats = records
-                .SelectMany(record => record.Party.Select(player => new
-                {
-                    Record = record,
-                    Player = player
-                }))
-                .Where(x =>
-                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    playerRecords.ContainsKey(x.Player) &&
-                    !string.IsNullOrWhiteSpace(x.Player.Gender) &&
-                    x.Player.Gender != "Unknown")
-                .GroupBy(x => x.Player.Gender)
-                .Select(group => new
-                {
-                    Gender = group.Key,
-                    Seen = group.Count(),
-                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
-                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
-                })
-                .OrderBy(x => x.Gender)
-                .ToList();
+            var stats = GetPlayerStatistics(data, PlayerStatistic.Gender);
 
             if (stats.Count == 0)
             {
@@ -513,8 +386,8 @@ namespace MentorRouletteTracker
                     stats = spec.ColumnIndex switch
                     {
                         0 => ascending
-                            ? stats.OrderBy(x => x.Gender).ToList()
-                            : stats.OrderByDescending(x => x.Gender).ToList(),
+                            ? stats.OrderBy(x => x.Name).ToList()
+                            : stats.OrderByDescending(x => x.Name).ToList(),
 
                         1 => ascending
                             ? stats.OrderBy(x => x.Seen).ToList()
@@ -539,7 +412,7 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Gender);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
                     ImGui.TextUnformatted(stat.Seen.ToString());
@@ -556,33 +429,15 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawJobStatistics(
-            List<DutyRecord> records,
-            Dictionary<PartyMemberSnapshot, DutyRecord>? playerRecords = null,
-            bool applyPlayerFilters = false)
+        private void DrawJobStatistics(PlayerViewData data)
         {
             ImGui.Text("Players by job");
             ImGui.Spacing();
-
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
-            playerRecords ??= BuildStatisticsPlayerRecords(records);
-
-            var jobStats = records
-                .SelectMany(record => record.Party.Where(player =>
-                    config.IncludeSelfInStatistics ||
-                    !IsRecordingPlayer(record, player, localPlayerName)))
-                .Where(x =>
-                    (!applyPlayerFilters || playerRecords.ContainsKey(x)) &&
-                    !string.IsNullOrWhiteSpace(x.Job) &&
-                    x.Job != "Unknown")
-                .GroupBy(x => x.Job)
-                .OrderBy(x => x.Key)
-                .ToList();
+            var jobStats = GetPlayerStatistics(data, PlayerStatistic.Job);
 
             if (jobStats.Count == 0)
             {
-                ImGui.TextDisabled("No job data yet.");
+                ImGui.TextDisabled("No jobs match your filters.");
                 return;
             }
 
@@ -605,15 +460,7 @@ namespace MentorRouletteTracker
 
                 ImGui.TableHeadersRow();
 
-                var stats = jobStats
-                    .Select(x => new
-                    {
-                        Job = x.Key,
-                        Seen = x.Count(),
-                        Deaths = TotalKnownDeaths(x.Select(y => SummaryDeaths(y, playerRecords))),
-                        AverageDeaths = x.Average(y => SummaryDeaths(y, playerRecords))
-                    })
-                    .ToList();
+                var stats = jobStats;
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
 
@@ -624,22 +471,22 @@ namespace MentorRouletteTracker
                     stats = spec.ColumnIndex switch
                     {
                         0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Job).ToList()
-                            : stats.OrderByDescending(x => x.Job).ToList(),
+                            ? stats.OrderBy(x => x.Name).ToList()
+                            : stats.OrderByDescending(x => x.Name).ToList(),
 
                         1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Seen).ThenBy(x => x.Job).ToList()
-                            : stats.OrderByDescending(x => x.Seen).ThenBy(x => x.Job).ToList(),
+                            ? stats.OrderBy(x => x.Seen).ThenBy(x => x.Name).ToList()
+                            : stats.OrderByDescending(x => x.Seen).ThenBy(x => x.Name).ToList(),
 
                         2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ThenBy(x => x.Job).ToList()
-                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ThenBy(x => x.Job).ToList(),
+                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ThenBy(x => x.Name).ToList()
+                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ThenBy(x => x.Name).ToList(),
 
                         3 => spec.SortDirection == ImGuiSortDirection.Ascending
                             ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
-                                .ThenBy(x => x.Job).ToList()
+                                .ThenBy(x => x.Name).ToList()
                             : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
-                                .ThenBy(x => x.Job).ToList(),
+                                .ThenBy(x => x.Name).ToList(),
 
                         _ => stats
                     };
@@ -654,7 +501,7 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Job);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
                     ImGui.TextUnformatted(stat.Seen.ToString());
@@ -670,39 +517,11 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawStatusStatistics(
-            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords)
+        private void DrawStatusStatistics(PlayerViewData data)
         {
             ImGui.Text("Players by status");
             ImGui.Spacing();
-
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
-            var encounters = records
-                .SelectMany(record => record.Party.Select(player => new
-                {
-                    Record = record,
-                    Player = player
-                }))
-                .Where(x =>
-                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    playerRecords.ContainsKey(x.Player))
-                .ToList();
-
-            var stats = encounters
-                .GroupBy(x =>
-                    string.IsNullOrWhiteSpace(x.Player.Status)
-                        ? "Unknown"
-                        : x.Player.Status)
-                .Select(group => new
-                {
-                    Status = group.Key,
-                    Encounters = group.Count(),
-                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
-                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
-                })
-                .OrderByDescending(x => x.Encounters)
-                .ToList();
+            var stats = GetPlayerStatistics(data, PlayerStatistic.Status);
 
             if (stats.Count == 0)
             {
@@ -736,12 +555,12 @@ namespace MentorRouletteTracker
                     stats = spec.ColumnIndex switch
                     {
                         0 => ascending
-                            ? stats.OrderBy(x => x.Status).ToList()
-                            : stats.OrderByDescending(x => x.Status).ToList(),
+                            ? stats.OrderBy(x => x.Name).ToList()
+                            : stats.OrderByDescending(x => x.Name).ToList(),
 
                         1 or 2 => ascending
-                            ? stats.OrderBy(x => x.Encounters).ToList()
-                            : stats.OrderByDescending(x => x.Encounters).ToList(),
+                            ? stats.OrderBy(x => x.Seen).ToList()
+                            : stats.OrderByDescending(x => x.Seen).ToList(),
 
                         3 => ascending
                             ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ToList()
@@ -758,14 +577,14 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Status);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(stat.Encounters.ToString());
+                    ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted(
-                        $"{(double)stat.Encounters / encounters.Count * 100:F1}%");
+                        $"{(double)stat.Seen / data.Encounters.Count * 100:F1}%");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(
@@ -776,47 +595,21 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawWorldStatistics(
-            List<DutyRecord> records, Dictionary<PartyMemberSnapshot, DutyRecord> playerRecords,
-            bool groupByDatacenter = false)
+        private void DrawWorldStatistics(PlayerViewData data, bool groupByDatacenter = false)
         {
             ImGui.Text(groupByDatacenter
                 ? "Players by datacenter"
                 : "Players by home world");
             ImGui.Spacing();
-
-            var localPlayerName = objectTable.LocalPlayer?.Name.TextValue;
-
-            var encounters = records
-                .SelectMany(record => record.Party.Select(player => new
-                {
-                    Record = record,
-                    Player = player
-                }))
-                .Where(x =>
-                    (config.IncludeSelfInStatistics || !IsRecordingPlayer(x.Record, x.Player, localPlayerName)) &&
-                    playerRecords.ContainsKey(x.Player) &&
-                    !string.IsNullOrWhiteSpace(x.Player.World) &&
-                    x.Player.World != "Unknown")
-                .ToList();
-
-            var stats = encounters
-                .GroupBy(x => groupByDatacenter
-                    ? worldDatacenters.GetValueOrDefault(x.Player.World, "Unknown")
-                    : x.Player.World)
-                .Select(group => new
-                {
-                    World = group.Key,
-                    Encounters = group.Count(),
-                    Deaths = TotalKnownDeaths(group.Select(x => EffectiveDeaths(x.Record, x.Player))),
-                    AverageDeaths = group.Average(x => EffectiveDeaths(x.Record, x.Player))
-                })
-                .OrderByDescending(x => x.Encounters)
-                .ToList();
+            var statistic = groupByDatacenter ? PlayerStatistic.Datacenter : PlayerStatistic.World;
+            var stats = GetPlayerStatistics(data, statistic);
+            var encounterCount = stats.Sum(row => row.Seen);
 
             if (stats.Count == 0)
             {
-                ImGui.TextDisabled("No home worlds match your filters.");
+                ImGui.TextDisabled(groupByDatacenter
+                    ? "No datacenters match your filters."
+                    : "No home worlds match your filters.");
                 return;
             }
 
@@ -846,12 +639,12 @@ namespace MentorRouletteTracker
                     stats = spec.ColumnIndex switch
                     {
                         0 => ascending
-                            ? stats.OrderBy(x => x.World).ToList()
-                            : stats.OrderByDescending(x => x.World).ToList(),
+                            ? stats.OrderBy(x => x.Name).ToList()
+                            : stats.OrderByDescending(x => x.Name).ToList(),
 
                         1 or 2 => ascending
-                            ? stats.OrderBy(x => x.Encounters).ToList()
-                            : stats.OrderByDescending(x => x.Encounters).ToList(),
+                            ? stats.OrderBy(x => x.Seen).ToList()
+                            : stats.OrderByDescending(x => x.Seen).ToList(),
 
                         3 => ascending
                             ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ToList()
@@ -868,14 +661,14 @@ namespace MentorRouletteTracker
                     ImGui.TableNextRow();
 
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.World);
+                    ImGui.TextUnformatted(stat.Name);
 
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(stat.Encounters.ToString());
+                    ImGui.TextUnformatted(stat.Seen.ToString());
 
                     ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted(
-                        $"{(double)stat.Encounters / encounters.Count * 100:F1}%");
+                        $"{(double)stat.Seen / encounterCount * 100:F1}%");
 
                     ImGui.TableSetColumnIndex(3);
                     ImGui.TextUnformatted(

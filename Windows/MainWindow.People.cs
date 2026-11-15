@@ -26,7 +26,7 @@ namespace MentorRouletteTracker
             public required List<PlayerEncounter> Encounters { get; init; }
             public int TimesSeen => Encounters.Count;
             public required int? TotalDeaths { get; init; }
-            public int KnownDeathEncounters => Encounters.Count(x => EffectiveDeaths(x.Record, x.Player).HasValue);
+            public required int KnownDeathEncounters { get; init; }
             public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double?)TotalDeaths / KnownDeathEncounters;
         }
 
@@ -56,14 +56,12 @@ namespace MentorRouletteTracker
                 qualifiedPlayers.Contains((encounter.Player.Name, encounter.Player.World))).ToList();
         }
 
-        private void DrawPeopleTab()
+        private List<PeopleTableRow> GetPeopleRows(PlayerViewData data)
         {
-            ImGui.Text("Players you've met");
-            ImGui.Spacing();
+            if (data.People != null)
+                return data.People;
 
-            var encounters = GetMatchingPlayerEncounters(FilterDutyRecords(applyPlayerFilters: false));
-
-            var people = encounters
+            var people = data.Encounters
                 .GroupBy(x => (x.Player.Name, x.Player.World))
                 .Select(group =>
                 {
@@ -76,22 +74,39 @@ namespace MentorRouletteTracker
                             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x != "Unknown") ?? "Unknown",
                         Gender = entries.Select(x => x.Player.Gender)
                             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x != "Unknown") ?? "Unknown",
-                        Encounters = entries,
+                        Encounters = entries.OrderByDescending(entry => entry.Record.Timestamp).ToList(),
+                        KnownDeathEncounters = entries.Count(entry => EffectiveDeaths(entry.Record, entry.Player).HasValue),
                         TotalDeaths = TotalKnownDeaths(entries.Select(x => EffectiveDeaths(x.Record, x.Player)))
                     };
                 })
                 .ToList();
+
+            data.People = people;
+            return people;
+        }
+
+        private void DrawPeopleTab()
+        {
+            ImGui.Text("Players you've met");
+            ImGui.Spacing();
+            var data = GetPlayerViewData();
+            var people = GetPeopleRows(data);
 
             int uniqueLalafell = people.Count(x => x.Race == "Lalafell");
             ImGui.Text($"Unique players: {people.Count}");
             ImGui.SameLine();
             ImGui.TextDisabled($"({uniqueLalafell} Lalafell)");
             ImGui.Spacing();
+            ImGui.PushTextWrapPos();
             ImGui.TextDisabled("Click a player to see your duties together. Click a column to sort.");
             ImGui.TextDisabled("Death totals include known counts only. Averages skip unknown counts. '-' means no known counts.");
+            ImGui.PopTextWrapPos();
             ImGui.Spacing();
 
-            if (ImGui.BeginTable(
+            if (people.Count == 0)
+                ImGui.TextDisabled("No players match your filters. Try clearing filters or lowering minimum encounters.");
+
+            if (people.Count > 0 && ImGui.BeginTable(
                 "peopleTable",
                 7,
                 ImGuiTableFlags.Borders |
@@ -101,7 +116,7 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.SizingStretchProp |
                 ImGuiTableFlags.Sortable))
             {
-                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.PreferSortAscending);
+                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.PreferSortAscending | ImGuiTableColumnFlags.WidthStretch, 2f);
                 ImGui.TableSetupColumn("World");
                 ImGui.TableSetupColumn("Race");
                 ImGui.TableSetupColumn("Gender");
@@ -111,7 +126,9 @@ namespace MentorRouletteTracker
                 ImGui.TableHeadersRow();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsCount > 0)
+                if (sortSpecs.SpecsCount > 0 &&
+                    (sortSpecs.SpecsDirty || data.PeopleSort !=
+                        (sortSpecs.Specs.ColumnIndex, (int)sortSpecs.Specs.SortDirection)))
                 {
                     var spec = sortSpecs.Specs;
                     bool ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
@@ -126,6 +143,8 @@ namespace MentorRouletteTracker
                         6 => ascending ? people.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths).ThenBy(x => x.Name).ToList() : people.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths).ThenBy(x => x.Name).ToList(),
                         _ => people
                     };
+                    data.People = people;
+                    data.PeopleSort = (spec.ColumnIndex, (int)spec.SortDirection);
                     sortSpecs.SpecsDirty = false;
                 }
 
@@ -199,9 +218,7 @@ namespace MentorRouletteTracker
                         ImGui.TableSetupColumn("Deaths");
                         ImGui.TableHeadersRow();
 
-                        var history = selected.Encounters
-                            .OrderByDescending(x => x.Record.Timestamp)
-                            .ToList();
+                        var history = selected.Encounters;
 
                         for (int i = 0; i < history.Count; i++)
                         {
