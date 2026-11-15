@@ -124,7 +124,7 @@ namespace MentorRouletteTracker
                     PlayerStatistic.RaceAndGender => (player.Race, player.Gender),
                     PlayerStatistic.Gender => (player.Gender, ""),
                     PlayerStatistic.Job => (player.Job, ""),
-                    PlayerStatistic.Status => (string.IsNullOrWhiteSpace(player.Status) ? "Unknown" : player.Status, ""),
+                    PlayerStatistic.Status => (GetPlayerStatus(player), ""),
                     PlayerStatistic.World => (player.World, ""),
                     PlayerStatistic.Datacenter => (worldDatacenters.GetValueOrDefault(player.World, "Unknown"), ""),
                     _ => throw new ArgumentOutOfRangeException(nameof(statistic))

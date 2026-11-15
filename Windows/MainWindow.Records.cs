@@ -555,8 +555,8 @@ namespace MentorRouletteTracker
                                     : sortedParty.OrderByDescending(x => x.Gender).ToList(),
 
                                 5 => ascending
-                                    ? sortedParty.OrderBy(x => x.Status ?? "Unknown").ToList()
-                                    : sortedParty.OrderByDescending(x => x.Status ?? "Unknown").ToList(),
+                                    ? sortedParty.OrderBy(GetPlayerStatus).ToList()
+                                    : sortedParty.OrderByDescending(GetPlayerStatus).ToList(),
 
                                 6 => ascending
                                     ? sortedParty.OrderBy(x => !EffectiveDeaths(r, x).HasValue).ThenBy(x => EffectiveDeaths(r, x)).ToList()
@@ -597,7 +597,7 @@ namespace MentorRouletteTracker
                             ImGui.TextUnformatted(member.Gender);
 
                             ImGui.TableSetColumnIndex(5);
-                            ImGui.TextUnformatted(member.Status);
+                            ImGui.TextUnformatted(GetPlayerStatus(member));
 
                             ImGui.TableSetColumnIndex(6);
 

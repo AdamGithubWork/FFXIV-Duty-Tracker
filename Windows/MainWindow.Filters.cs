@@ -5,6 +5,37 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
+        private string[] statusFilterOptions = Array.Empty<string>();
+        private long statusFilterHistoryVersion = -1;
+        private int statusFilterRecordCount = -1;
+
+        private IEnumerable<string> GetStatusFilterOptions()
+        {
+            if (statusFilterHistoryVersion != config.History.ChangeVersion ||
+                statusFilterRecordCount != config.History.Records.Count)
+            {
+                statusFilterOptions = new[]
+                    { "Mentor", "Trade Mentor", "Sprout", "Party Member", "Returner" }
+                    .Concat(config.History.Records.SelectMany(record => record.Party)
+                        .Select(GetPlayerStatus))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                statusFilterHistoryVersion = config.History.ChangeVersion;
+                statusFilterRecordCount = config.History.Records.Count;
+            }
+
+            return statusFilterOptions.Concat(selectedPlayerStatuses)
+                .Where(status => status != "Unknown")
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string GetPlayerStatus(PartyMemberSnapshot player) => player.Status switch
+        {
+            "Battle Mentor" or "PvE Mentor" or "PvP Mentor" or "Mentor" => "Mentor",
+            _ => string.IsNullOrWhiteSpace(player.Status) ? "Unknown" : player.Status
+        };
+
         private void DrawFilterCheckboxes(
             IEnumerable<string> options,
             HashSet<string> selected)
@@ -97,7 +128,7 @@ namespace MentorRouletteTracker
                  selectedPlayerGenders.Contains(player.Gender)) &&
 
                 (selectedPlayerStatuses.Count == 0 ||
-                 selectedPlayerStatuses.Contains(player.Status)) &&
+                 selectedPlayerStatuses.Contains(GetPlayerStatus(player))) &&
 
                 (selectedPlayerJobs.Count == 0 || selectedPlayerJobs.Contains(player.Job)) &&
                 (selectedPlayerWorlds.Count == 0 || selectedPlayerWorlds.Contains(player.World)) &&

@@ -278,14 +278,7 @@ namespace MentorRouletteTracker
                         ? "(All)"
                         : $"({selectedPlayerStatuses.Count} selected)");
 
-                string[] statuses =
-                {
-                    "Battle Mentor",
-                    "Trade Mentor",
-                    "Sprout",
-                    "Party Member",
-                    "Returner"
-                };
+                var statuses = GetStatusFilterOptions();
 
                 DrawFilterCheckboxes(
                     statuses,
