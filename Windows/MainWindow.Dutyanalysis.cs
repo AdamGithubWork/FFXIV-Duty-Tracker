@@ -236,6 +236,13 @@ namespace MentorRouletteTracker
 
                 ImGui.TableHeadersRow();
 
+                var maxValue = Math.Max(
+                    1.0,
+                    dutiesByDayAndTime.Max(x =>
+                        selectedHeatmapMetric == 0
+                            ? x.Count
+                            : x.AverageDuration));
+
                 foreach (var day in days)
                 {
                     ImGui.TableNextRow();
@@ -257,13 +264,6 @@ namespace MentorRouletteTracker
                             : group?.AverageDuration ?? 0;
 
                         ImGui.TableSetColumnIndex(i + 1);
-
-                        var maxValue = Math.Max(
-                            1.0,
-                            dutiesByDayAndTime.Max(x =>
-                                selectedHeatmapMetric == 0
-                                    ? x.Count
-                                    : x.AverageDuration));
 
                         var intensity = (float)(value / maxValue);
 
