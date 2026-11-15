@@ -1,6 +1,7 @@
 ﻿
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -616,16 +617,15 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                ImGui.PushFont(UiBuilder.IconFont);
-
-                if (ImGui.Button(FontAwesomeIcon.Edit.ToIconString() + "###EditDutyNote"))
+                if (ImGuiComponents.IconButton("EditDutyNote", FontAwesomeIcon.Edit))
                 {
                     noteRecord = r;
                     noteDraft = r.Note ?? string.Empty;
                     showNoteWindow = true;
                 }
 
-                ImGui.PopFont();
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Edit duty note");
 
                 ImGui.SameLine();
                 ImGui.TextWrapped($"Notes: {r.Note}");
