@@ -19,8 +19,10 @@ namespace MentorRouletteTracker
                 : null;
         }
 
-        // Refresh once a second to avoid rebuilding milestones every frame.
+        // Rolling date filters can change even when no history is saved.
         private DateTime nextMilestoneRefresh = DateTime.MinValue;
+        private long milestoneHistoryVersion = -1;
+        private int milestoneRecordCount = -1;
         private string? milestoneFilterKey;
         private string? milestonePlayerName;
         private bool milestonesIncludeSelf;
@@ -32,11 +34,8 @@ namespace MentorRouletteTracker
 
         private readonly List<(string Title, List<(string Label, MilestoneResult Value)> Rows)> milestoneSections = new();
 
-        private void DrawSummaryTab()
+        private void RefreshMilestonesIfNeeded(string? localName)
         {
-            config.HiddenMilestones ??= new();
-            var localName = objectTable.LocalPlayer?.Name.TextValue;
-
             var dutyFilterKey = string.Join("|",
                 string.Join(",", selectedDutyTypes.OrderBy(x => x, StringComparer.Ordinal)),
                 globalDutySearchText.Trim(),
@@ -44,7 +43,9 @@ namespace MentorRouletteTracker
                 customStartDate.Date.ToString("yyyyMMdd"),
                 customEndDate.Date.ToString("yyyyMMdd"));
 
-            if (DateTime.UtcNow >= nextMilestoneRefresh ||
+            if (milestoneHistoryVersion != config.History.ChangeVersion ||
+                milestoneRecordCount != config.History.Records.Count ||
+                (selectedTimeRange is >= 1 and <= 3 && DateTime.UtcNow >= nextMilestoneRefresh) ||
                 dutyFilterKey != milestoneFilterKey ||
                 localName != milestonePlayerName ||
                 milestonesIncludeSelf != config.IncludeSelfInStatistics)
@@ -54,7 +55,15 @@ namespace MentorRouletteTracker
                 milestoneFilterKey = dutyFilterKey;
                 milestonePlayerName = localName;
                 milestonesIncludeSelf = config.IncludeSelfInStatistics;
+                milestoneHistoryVersion = config.History.ChangeVersion;
+                milestoneRecordCount = config.History.Records.Count;
             }
+        }
+
+        private void DrawSummaryTab()
+        {
+            config.HiddenMilestones ??= new();
+            RefreshMilestonesIfNeeded(objectTable.LocalPlayer?.Name.TextValue);
 
             if (ImGui.BeginChild("SummaryContent", Vector2.Zero, false,
                     ImGuiWindowFlags.HorizontalScrollbar))
