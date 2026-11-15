@@ -20,25 +20,25 @@ public partial class MainWindow
                 .Where(pair => pair.Value == datacenter).Select(pair => pair.Key).Order().ToArray()))
             .ToArray();
         var players = config.History.Records.SelectMany(record => record.Party);
-        var availableWidth = ImGui.GetContentRegionAvail().X;
-        var preferredWidth = ImGui.GetFontSize() * 16f;
-        var sideBySide = availableWidth >= preferredWidth * 2 + ImGui.GetStyle().ItemSpacing.X;
-        var width = Math.Max(1f, Math.Min(preferredWidth, availableWidth));
-
-        ImGui.SetNextItemWidth(width);
-        DrawGroupedFilter("Jobs", "All Jobs", selectedPlayerJobs, JobFilterGroups,
-            players.Select(player => player.Job));
-        if (sideBySide)
-            ImGui.SameLine();
-        else
-            ImGui.Spacing();
-        ImGui.SetNextItemWidth(width);
-        DrawGroupedFilter("Worlds", "All Worlds", selectedPlayerWorlds, worlds,
-            players.Select(player => player.World));
+        var columns = ImGui.GetContentRegionAvail().X >= ImGui.GetFontSize() * 19f ? 2 : 1;
+        if (ImGui.BeginTable("JobAndWorldFilters", columns, ImGuiTableFlags.SizingStretchSame))
+        {
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted("Job");
+            ImGui.SetNextItemWidth(-1);
+            DrawGroupedFilter("Jobs", "All Jobs", "Roles", selectedPlayerJobs, JobFilterGroups,
+                players.Select(player => player.Job));
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted("Home world");
+            ImGui.SetNextItemWidth(-1);
+            DrawGroupedFilter("Worlds", "All Worlds", "Datacenters", selectedPlayerWorlds, worlds,
+                players.Select(player => player.World));
+            ImGui.EndTable();
+        }
     }
 
     private static void DrawGroupedFilter(
-        string id, string allLabel, HashSet<string> selected,
+        string id, string allLabel, string groupLabel, HashSet<string> selected,
         (string Name, string[] Options)[] groups, IEnumerable<string> recordedOptions)
     {
         var preview = selected.Count switch
@@ -56,6 +56,7 @@ public partial class MainWindow
             selected.Clear();
 
         ImGui.Separator();
+        ImGui.TextDisabled(groupLabel);
         foreach (var group in groups)
         {
             var wholeGroup = group.Options.All(selected.Contains);

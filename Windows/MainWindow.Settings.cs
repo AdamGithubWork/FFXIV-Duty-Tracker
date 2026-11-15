@@ -1,12 +1,37 @@
-﻿
-using Dalamud.Bindings.ImGui;
+﻿using Dalamud.Bindings.ImGui;
+using System.Numerics;
 
 namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
+        private bool? settingsExpansion;
+        private bool? milestoneExpansion;
+
         private void DrawSettingsTab()
         {
+            if (ImGui.BeginChild("SettingsContent", Vector2.Zero, false))
+                DrawSettingsContent();
+            ImGui.EndChild();
+        }
+
+        private void DrawSettingsContent()
+        {
+            if (ImGui.Button("Collapse all##Settings"))
+            {
+                settingsExpansion = false;
+                milestoneExpansion = false;
+                tableColumnsExpansion = false;
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Expand all##Settings"))
+            {
+                settingsExpansion = true;
+                milestoneExpansion = true;
+                tableColumnsExpansion = true;
+            }
+            ImGui.Spacing();
+
             var contentTypes = new (uint Id, string Name)[]
             {
                 (2, "Dungeons"),
@@ -20,89 +45,317 @@ namespace MentorRouletteTracker
                 (37, "Chaotic Alliance Raid")
             };
 
-            ImGui.Text("Duty recording");
-            ImGui.TextDisabled(
-                "Choose which duties to record.");
-
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            foreach (var contentType in contentTypes)
+            if (BeginSettingsSection("Duty recording", defaultOpen: true))
             {
-                var isTracked =
-                    config.TrackedContentTypeIds.Contains(contentType.Id);
+                var armed = tracker.Armed;
 
-                if (ImGui.Checkbox(
-                    $"{contentType.Name}##DutyTracking",
-                    ref isTracked))
+                if (ImGui.Checkbox("Record duties", ref armed))
                 {
-                    if (isTracked)
-                        config.TrackedContentTypeIds.Add(contentType.Id);
-                    else
-                        config.TrackedContentTypeIds.Remove(contentType.Id);
-
-                    config.Save();
+                    tracker.Armed = armed;
                 }
+
+                ImGui.PushTextWrapPos();
+                ImGui.TextDisabled(
+                    "Turn this off before duties you don't want recorded.");
+                ImGui.PopTextWrapPos();
+
+                ImGui.Spacing();
+                ImGui.TextDisabled("Choose which duties to record.");
+                ImGui.Spacing();
+                foreach (var contentType in contentTypes)
+                {
+                    var isTracked =
+                        config.TrackedContentTypeIds.Contains(contentType.Id);
+
+                    if (ImGui.Checkbox(
+                        $"{contentType.Name}##DutyTracking",
+                        ref isTracked))
+                    {
+                        if (isTracked)
+                            config.TrackedContentTypeIds.Add(contentType.Id);
+                        else
+                            config.TrackedContentTypeIds.Remove(contentType.Id);
+
+                        config.Save();
+                    }
+                }
+                EndSettingsSection();
             }
 
             ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            ImGui.Text("Duty timer");
-            ImGui.TextDisabled(
-                "Choose which duties show the timer.");
-
-            ImGui.Spacing();
-
-            foreach (var contentType in contentTypes)
+            if (BeginSettingsSection("Player tracking", defaultOpen: true))
             {
-                var showTimer =
-                    config.TimerVisibleContentTypeIds.Contains(contentType.Id);
+                bool includeSelf = config.IncludeSelfInStatistics;
 
                 if (ImGui.Checkbox(
-                    $"{contentType.Name}##TimerVisibility",
-                    ref showTimer))
+                    "Include yourself in statistics",
+                    ref includeSelf))
                 {
-                    if (showTimer)
-                        config.TimerVisibleContentTypeIds.Add(contentType.Id);
-                    else
-                        config.TimerVisibleContentTypeIds.Remove(contentType.Id);
-
+                    config.IncludeSelfInStatistics = includeSelf;
                     config.Save();
                 }
+
+                bool trackAlliance = config.TrackAllianceMembers;
+
+                if (ImGui.Checkbox(
+                    "Track alliance members",
+                    ref trackAlliance))
+                {
+                    config.TrackAllianceMembers = trackAlliance;
+                    config.Save();
+                }
+                EndSettingsSection();
             }
 
             ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            ImGui.Text("Player tracking");
-
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            bool includeSelf = config.IncludeSelfInStatistics;
-
-            if (ImGui.Checkbox(
-                "Include yourself in statistics",
-                ref includeSelf))
+            if (BeginSettingsSection("Duty timer"))
             {
-                config.IncludeSelfInStatistics = includeSelf;
+                ImGui.TextDisabled("Choose which duties show the timer.");
+                ImGui.Spacing();
+                foreach (var contentType in contentTypes)
+                {
+                    var showTimer =
+                        config.TimerVisibleContentTypeIds.Contains(contentType.Id);
+
+                    if (ImGui.Checkbox(
+                        $"{contentType.Name}##TimerVisibility",
+                        ref showTimer))
+                    {
+                        if (showTimer)
+                            config.TimerVisibleContentTypeIds.Add(contentType.Id);
+                        else
+                            config.TimerVisibleContentTypeIds.Remove(contentType.Id);
+
+                        config.Save();
+                    }
+                }
+                EndSettingsSection();
+            }
+
+            ImGui.Spacing();
+            if (BeginSettingsSection("Appearance"))
+            {
+                DrawAppearanceSettings();
+                EndSettingsSection();
+            }
+
+            ImGui.Spacing();
+            if (BeginSettingsSection("Statistics sections"))
+            {
+                DrawStatisticsCustomization();
+                EndSettingsSection();
+            }
+
+            ImGui.Spacing();
+            if (BeginSettingsSection("Table columns"))
+            {
+                DrawTableColumnSettings();
+                EndSettingsSection();
+            }
+
+            ImGui.Spacing();
+            if (BeginSettingsSection("Milestones"))
+            {
+                DrawMilestoneCustomization();
+                EndSettingsSection();
+            }
+
+            settingsExpansion = null;
+        }
+
+        private bool BeginSettingsSection(string title, bool defaultOpen = false)
+        {
+            if (settingsExpansion.HasValue)
+                ImGui.SetNextItemOpen(settingsExpansion.Value, ImGuiCond.Always);
+            var flags = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
+            if (!ImGui.CollapsingHeader(title, flags))
+                return false;
+            ImGui.Indent();
+            ImGui.Spacing();
+            return true;
+        }
+
+        private static void EndSettingsSection()
+        {
+            ImGui.Spacing();
+            ImGui.Unindent();
+        }
+
+        private void DrawAppearanceSettings()
+        {
+            ImGui.PushTextWrapPos();
+            ImGui.TextDisabled("Choose background colors below. Use Opacity to control transparency. Reset restores the default color.");
+            ImGui.PopTextWrapPos();
+            ImGui.Spacing();
+
+            DrawBackgroundColor("Window background", config.WindowBackgroundColor,
+                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.WindowBg)), value => config.WindowBackgroundColor = value);
+            DrawBackgroundColor("Panel background", config.PanelBackgroundColor,
+                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.ChildBg)), value => config.PanelBackgroundColor = value);
+            DrawBackgroundColor("Table headers", config.TableHeaderBackgroundColor,
+                WindowAppearance.DefaultTableHeader, value => config.TableHeaderBackgroundColor = value);
+            DrawBackgroundColor("Table rows", config.TableRowBackgroundColor,
+                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.TableRowBg)), value => config.TableRowBackgroundColor = value);
+            DrawBackgroundColor("Alternate table rows", config.AlternateRowBackgroundColor,
+                WindowAppearance.DefaultAlternateRow, value => config.AlternateRowBackgroundColor = value);
+
+            if (ImGui.Button("Reset colors"))
+            {
+                config.WindowBackgroundColor = null;
+                config.PanelBackgroundColor = null;
+                config.TableHeaderBackgroundColor = null;
+                config.TableRowBackgroundColor = null;
+                config.AlternateRowBackgroundColor = null;
                 config.Save();
             }
-
-            bool trackAlliance = config.TrackAllianceMembers;
-
-            if (ImGui.Checkbox(
-                "Track alliance members",
-                ref trackAlliance))
+            ImGui.SameLine();
+            if (ImGui.Button("Make colors opaque"))
+                MakeBackgroundColorsOpaque();
+            ImGui.Spacing();
+            ImGui.TextDisabled("Table preview");
+            if (BeginStyledTable("AppearancePreview", 2,
+                ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
             {
-                config.TrackAllianceMembers = trackAlliance;
+                ImGui.TableSetupColumn("Row");
+                ImGui.TableSetupColumn("Example");
+                ImGui.TableHeadersRow();
+                for (var i = 0; i < 3; i++)
+                {
+                    ImGui.TableNextRow();
+                    DrawTableCell(0, $"Row {i + 1}");
+                    DrawTableCell(1, i % 2 == 0 ? "Table row color" : "Alternate row color");
+                }
+                EndStyledTable();
+            }
+            ImGui.Spacing();
+            var wrap = config.WrapTableHeaders;
+            if (ImGui.Checkbox("Wrap headers in very narrow columns", ref wrap))
+            {
+                config.WrapTableHeaders = wrap;
                 config.Save();
             }
         }
+
+        private void DrawBackgroundColor(string label, uint? saved, Vector4 fallback, Action<uint?> update)
+        {
+            ImGui.PushID(label);
+            ImGui.TextUnformatted(label);
+            var color = saved.HasValue ? ImGui.ColorConvertU32ToFloat4(saved.Value) : fallback;
+            var customized = saved.HasValue;
+            var resetWidth = ImGui.CalcTextSize("Default").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+            ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - resetWidth)));
+            if (ImGui.ColorEdit4("##Color", ref color, ImGuiColorEditFlags.NoAlpha))
+            {
+                if (!customized)
+                    color.W = 1f;
+                update(ImGui.ColorConvertFloat4ToU32(color));
+                config.Save();
+                customized = true;
+            }
+            ImGui.SameLine();
+            if (customized)
+            {
+                if (ImGui.SmallButton("Reset"))
+                {
+                    update(null);
+                    config.Save();
+                }
+            }
+            else
+            {
+                ImGui.TextDisabled("Default");
+            }
+            var opacity = color.W * 100f;
+            var opacityLabelWidth = ImGui.CalcTextSize("Opacity").X + ImGui.GetStyle().ItemSpacing.X;
+            ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - opacityLabelWidth)));
+            if (ImGui.SliderFloat("Opacity", ref opacity, 0, 100, "%.0f%%"))
+            {
+                color.W = opacity / 100f;
+                update(ImGui.ColorConvertFloat4ToU32(color));
+                config.Save();
+            }
+            ImGui.PopID();
+            ImGui.Spacing();
+        }
+
+        private void MakeBackgroundColorsOpaque()
+        {
+            static uint? Opaque(uint? color) => color.HasValue ? color.Value | 0xFF000000u : null;
+            config.WindowBackgroundColor = Opaque(config.WindowBackgroundColor);
+            config.PanelBackgroundColor = Opaque(config.PanelBackgroundColor);
+            config.TableHeaderBackgroundColor = Opaque(config.TableHeaderBackgroundColor);
+            config.TableRowBackgroundColor = Opaque(config.TableRowBackgroundColor);
+            config.AlternateRowBackgroundColor = Opaque(config.AlternateRowBackgroundColor);
+            config.Save();
+        }
+
+        private void DrawStatisticsCustomization()
+        {
+            var changed = false;
+            void Option(string label, bool visible, Action<bool> update)
+            {
+                if (ImGui.Checkbox(label, ref visible))
+                {
+                    update(visible);
+                    changed = true;
+                }
+            }
+
+            Option("Overview", config.ShowStatisticsOverview, value => config.ShowStatisticsOverview = value);
+            Option("Race", config.ShowRaceStatistics, value => config.ShowRaceStatistics = value);
+            Option("Gender", config.ShowGenderStatistics, value => config.ShowGenderStatistics = value);
+            Option("Job", config.ShowJobStatistics, value => config.ShowJobStatistics = value);
+            Option("Status", config.ShowStatusStatistics, value => config.ShowStatusStatistics = value);
+            Option("Home world", config.ShowWorldStatistics, value => config.ShowWorldStatistics = value);
+            Option("Datacenter", config.ShowDatacenterStatistics, value => config.ShowDatacenterStatistics = value);
+
+            if (changed)
+                config.Save();
+        }
+
+        private void DrawMilestoneCustomization()
+        {
+            config.HiddenMilestones ??= new();
+            RefreshMilestonesIfNeeded(objectTable.LocalPlayer?.Name.TextValue);
+
+            var changed = false;
+            if (ImGui.Button("Show all milestones") && config.HiddenMilestones.Count > 0)
+            {
+                config.HiddenMilestones.Clear();
+                changed = true;
+            }
+            ImGui.Separator();
+
+            if (milestoneSections.Count == 0)
+                ImGui.TextWrapped("Complete a duty or clear the duty filters to see the milestone options.");
+            foreach (var section in milestoneSections)
+            {
+                ImGui.PushID(section.Title);
+                if (milestoneExpansion.HasValue)
+                    ImGui.SetNextItemOpen(milestoneExpansion.Value, ImGuiCond.Always);
+                if (ImGui.TreeNodeEx(section.Title, ImGuiTreeNodeFlags.SpanAvailWidth))
+                {
+                    foreach (var row in section.Rows)
+                    {
+                        var key = MilestoneKey(section.Title, row.Label);
+                        var visible = !config.HiddenMilestones.Contains(key);
+                        if (!ImGui.Checkbox(row.Label, ref visible))
+                            continue;
+                        if (visible)
+                            config.HiddenMilestones.Remove(key);
+                        else
+                            config.HiddenMilestones.Add(key);
+                        changed = true;
+                    }
+                    ImGui.TreePop();
+                }
+                ImGui.PopID();
+            }
+            milestoneExpansion = null;
+
+            if (changed)
+                config.Save();
+        }
+
     }
 }

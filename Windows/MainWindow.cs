@@ -52,6 +52,7 @@ namespace MentorRouletteTracker
         private string lastExportMessage = string.Empty;
 
         private int selectedHeatmapMetric = 0;
+        private int appearanceColorCount;
 
         public MainWindow(
             Configuration config,
@@ -79,6 +80,21 @@ namespace MentorRouletteTracker
 
             Size = new Vector2(800, 520);
             SizeCondition = ImGuiCond.FirstUseEver;
+        }
+
+        private static void DrawSectionHeading(string title) =>
+            ImGui.TextColored(new Vector4(0.65f, 0.8f, 1f, 1f), title);
+
+        public override void PreDraw()
+        {
+            appearanceColorCount = WindowAppearance.Push(config);
+        }
+
+        public override void PostDraw()
+        {
+            if (appearanceColorCount > 0)
+                ImGui.PopStyleColor(appearanceColorCount);
+            appearanceColorCount = 0;
         }
 
         public void Dispose()
@@ -123,274 +139,6 @@ namespace MentorRouletteTracker
                 return;
             }
 
-            int activeFilterCount =
-                selectedDutyTypes.Count +
-                selectedPlayerRaces.Count +
-                selectedPlayerGenders.Count +
-                selectedPlayerStatuses.Count +
-                (selectedPlayerJobs.Count == 0 ? 0 : 1) +
-                (selectedPlayerWorlds.Count == 0 ? 0 : 1) +
-                (string.IsNullOrWhiteSpace(globalPlayerSearchText) ? 0 : 1) +
-                (string.IsNullOrWhiteSpace(globalDutySearchText) ? 0 : 1) +
-                (selectedTimeRange == 0 ? 0 : 1) +
-                (minimumEncounters > 1 ? 1 : 0);
-
-            string filterHeader = activeFilterCount == 0
-                ? "Filters"
-                : $"Filters ({activeFilterCount} active)";
-
-            if (ImGui.CollapsingHeader(filterHeader + "###GlobalFilters"))
-            {
-                ImGui.Spacing();
-
-                ImGui.Text("Find players");
-
-                ImGui.SetNextItemWidth(
-                    Math.Min(300f, ImGui.GetContentRegionAvail().X));
-
-                ImGui.InputText(
-                    "##GlobalPlayerSearch",
-                    ref globalPlayerSearchText,
-                    100);
-
-                ImGui.TextDisabled("Player name or home world.");
-                ImGui.Spacing();
-
-                ImGui.Text("Find duties");
-
-                ImGui.SetNextItemWidth(
-                    Math.Min(300f, ImGui.GetContentRegionAvail().X));
-
-                ImGui.InputText(
-                    "##GlobalDutySearch",
-                    ref globalDutySearchText,
-                    100);
-
-                ImGui.TextDisabled("Duty name.");
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                ImGui.Text("Duty Types");
-
-                ImGui.SameLine();
-
-                ImGui.TextDisabled(
-                    selectedDutyTypes.Count == 0
-                        ? "(All)"
-                        : $"({selectedDutyTypes.Count} selected)");
-
-                ImGui.Spacing();
-
-                var dutyTypes = config.History.Records
-                    .Select(record => record.DutyType)
-                    .Where(type => !string.IsNullOrWhiteSpace(type))
-                    .Concat(new[] { "Extreme Trials", "Savage Raids" })
-                    .Distinct()
-                    .OrderBy(type => type)
-                    .ToList();
-
-                DrawFilterCheckboxes(
-                    dutyTypes,
-                    selectedDutyTypes);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                int activePlayerFilters =
-                    selectedPlayerRaces.Count +
-                    selectedPlayerGenders.Count +
-                    selectedPlayerStatuses.Count +
-                    (selectedPlayerJobs.Count == 0 ? 0 : 1) +
-                    (selectedPlayerWorlds.Count == 0 ? 0 : 1) +
-                    (minimumEncounters > 1 ? 1 : 0);
-
-                ImGui.Text("Player filters");
-                ImGui.SameLine();
-
-                ImGui.TextDisabled(
-                    activePlayerFilters == 0
-                        ? "(All)"
-                        : $"({activePlayerFilters} selected)");
-
-                ImGui.Spacing();
-
-                DrawJobAndWorldFilters();
-                ImGui.Spacing();
-
-                ImGui.SetNextItemWidth(Math.Min(260f, ImGui.GetContentRegionAvail().X));
-                ImGui.SliderInt("Minimum encounters", ref minimumEncounters, 1, 100, "%d", ImGuiSliderFlags.AlwaysClamp);
-                ImGui.TextDisabled("People and Statistics: matching completed duties per player.");
-                ImGui.Spacing();
-
-                ImGui.Text("Race");
-                ImGui.SameLine();
-
-                ImGui.TextDisabled(
-                    selectedPlayerRaces.Count == 0
-                        ? "(All)"
-                        : $"({selectedPlayerRaces.Count} selected)");
-
-                string[] races =
-                {
-                    "Hyur",
-                    "Elezen",
-                    "Lalafell",
-                    "Miqo'te",
-                    "Roegadyn",
-                    "Au Ra",
-                    "Hrothgar",
-                    "Viera"
-                };
-
-                DrawFilterCheckboxes(
-                    races,
-                    selectedPlayerRaces);
-
-                ImGui.Spacing();
-
-                ImGui.Text("Gender");
-                ImGui.SameLine();
-
-                ImGui.TextDisabled(
-                    selectedPlayerGenders.Count == 0
-                        ? "(All)"
-                        : $"({selectedPlayerGenders.Count} selected)");
-
-                string[] genders =
-                {
-                    "Male",
-                    "Female"
-                };
-
-                DrawFilterCheckboxes(
-                    genders,
-                    selectedPlayerGenders);
-
-                ImGui.Spacing();
-
-                ImGui.Text("Status");
-                ImGui.SameLine();
-
-                ImGui.TextDisabled(
-                    selectedPlayerStatuses.Count == 0
-                        ? "(All)"
-                        : $"({selectedPlayerStatuses.Count} selected)");
-
-                var statuses = GetStatusFilterOptions();
-
-                DrawFilterCheckboxes(
-                    statuses,
-                    selectedPlayerStatuses);
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                ImGui.Text("Time Range");
-
-                string[] timeRanges =
-                {
-                    "All Time",
-                    "Last 7 Days",
-                    "Last 30 Days",
-                    "Last 90 Days",
-                    "Custom Range"
-                };
-
-                ImGui.SetNextItemWidth(
-                    Math.Min(220f, ImGui.GetContentRegionAvail().X));
-
-                ImGui.Combo(
-                    "##GlobalTimeRange",
-                    ref selectedTimeRange,
-                    timeRanges,
-                    timeRanges.Length);
-
-                if (selectedTimeRange == 4)
-                {
-                    ImGui.Spacing();
-
-                    int startYear = customStartDate.Year;
-                    int startMonth = customStartDate.Month;
-                    int startDay = customStartDate.Day;
-
-                    int endYear = customEndDate.Year;
-                    int endMonth = customEndDate.Month;
-                    int endDay = customEndDate.Day;
-
-                    ImGui.Text("Start Date");
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Year##GlobalStart", ref startYear);
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Month##GlobalStart", ref startMonth);
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Day##GlobalStart", ref startDay);
-
-                    ImGui.Spacing();
-
-                    ImGui.Text("End Date");
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Year##GlobalEnd", ref endYear);
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Month##GlobalEnd", ref endMonth);
-
-                    ImGui.SetNextItemWidth(110);
-                    ImGui.InputInt("Day##GlobalEnd", ref endDay);
-
-                    if (IsValidDate(startYear, startMonth, startDay))
-                    {
-                        customStartDate = new DateTime(
-                            startYear, startMonth, startDay);
-                    }
-
-                    if (IsValidDate(endYear, endMonth, endDay))
-                    {
-                        customEndDate = new DateTime(
-                            endYear, endMonth, endDay);
-                    }
-
-                    if (customStartDate > customEndDate)
-                    {
-                        ImGui.TextDisabled(
-                            "The start date can't be after the end date.");
-                    }
-                }
-
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                if (ImGui.Button("Clear filters"))
-                {
-                    globalPlayerSearchText = string.Empty;
-                    globalDutySearchText = string.Empty;
-                    selectedDutyTypes.Clear();
-                    selectedPlayerRaces.Clear();
-                    selectedPlayerGenders.Clear();
-                    selectedPlayerStatuses.Clear();
-                    selectedPlayerJobs.Clear();
-                    selectedPlayerWorlds.Clear();
-                    selectedTimeRange = 0;
-                    minimumEncounters = 1;
-
-                    dutyHistoryFilter = null;
-                    dutyHistoryFullRunsOnly = false;
-                }
-
-                ImGui.Dummy(new Vector2(0, 8));
-                ImGui.Separator();
-                ImGui.Dummy(new Vector2(0, 8));
-            }
-
-            ImGui.Spacing();
-
             if (ImGui.BeginTabBar("MainTabs"))
             {
                 var recordsTabFlags = openDutyHistory
@@ -399,6 +147,7 @@ namespace MentorRouletteTracker
 
                 if (ImGui.BeginTabItem("Records", recordsTabFlags))
                 {
+                    DrawFilterPanel("Records");
                     DrawRecordsTab();
                     ImGui.EndTabItem();
                 }
@@ -407,24 +156,28 @@ namespace MentorRouletteTracker
 
                 if (ImGui.BeginTabItem("Statistics"))
                 {
+                    DrawFilterPanel("Statistics", encounterFilter: true);
                     DrawStatisticsTab();
                     ImGui.EndTabItem();
                 }
 
                 if (ImGui.BeginTabItem("Duty Analysis"))
                 {
+                    DrawFilterPanel("Duty Analysis");
                     DrawDutyAnalysisTab();
                     ImGui.EndTabItem();
                 }
 
                 if (ImGui.BeginTabItem("Summary"))
                 {
+                    DrawFilterPanel("Summary", playerFilters: false);
                     DrawSummaryTab();
                     ImGui.EndTabItem();
                 }
 
                 if (ImGui.BeginTabItem("People"))
                 {
+                    DrawFilterPanel("People", encounterFilter: true);
                     DrawPeopleTab();
                     ImGui.EndTabItem();
                 }

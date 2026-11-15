@@ -15,6 +15,7 @@ namespace MentorRouletteTracker
         private long cachedChangeVersion = -1;
         private int cachedRunCount;
         private string averageText = "No full runs yet";
+        private int appearanceColorCount;
 
         public DutyTimerWindow(
             DutyTrackerService tracker,
@@ -31,6 +32,18 @@ namespace MentorRouletteTracker
             this.config = config;
 
             IsOpen = true;
+        }
+
+        public override void PreDraw()
+        {
+            appearanceColorCount = WindowAppearance.Push(config);
+        }
+
+        public override void PostDraw()
+        {
+            if (appearanceColorCount > 0)
+                ImGui.PopStyleColor(appearanceColorCount);
+            appearanceColorCount = 0;
         }
 
         public override bool DrawConditions()
@@ -62,7 +75,7 @@ namespace MentorRouletteTracker
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("View full runs used for this average");
+                ImGui.SetTooltip("Click to view the full runs used for this average");
             }
 
             ImGui.TextDisabled($"Based on {cachedRunCount} full runs");

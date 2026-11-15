@@ -36,57 +36,6 @@ namespace MentorRouletteTracker
             _ => string.IsNullOrWhiteSpace(player.Status) ? "Unknown" : player.Status
         };
 
-        private void DrawFilterCheckboxes(
-            IEnumerable<string> options,
-            HashSet<string> selected)
-        {
-            var items = options.ToList();
-
-            if (items.Count == 0)
-            {
-                ImGui.TextDisabled("No options yet.");
-                return;
-            }
-
-            float spacing = ImGui.GetStyle().ItemSpacing.X;
-            float checkboxSize = ImGui.GetFrameHeight();
-
-            ImGui.PushID(selected.GetHashCode());
-
-            for (int i = 0; i < items.Count; i++)
-            {
-                string option = items[i];
-                bool isSelected = selected.Contains(option);
-
-                if (ImGui.Checkbox(option, ref isSelected))
-                {
-                    if (isSelected)
-                        selected.Add(option);
-                    else
-                        selected.Remove(option);
-                }
-
-                if (i < items.Count - 1)
-                {
-                    string nextOption = items[i + 1];
-
-                    float nextWidth =
-                        checkboxSize +
-                        ImGui.GetStyle().ItemInnerSpacing.X +
-                        ImGui.CalcTextSize(nextOption).X;
-
-                    if (ImGui.GetContentRegionAvail().X >=
-                        nextWidth + spacing)
-                    {
-                        ImGui.SameLine();
-                    }
-                }
-            }
-
-            ImGui.PopID();
-        }
-
-
         private IEnumerable<DutyRecord> FilterDutyRecords(bool? completed = true, bool applyPlayerFilters = true)
         {
             var now = DateTime.Now;

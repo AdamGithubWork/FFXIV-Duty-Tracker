@@ -20,6 +20,13 @@ namespace MentorRouletteTracker
         public bool ShowWorldStatistics { get; set; } = true;
         public bool ShowDatacenterStatistics { get; set; } = true;
         public HashSet<string> HiddenMilestones { get; set; } = new();
+        public Dictionary<string, HashSet<string>> TableColumns { get; set; } = new();
+        public uint? WindowBackgroundColor { get; set; }
+        public uint? PanelBackgroundColor { get; set; }
+        public uint? TableHeaderBackgroundColor { get; set; }
+        public uint? TableRowBackgroundColor { get; set; }
+        public uint? AlternateRowBackgroundColor { get; set; }
+        public bool WrapTableHeaders { get; set; } = true;
 
         [NonSerialized]
         private HistorySession? history;

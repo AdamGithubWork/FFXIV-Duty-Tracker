@@ -20,13 +20,13 @@ namespace MentorRouletteTracker
                 ImGuiWindowFlags.HorizontalScrollbar))
             {
                 ImGui.Text("Duty Analysis");
-                ImGui.TextDisabled("Completed duties that match your filters. Death counts use matching players only.");
+                ImGui.TextDisabled("Completed duties matching the filters above.");
                 ImGui.Separator();
                 ImGui.Spacing();
 
                 if (records.Count == 0)
                 {
-                    ImGui.TextDisabled("No completed duties match your filters.");
+                    ImGui.TextDisabled("No completed duties with these filters.");
                 }
                 else
                 {
@@ -59,10 +59,10 @@ namespace MentorRouletteTracker
 
         private void DrawDutyOverview(List<DutyRecord> records)
         {
-            ImGui.Text("Overview");
+            DrawSectionHeading("Overview");
             ImGui.Spacing();
 
-            if (ImGui.BeginTable(
+            if (BeginStyledTable(
                 "dutyOverview",
                 2,
                 ImGuiTableFlags.Borders |
@@ -84,13 +84,13 @@ namespace MentorRouletteTracker
                 DrawStatisticRow("Joined In Progress",
                     records.Count(x => x.JoinedInProgress).ToString());
 
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 
         private void DrawDutyTypeStatistics(List<DutyRecord> records)
         {
-            ImGui.Text("Duties by Type");
+            DrawSectionHeading("Duties by Type");
 
             ImGui.Spacing();
 
@@ -100,7 +100,7 @@ namespace MentorRouletteTracker
                 .ThenBy(x => x.Key)
                 .ToList();
 
-            if (ImGui.BeginTable(
+            if (BeginStyledTable(
                 "dutyTypeStats",
                 2,
                 ImGuiTableFlags.Borders |
@@ -124,13 +124,13 @@ namespace MentorRouletteTracker
                         group.Count().ToString());
                 }
 
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 
         private void DrawMostCommonDuty(List<DutyRecord> records)
         {
-            ImGui.Text("Most Common Duty");
+            DrawSectionHeading("Most Common Duty");
 
             ImGui.Spacing();
 
@@ -140,7 +140,7 @@ namespace MentorRouletteTracker
                 .ThenBy(x => x.Key)
                 .First();
 
-            if (ImGui.BeginTable(
+            if (BeginStyledTable(
                 "mostCommonDuty",
                 2,
                 ImGuiTableFlags.Borders |
@@ -159,7 +159,7 @@ namespace MentorRouletteTracker
                 ImGui.TextUnformatted(
                     mostCommon.Count().ToString());
 
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 
@@ -180,7 +180,7 @@ namespace MentorRouletteTracker
                 })
                 .ToList();
 
-            ImGui.Text("Duties by Day and Time");
+            DrawSectionHeading("Duties by Day and Time");
             ImGui.Separator();
 
             var heatmapMetrics = new[]
@@ -190,13 +190,11 @@ namespace MentorRouletteTracker
             };
 
             ImGui.SetNextItemWidth(200);
-
             ImGui.Combo(
                 "Metric##Heatmap",
                 ref selectedHeatmapMetric,
                 heatmapMetrics,
                 heatmapMetrics.Length);
-
             ImGui.Spacing();
 
             var timePeriods = new[]
@@ -220,7 +218,7 @@ namespace MentorRouletteTracker
                 DayOfWeek.Sunday
             };
 
-            if (ImGui.BeginTable(
+            if (BeginStyledTable(
                 "dutiesHeatmap",
                 7,
                 ImGuiTableFlags.Borders |
@@ -319,7 +317,7 @@ namespace MentorRouletteTracker
                     }
                 }
 
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 
@@ -340,181 +338,85 @@ namespace MentorRouletteTracker
             }).Average();
         }
 
+        private sealed record DutyAnalysisRow(
+            string Duty, int Runs, int? Deaths, double? AverageDeaths, int TotalWipes,
+            TimeSpan AverageTime, int InProgress, int Sprouts, int Mentors, int Players, int Lalafell)
+        {
+            public double WipesPerRun => Runs == 0 ? 0 : (double)TotalWipes / Runs;
+        }
+
+        private List<DutyAnalysisRow> BuildDutyAnalysisRows(IEnumerable<DutyRecord> records)
+        {
+            return records.GroupBy(record => record.DutyName).OrderBy(group => group.Key).Select(group =>
+            {
+                var runs = group.ToList();
+                var counts = runs.Select(GetDutyPlayerCounts).ToList();
+                return new DutyAnalysisRow(group.Key, runs.Count,
+                    TotalKnownDeaths(counts.Select(count => count.Deaths)), AverageKnownDeathsPerRun(runs),
+                    runs.Sum(record => record.WipeCount), TimeSpan.FromTicks((long)runs.Average(record => record.TimeInDuty.Ticks)),
+                    runs.Count(record => record.JoinedInProgress), counts.Sum(count => count.Sprouts),
+                    counts.Sum(count => count.Mentors), counts.Sum(count => count.Players), counts.Sum(count => count.Lalafell));
+            }).ToList();
+        }
+
         private void DrawDutySpecificDetails(List<DutyRecord> records)
         {
-            ImGui.Text("Stats by duty");
-            ImGui.TextDisabled("Death totals include known counts only. Deaths / Run skips runs with unknown counts. '-' means no known counts.");
-
+            DrawSectionHeading("Stats by duty");
+            ImGui.PushTextWrapPos();
+            ImGui.TextDisabled("Player counts use the current filters. Death totals only include known counts; Deaths / run skips runs with missing counts. Choose columns in Settings.");
+            ImGui.PopTextWrapPos();
             ImGui.Spacing();
-
-            var dutyStats = records
-                .GroupBy(x => x.DutyName)
-                .OrderBy(x => x.Key)
-                .ToList();
-
-            if (dutyStats.Count == 0)
+            var stats = BuildDutyAnalysisRows(records);
+            if (stats.Count == 0)
             {
-                ImGui.TextDisabled(
-                    "No duty data has been recorded yet.");
-
+                ImGui.TextDisabled("No duties with these filters.");
                 return;
             }
 
-            if (ImGui.BeginTable(
-                "dutySpecificDetails",
-                8,
-                ImGuiTableFlags.Borders |
-                ImGuiTableFlags.RowBg |
-                ImGuiTableFlags.Resizable |
-                ImGuiTableFlags.SizingStretchProp |
-                ImGuiTableFlags.Sortable))
+            var rowHeight = ImGui.GetTextLineHeight() + TableCellVerticalPadding * 2;
+            var height = rowHeight * (Math.Min(stats.Count, 12) + 2) + ImGui.GetStyle().ScrollbarSize;
+            if (BeginConfiguredTable("Duty Analysis", "dutySpecificDetails", verticalScroll: true, height: height))
             {
-                ImGui.TableSetupColumn(
-                    "Duty",
-                    ImGuiTableColumnFlags.PreferSortAscending);
-
-                ImGui.TableSetupColumn("Runs");
-                ImGui.TableSetupColumn("Deaths");
-                ImGui.TableSetupColumn("Deaths / Run");
-                ImGui.TableSetupColumn("Total Wipes");
-                ImGui.TableSetupColumn("Wipes / Run");
-                ImGui.TableSetupColumn("Avg Time");
-                ImGui.TableSetupColumn("In Progress");
-
-                ImGui.TableHeadersRow();
-
-                var stats = dutyStats
-                    .Select(x => new
-                    {
-                        Duty = x.Key,
-                        Runs = x.Count(),
-                        AverageDeaths = AverageKnownDeathsPerRun(x),
-
-                        Deaths = TotalKnownDeaths(x.SelectMany(y =>
-                            y.Party
-                                .Where(p =>
-                                    !string.IsNullOrWhiteSpace(p.Name) && MatchesPlayerFilters(p) &&
-                                    (config.IncludeSelfInStatistics ||
-                                     !IsRecordingPlayer(y, p, objectTable.LocalPlayer?.Name.TextValue)))
-                                .Select(p => EffectiveDeaths(y, p)))),
-
-                        TotalWipes = x.Sum(y => y.WipeCount),
-
-                        AverageTime = TimeSpan.FromTicks(
-                            (long)x.Average(y => y.TimeInDuty.Ticks)),
-
-                        InProgress = x.Count(y => y.JoinedInProgress)
-                    })
-                    .ToList();
-
+                SetupConfiguredColumns("Duty Analysis", scrollable: true);
                 var sortSpecs = ImGui.TableGetSortSpecs();
-
-                if (sortSpecs.SpecsCount > 0)
+                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Duty Analysis", sortSpecs.Specs.ColumnIndex))
                 {
                     var spec = sortSpecs.Specs;
-
-                    stats = spec.ColumnIndex switch
+                    stats = SortTableRows(stats, row => spec.ColumnIndex switch
                     {
-                        0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Duty).ToList()
-                            : stats.OrderByDescending(x => x.Duty).ToList(),
-
-                        1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.Runs).ThenBy(x => x.Duty).ToList()
-                            : stats.OrderByDescending(x => x.Runs).ThenBy(x => x.Duty).ToList(),
-
-                        2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => !x.Deaths.HasValue).ThenBy(x => x.Deaths).ThenBy(x => x.Duty).ToList()
-                            : stats.OrderBy(x => !x.Deaths.HasValue).ThenByDescending(x => x.Deaths).ThenBy(x => x.Duty).ToList(),
-
-                        3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenBy(x => x.AverageDeaths)
-                                .ThenBy(x => x.Duty)
-                                .ToList()
-                            : stats.OrderBy(x => !x.AverageDeaths.HasValue).ThenByDescending(x => x.AverageDeaths)
-                                .ThenBy(x => x.Duty)
-                                .ToList(),
-
-                        4 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.TotalWipes)
-                                .ThenBy(x => x.Duty)
-                                .ToList()
-                            : stats.OrderByDescending(x => x.TotalWipes)
-                                .ThenBy(x => x.Duty)
-                                .ToList(),
-
-                        5 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x =>
-                                x.Runs == 0
-                                    ? 0
-                                    : (double)x.TotalWipes / x.Runs)
-                                .ThenBy(x => x.Duty)
-                                .ToList()
-                            : stats.OrderByDescending(x =>
-                                x.Runs == 0
-                                    ? 0
-                                    : (double)x.TotalWipes / x.Runs)
-                                .ThenBy(x => x.Duty)
-                                .ToList(),
-
-                        6 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.AverageTime)
-                                .ThenBy(x => x.Duty)
-                                .ToList()
-                            : stats.OrderByDescending(x => x.AverageTime)
-                                .ThenBy(x => x.Duty)
-                                .ToList(),
-
-                        7 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? stats.OrderBy(x => x.InProgress)
-                                .ThenBy(x => x.Duty)
-                                .ToList()
-                            : stats.OrderByDescending(x => x.InProgress)
-                                .ThenBy(x => x.Duty)
-                                .ToList(),
-
-                        _ => stats
-                    };
-
+                        0 => row.Duty,
+                        1 => row.Runs,
+                        2 => row.Deaths,
+                        3 => row.AverageDeaths,
+                        4 => row.TotalWipes,
+                        5 => row.WipesPerRun,
+                        6 => row.AverageTime,
+                        7 => row.InProgress,
+                        8 => row.Sprouts,
+                        9 => row.Mentors,
+                        10 => row.Players,
+                        11 => row.Lalafell,
+                        _ => row.Duty
+                    }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
                     sortSpecs.SpecsDirty = false;
                 }
-
-                foreach (var stat in stats)
+                foreach (var row in stats)
                 {
-                    var deathsPerRun = stat.AverageDeaths;
-
-                    var wipesPerRun = stat.Runs == 0
-                        ? 0
-                        : (double)stat.TotalWipes / stat.Runs;
-
                     ImGui.TableNextRow();
-
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(stat.Duty);
-
-                    ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(stat.Runs.ToString());
-
-                    ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(stat.Deaths?.ToString() ?? "-");
-
-                    ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(deathsPerRun?.ToString("0.00") ?? "-");
-
-                    ImGui.TableSetColumnIndex(4);
-                    ImGui.TextUnformatted(stat.TotalWipes.ToString());
-
-                    ImGui.TableSetColumnIndex(5);
-                    ImGui.TextUnformatted(wipesPerRun.ToString("0.00"));
-
-                    ImGui.TableSetColumnIndex(6);
-                    ImGui.TextUnformatted(FormatDuration(stat.AverageTime));
-
-                    ImGui.TableSetColumnIndex(7);
-                    ImGui.TextUnformatted(stat.InProgress.ToString());
+                    DrawTableCell(0, row.Duty);
+                    DrawTableCell(1, row.Runs.ToString());
+                    DrawTableCell(2, row.Deaths?.ToString() ?? "-");
+                    DrawTableCell(3, row.AverageDeaths?.ToString("F2") ?? "-");
+                    DrawTableCell(4, row.TotalWipes.ToString());
+                    DrawTableCell(5, row.WipesPerRun.ToString("F2"));
+                    DrawTableCell(6, FormatDuration(row.AverageTime));
+                    DrawTableCell(7, row.InProgress.ToString());
+                    DrawTableCell(8, row.Sprouts.ToString());
+                    DrawTableCell(9, row.Mentors.ToString());
+                    DrawTableCell(10, row.Players.ToString());
+                    DrawTableCell(11, row.Lalafell.ToString());
                 }
-
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 

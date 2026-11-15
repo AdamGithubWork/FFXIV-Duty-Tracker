@@ -52,7 +52,7 @@ export your history to CSV.
 See players grouped by race, gender, job, status, home world, and datacenter.
 Tables show encounters, unique players, and death stats. Datacenter grouping
 currently covers North American home worlds; other worlds show as Unknown.
-Use Customize statistics to show or hide the overview, race, gender, job, status,
+Use Settings > Statistics sections to show or hide the overview, race, gender, job, status,
 home world, and datacenter sections. Your choices are saved; all sections start visible.
 
 ### Duty Analysis
@@ -65,7 +65,7 @@ The day-and-time heatmap shows when you run duties or how long those runs take.
 See milestones across your completed duties: fastest clears, most wipes, player
 records, streaks, and busy days. Click a linked result to open that duty.
 Milestones use duty type, duty search, and date filters. Player filters don't apply.
-Use Customize milestones to show or hide individual milestones by category.
+Use Settings > Milestones to show or hide individual milestones by category.
 Your choices are saved. Show all milestones restores everything.
 
 ### People
@@ -75,8 +75,29 @@ your duties together.
 
 ### Settings
 
-Choose what to record, when to show the duty timer, whether to track alliance
-members, and whether to include yourself in stats.
+Turn duty recording on or off, choose what to record and when to show the duty
+timer, and set player tracking preferences. Choose your visible statistics and
+milestones here. The heatmap metric selector is in Duty Analysis.
+
+Settings > Appearance lets you change window and panel backgrounds, table headers,
+and row colors, with a separate Opacity slider and a live table preview. New custom
+colors start fully opaque. Make colors opaque keeps the selected colors and sets
+their opacity to 100%. Reset a single color or use Reset colors to restore the
+defaults. Appearance choices are saved. Headers stay on one line until
+columns are very narrow; you can also turn wrapping off. Hover a clipped header
+or table value to read its full text.
+
+Settings > Table columns controls the visible, sortable columns in Records, People,
+Stats by duty, and each grouped Statistics table. Existing columns start visible;
+new optional columns start hidden. Use Reset columns under a table to restore its
+defaults. The identifying duty, player, or group columns stay visible.
+
+Records and Stats by duty can show sprouts, mentors, players, and known deaths.
+Player-based counts follow player filters and Include yourself; mentor counts
+include Trade Mentors. People can also show first/last seen, different duties,
+known-death and deathless encounters, and sprout/mentor encounters. These values
+use encounters matching the current filters. Unknown deaths don't count as deathless.
+Column choices are saved in settings. Damage and DPS columns aren't available yet.
 
 ## Duty timer
 
@@ -86,6 +107,10 @@ to see the full runs used for that average. The average refreshes after record e
 Choose which duty types show the window in Settings.
 
 ## Filters
+
+Expand the Filters panel below the active data tab. Duty/date and player controls
+are grouped separately, with multi-select dropdowns for categories. The panel is
+hidden in Settings. Summary shows only the duty and date controls it uses.
 
 Filter by duty type, duty name, player name or home world, job, race, gender,
 status, and date. You can use a preset date range or enter your own dates.

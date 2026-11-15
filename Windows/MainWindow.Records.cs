@@ -34,18 +34,9 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
             }
 
-            var armed = tracker.Armed;
-
-            if (ImGui.Checkbox("Record duties", ref armed))
-            {
-                tracker.Armed = armed;
-            }
-
-            ImGui.SameLine();
-
-            ImGui.TextDisabled(
-                "Turn this off before duties you don't want recorded.");
-
+            ImGui.TextDisabled(tracker.Armed
+                ? "Recording is on."
+                : "Recording is off. You can turn it back on in Settings.");
             ImGui.Spacing();
 
             if (ImGui.Button("Export CSV"))
@@ -107,7 +98,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             ImGui.TextDisabled(
-                "Click a duty for details. Right-click to delete. Click a column to sort.");
+                "Click a duty for details. Right-click to edit or delete. Click a header to sort.");
 
             ImGui.Spacing();
 
@@ -147,96 +138,53 @@ namespace MentorRouletteTracker
             if (records.Count == 0)
             {
                 ImGui.TextDisabled(completed
-                    ? "No completed duties match your filters."
-                    : "No incomplete duties match your filters.");
+                    ? "No completed duties with these filters."
+                    : "No incomplete duties with these filters.");
                 return;
             }
 
-            if (ImGui.BeginTable(
-                    completed ? "completedRecords" : "incompleteRecords",
-                    9,
-                    ImGuiTableFlags.Borders |
-                    ImGuiTableFlags.RowBg |
-                    ImGuiTableFlags.ScrollY |
-                    ImGuiTableFlags.Resizable |
-                    ImGuiTableFlags.SizingStretchProp |
-                    ImGuiTableFlags.Sortable))
+            Dictionary<DutyRecord, DutyPlayerCounts> playerCounts = new(ReferenceEqualityComparer.Instance);
+            DutyPlayerCounts Counts(DutyRecord record)
             {
-                ImGui.TableSetupColumn(
-                    "Duty",
-                    ImGuiTableColumnFlags.PreferSortAscending | ImGuiTableColumnFlags.WidthStretch,
-                    2f);
+                if (!playerCounts.TryGetValue(record, out var counts))
+                {
+                    counts = GetDutyPlayerCounts(record);
+                    playerCounts.Add(record, counts);
+                }
+                return counts;
+            }
 
-                ImGui.TableSetupColumn("Type");
-                ImGui.TableSetupColumn("Job");
-                ImGui.TableSetupColumn("Started");
-                ImGui.TableSetupColumn("Time");
-
-                ImGui.TableSetupColumn(
-                    "Joined In Progress",
-                    ImGuiTableColumnFlags.WidthFixed,
-                    110f);
-
-                ImGui.TableSetupColumn("Wipes");
-                ImGui.TableSetupColumn("Lalafell");
-                ImGui.TableSetupColumn("Completed");
-
-                ImGui.TableHeadersRow();
+            if (BeginConfiguredTable("Records", completed ? "completedRecords" : "incompleteRecords", verticalScroll: true))
+            {
+                SetupConfiguredColumns("Records", scrollable: true);
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
 
-                if (sortSpecs.SpecsCount > 0)
+                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Records", sortSpecs.Specs.ColumnIndex))
                 {
                     var spec = sortSpecs.Specs;
-
-                    records = spec.ColumnIndex switch
+                    records = SortTableRows(records, record => spec.ColumnIndex switch
                     {
-                        0 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.DutyName).ToList()
-                            : records.OrderByDescending(x => x.DutyName).ToList(),
-
-                        1 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.DutyType).ToList()
-                            : records.OrderByDescending(x => x.DutyType).ToList(),
-
-                        2 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.PlayerJob).ToList()
-                            : records.OrderByDescending(x => x.PlayerJob).ToList(),
-
-                        3 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Timestamp).ToList()
-                            : records.OrderByDescending(x => x.Timestamp).ToList(),
-
-                        4 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.TimeInDuty).ToList()
-                            : records.OrderByDescending(x => x.TimeInDuty).ToList(),
-
-                        5 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.JoinedInProgress).ToList()
-                            : records.OrderByDescending(x => x.JoinedInProgress).ToList(),
-
-                        6 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.WipeCount).ToList()
-                            : records.OrderByDescending(x => x.WipeCount).ToList(),
-
-                        7 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.LalafellCount).ToList()
-                            : records.OrderByDescending(x => x.LalafellCount).ToList(),
-
-                        8 => spec.SortDirection == ImGuiSortDirection.Ascending
-                            ? records.OrderBy(x => x.Completed).ToList()
-                            : records.OrderByDescending(x => x.Completed).ToList(),
-
-                        _ => records
-                    };
-
+                        0 => record.DutyName,
+                        1 => record.DutyType,
+                        2 => record.PlayerJob,
+                        3 => record.Timestamp,
+                        4 => record.TimeInDuty,
+                        5 => record.JoinedInProgress,
+                        6 => record.WipeCount,
+                        7 => Counts(record).Lalafell,
+                        8 => record.Completed,
+                        9 => Counts(record).Sprouts,
+                        10 => Counts(record).Mentors,
+                        11 => Counts(record).Players,
+                        12 => Counts(record).Deaths,
+                        _ => record.DutyName
+                    }, spec.SortDirection == ImGuiSortDirection.Ascending, record => record.DutyName);
                     sortSpecs.SpecsDirty = false;
                 }
                 else
                 {
-                    records = records
-                        .OrderByDescending(x => x.Timestamp)
-                        .ToList();
+                    records = records.OrderByDescending(record => record.Timestamp).ToList();
                 }
 
                 foreach (var r in records)
@@ -276,38 +224,26 @@ namespace MentorRouletteTracker
                         ImGui.EndPopup();
                     }
 
-                    ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(r.DutyType);
-
-                    ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted(r.PlayerJob);
-
-                    ImGui.TableSetColumnIndex(3);
-                    ImGui.TextUnformatted(
-                        r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
-
-                    ImGui.TableSetColumnIndex(4);
-                    ImGui.TextUnformatted(
-                        FormatDuration(r.TimeInDuty));
-
-                    ImGui.TableSetColumnIndex(5);
-                    ImGui.TextUnformatted(
-                        r.JoinedInProgress ? "Yes" : "No");
-
-                    ImGui.TableSetColumnIndex(6);
-                    ImGui.TextUnformatted(
-                        r.WipeCount.ToString());
-
-                    ImGui.TableSetColumnIndex(7);
-                    ImGui.TextUnformatted(
-                        r.LalafellCount.ToString());
-
-                    ImGui.TableSetColumnIndex(8);
-                    ImGui.TextUnformatted(
-                        r.Completed ? "Yes" : "No");
+                    DrawTableCell(1, r.DutyType);
+                    DrawTableCell(2, r.PlayerJob);
+                    DrawTableCell(3, r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+                    DrawTableCell(4, FormatDuration(r.TimeInDuty));
+                    DrawTableCell(5, r.JoinedInProgress ? "Yes" : "No");
+                    DrawTableCell(6, r.WipeCount.ToString());
+                    if (ImGui.TableSetColumnIndex(7))
+                        ImGui.TextUnformatted(Counts(r).Lalafell.ToString());
+                    DrawTableCell(8, r.Completed ? "Yes" : "No");
+                    if (ImGui.TableSetColumnIndex(9))
+                        ImGui.TextUnformatted(Counts(r).Sprouts.ToString());
+                    if (ImGui.TableSetColumnIndex(10))
+                        ImGui.TextUnformatted(Counts(r).Mentors.ToString());
+                    if (ImGui.TableSetColumnIndex(11))
+                        ImGui.TextUnformatted(Counts(r).Players.ToString());
+                    if (ImGui.TableSetColumnIndex(12))
+                        ImGui.TextUnformatted(Counts(r).Deaths?.ToString() ?? "-");
                 }
 
-                ImGui.EndTable();
+                EndStyledTable();
             }
         }
 
@@ -355,11 +291,11 @@ namespace MentorRouletteTracker
             {
                 if (editWipeCount < 0)
                 {
-                    editError = "Wipe count cannot be negative";
+                    editError = "Wipes can't be negative.";
                 }
                 else if (editWipeCount > 99)
                 {
-                    editError = "Wipe count shouldn't be over 99";
+                    editError = "Keep wipes between 0 and 99.";
                 }
                 else
                 {
@@ -410,7 +346,7 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 ImGui.TextDisabled(
-                    "This deletes the duty and its party details.");
+                    "This deletes the run and the party details saved with it.");
 
                 ImGui.Spacing();
 
@@ -505,7 +441,7 @@ namespace MentorRouletteTracker
                         .ThenBy(x => x.Name)
                         .ToList();
 
-                    if (ImGui.BeginTable(
+                    if (BeginStyledTable(
                             "partyDetail",
                             7,
                             ImGuiTableFlags.Borders |
@@ -613,13 +549,13 @@ namespace MentorRouletteTracker
                             }
                         }
 
-                        ImGui.EndTable();
+                        EndStyledTable();
                     }
                 }
                 else
                 {
                     ImGui.TextDisabled(
-                        "No party details were captured for this run.");
+                        "No party details were recorded for this run.");
                 }
 
                 ImGui.Spacing();
@@ -634,7 +570,7 @@ namespace MentorRouletteTracker
                 }
 
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip("Edit duty note");
+                    ImGui.SetTooltip("Edit note");
 
                 ImGui.SameLine();
                 ImGui.TextWrapped($"Notes: {r.Note}");
