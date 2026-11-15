@@ -233,8 +233,9 @@ namespace MentorRouletteTracker.PvP
         }
 
         private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" &&
-            record.PvPRosterComplete != true && (record.PvPRosterComplete == false ||
-                record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue));
+            (record.PvPRosterComplete == true
+                ? !record.PvPCombatStatsComplete || !record.PvPResultsComplete
+                : record.PvPRosterComplete == false || record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue));
 
         private bool CanKeepLooking(DateTime time, DateTime now)
         {
@@ -284,14 +285,26 @@ namespace MentorRouletteTracker.PvP
                 log.Warning($"PvP scoreboard {result.MatchId}: no recorded players matched the roster.");
                 return false;
             }
-            if (record.PvPRosterComplete == true)
+            if (record.PvPRosterComplete == true && !NeedsPvpLookup(record))
                 return true;
 
             var changed = false;
+            if (record.PvPMode != result.Mode)
+            {
+                record.PvPMode = result.Mode;
+                changed = true;
+            }
             var byIdentity = record.Party.GroupBy(player => $"{player.Name}@{player.World}")
                 .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+            var localTeam = result.Players.GetValueOrDefault(recorderKey)?.Team;
             foreach (var (key, player) in result.Players)
             {
+                bool? enemy = key == recorderKey ? false : !string.IsNullOrEmpty(localTeam) && player.Team.Length > 0
+                    ? player.Team != localTeam : null;
+                // Without a known team, importing an unfamiliar player could bypass the enemy setting.
+                if (!record.TrackPvpEnemies && (enemy == true || enemy == null &&
+                    (!byIdentity.TryGetValue(key, out var known) || known.All(snapshot => snapshot.PvPIsEnemy != false))))
+                    continue;
                 if (!byIdentity.TryGetValue(key, out var existing))
                 {
                     var added = new PartyMemberSnapshot
@@ -306,6 +319,19 @@ namespace MentorRouletteTracker.PvP
                 }
                 foreach (var snapshot in existing)
                 {
+                    var before = (snapshot.PvPTeam, snapshot.PvPIsEnemy, snapshot.PvPDamageDealt, snapshot.PvPKills, snapshot.PvPAssists);
+                    if (player.Placement.HasValue && snapshot.PvPPlacement != player.Placement)
+                    {
+                        snapshot.PvPPlacement = player.Placement;
+                        changed = true;
+                    }
+                    if (player.Team.Length > 0)
+                        snapshot.PvPTeam = player.Team;
+                    snapshot.PvPIsEnemy = enemy ?? snapshot.PvPIsEnemy;
+                    snapshot.PvPDamageDealt = player.DamageDealt ?? snapshot.PvPDamageDealt;
+                    snapshot.PvPKills = player.Kills ?? snapshot.PvPKills;
+                    snapshot.PvPAssists = player.Assists ?? snapshot.PvPAssists;
+                    changed |= before != (snapshot.PvPTeam, snapshot.PvPIsEnemy, snapshot.PvPDamageDealt, snapshot.PvPKills, snapshot.PvPAssists);
                     if (player.Deaths.HasValue && snapshot.PvPScoreboardDeaths != player.Deaths)
                     {
                         snapshot.PvPScoreboardDeaths = player.Deaths;
@@ -319,7 +345,25 @@ namespace MentorRouletteTracker.PvP
                 }
             }
 
-            var complete = result.RosterComplete && result.Players.Values.All(player => player.Deaths.HasValue);
+            if (result.Placement.HasValue && record.PvPPlacement != result.Placement)
+            {
+                record.PvPPlacement = result.Placement;
+                changed = true;
+            }
+            var complete = result.RosterComplete && !string.IsNullOrEmpty(localTeam) &&
+                result.Players.Values.All(player => player.Deaths.HasValue && player.DamageDealt.HasValue &&
+                    player.Kills.HasValue && player.Assists.HasValue && player.Team.Length > 0);
+            if (record.PvPCombatStatsComplete != complete)
+            {
+                record.PvPCombatStatsComplete = complete;
+                changed = true;
+            }
+            var resultsComplete = result.RosterComplete && result.Players.Values.All(player => player.Placement.HasValue);
+            if (record.PvPResultsComplete != resultsComplete)
+            {
+                record.PvPResultsComplete = resultsComplete;
+                changed = true;
+            }
             if (record.PvPRosterComplete != complete)
             {
                 record.PvPRosterComplete = complete;
@@ -330,7 +374,7 @@ namespace MentorRouletteTracker.PvP
                 config.History.Save();
                 log.Information($"PvP scoreboard applied: {record.DutyName} | {result.Players.Count} scoreboard players, {record.Party.Count} recorded players.");
             }
-            return complete;
+            return complete && resultsComplete;
         }
 
         private void OnFrameworkUpdate(IFramework framework)

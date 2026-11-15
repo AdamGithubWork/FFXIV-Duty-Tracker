@@ -1,4 +1,5 @@
 using Dalamud.Bindings.ImGui;
+using MentorRouletteTracker.PvP;
 using System.Numerics;
 
 namespace MentorRouletteTracker
@@ -10,6 +11,7 @@ namespace MentorRouletteTracker
             globalPlayerSearchText = string.Empty;
             globalDutySearchText = string.Empty;
             selectedDutyTypes.Clear();
+            selectedPvpModes.Clear();
             selectedPlayerRaces.Clear();
             selectedPlayerGenders.Clear();
             selectedPlayerStatuses.Clear();
@@ -25,6 +27,7 @@ namespace MentorRouletteTracker
         {
             static int Active(HashSet<string> selection) => selection.Count > 0 ? 1 : 0;
             var activeCount = Active(selectedDutyTypes) +
+                (selectedPvpModes.Count > 0 ? 1 : 0) +
                 (string.IsNullOrWhiteSpace(globalDutySearchText) ? 0 : 1) +
                 (selectedTimeRange == 0 ? 0 : 1);
             if (playerFilters)
@@ -69,6 +72,9 @@ namespace MentorRouletteTracker
             ImGui.EndChild();
             ImGui.PopStyleVar();
             ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.TextColored(new Vector4(0.65f, 0.8f, 1f, 1f), $"End of filters — {tab} below");
+            ImGui.Spacing();
         }
 
         private void DrawDutyFilters()
@@ -83,7 +89,7 @@ namespace MentorRouletteTracker
             var dutyTypes = config.History.Records.Select(record => record.DutyType)
                 .Where(type => !string.IsNullOrWhiteSpace(type))
                 .Concat(new[] { "Extreme Trials", "Savage Raids" });
-            DrawSimpleFilter("Duty types", "All duty types", dutyTypes, selectedDutyTypes);
+            DrawDutyTypeFilter(dutyTypes);
 
             ImGui.TextUnformatted("Date range");
             ImGui.SetNextItemWidth(-1);
@@ -96,6 +102,76 @@ namespace MentorRouletteTracker
                 if (customStartDate > customEndDate)
                     ImGui.TextWrapped("The start date can't be after the end date.");
             }
+        }
+
+        private static readonly (PvpMode Mode, string Label)[] PvpModeOptions =
+        [
+            (PvpMode.Frontline, "Frontline"),
+            (PvpMode.CrystallineConflict, "Crystalline Conflict"),
+            (PvpMode.RivalWings, "Rival Wings")
+        ];
+
+        private void TogglePvpMode(PvpMode mode)
+        {
+            if (!selectedPvpModes.Remove(mode))
+                selectedPvpModes.Add(mode);
+            selectedDutyTypes.Add("PvP");
+        }
+
+        private void DrawDutyTypeFilter(IEnumerable<string> dutyTypes)
+        {
+            ImGui.TextUnformatted("Duty types");
+            ImGui.SetNextItemWidth(-1);
+            var preview = selectedDutyTypes.Count switch
+            {
+                0 => "All duty types",
+                1 when selectedDutyTypes.Contains("PvP") && selectedPvpModes.Count == 1 =>
+                    PvpModeOptions.First(option => selectedPvpModes.Contains(option.Mode)).Label,
+                1 when selectedDutyTypes.Contains("PvP") && selectedPvpModes.Count > 1 => $"PvP ({selectedPvpModes.Count} modes)",
+                1 => selectedDutyTypes.Single(),
+                _ => $"{selectedDutyTypes.Count} selected"
+            };
+            if (!ImGui.BeginCombo("##DutyTypesFilter", preview, ImGuiComboFlags.HeightLarge))
+            {
+                ImGui.Spacing();
+                return;
+            }
+            if (ImGui.Selectable("All duty types", selectedDutyTypes.Count == 0, ImGuiSelectableFlags.DontClosePopups))
+            {
+                selectedDutyTypes.Clear();
+                selectedPvpModes.Clear();
+            }
+            ImGui.Separator();
+            ImGui.TextDisabled("Duty types");
+            foreach (var dutyType in dutyTypes.Concat(selectedDutyTypes).Append("PvP")
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase).ToList())
+            {
+                if (dutyType != "PvP")
+                {
+                    DrawFilterOption(dutyType, selectedDutyTypes);
+                    continue;
+                }
+                if (ImGui.Selectable("PvP", selectedDutyTypes.Contains("PvP"), ImGuiSelectableFlags.DontClosePopups))
+                {
+                    if (!selectedDutyTypes.Remove("PvP"))
+                        selectedDutyTypes.Add("PvP");
+                    selectedPvpModes.Clear();
+                }
+                ImGui.Indent();
+                ImGui.TextDisabled("PvP modes");
+                if (ImGui.Selectable("All PvP modes", selectedDutyTypes.Contains("PvP") && selectedPvpModes.Count == 0,
+                    ImGuiSelectableFlags.DontClosePopups))
+                {
+                    selectedDutyTypes.Add("PvP");
+                    selectedPvpModes.Clear();
+                }
+                foreach (var (mode, label) in PvpModeOptions)
+                    if (ImGui.Selectable(label, selectedPvpModes.Contains(mode), ImGuiSelectableFlags.DontClosePopups))
+                        TogglePvpMode(mode);
+                ImGui.Unindent();
+            }
+            ImGui.EndCombo();
+            ImGui.Spacing();
         }
 
         private void DrawPlayerFilters(bool encounterFilter)

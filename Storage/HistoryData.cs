@@ -24,7 +24,12 @@ internal readonly record struct DutyRow(
     TimeSpan TimeInDuty,
     string Note,
     int? PvPDeaths,
-    bool? PvPRosterComplete);
+    bool? PvPRosterComplete,
+    bool TrackPvpEnemies,
+    int? PvPPlacement,
+    bool PvPCombatStatsComplete,
+    PvP.PvpMode PvPMode,
+    bool PvPResultsComplete);
 
 internal readonly record struct PlayerRow(
     string Name,
@@ -34,7 +39,13 @@ internal readonly record struct PlayerRow(
     string World,
     string Status,
     int DeathCount,
-    int? PvPScoreboardDeaths);
+    int? PvPScoreboardDeaths,
+    string PvPTeam,
+    bool? PvPIsEnemy,
+    long? PvPDamageDealt,
+    int? PvPKills,
+    int? PvPAssists,
+    int? PvPPlacement);
 
 internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<PlayerRow> Party, bool Pending)
 {
@@ -55,7 +66,12 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             record.TimeInDuty,
             record.Note ?? string.Empty,
             record.PvPDeaths,
-            record.PvPRosterComplete);
+            record.PvPRosterComplete,
+            record.TrackPvpEnemies,
+            record.PvPPlacement,
+            record.PvPCombatStatsComplete,
+            record.PvPMode,
+            record.PvPResultsComplete);
         var party = record.Party.Select(player => new PlayerRow(
             player.Name ?? string.Empty,
             player.Job ?? string.Empty,
@@ -64,7 +80,13 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             player.World ?? string.Empty,
             player.Status ?? string.Empty,
             player.DeathCount,
-            player.PvPScoreboardDeaths)).ToArray();
+            player.PvPScoreboardDeaths,
+            player.PvPTeam ?? string.Empty,
+            player.PvPIsEnemy,
+            player.PvPDamageDealt,
+            player.PvPKills,
+            player.PvPAssists,
+            player.PvPPlacement)).ToArray();
         return new DutyWrite(id, row, party, pending);
     }
 
@@ -96,6 +118,11 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             Note = Record.Note,
             PvPDeaths = Record.PvPDeaths,
             PvPRosterComplete = Record.PvPRosterComplete,
+            TrackPvpEnemies = Record.TrackPvpEnemies,
+            PvPPlacement = Record.PvPPlacement,
+            PvPCombatStatsComplete = Record.PvPCombatStatsComplete,
+            PvPMode = Record.PvPMode,
+            PvPResultsComplete = Record.PvPResultsComplete,
             Party = Party.Select(player => new PartyMemberSnapshot
             {
                 Name = player.Name,
@@ -105,7 +132,13 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
                 World = player.World,
                 Status = player.Status,
                 DeathCount = player.DeathCount,
-                PvPScoreboardDeaths = player.PvPScoreboardDeaths
+                PvPScoreboardDeaths = player.PvPScoreboardDeaths,
+                PvPTeam = player.PvPTeam,
+                PvPIsEnemy = player.PvPIsEnemy,
+                PvPDamageDealt = player.PvPDamageDealt,
+                PvPKills = player.PvPKills,
+                PvPAssists = player.PvPAssists,
+                PvPPlacement = player.PvPPlacement
             }).ToList()
         };
     }

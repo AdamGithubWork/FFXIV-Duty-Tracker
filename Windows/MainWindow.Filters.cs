@@ -55,6 +55,7 @@ namespace MentorRouletteTracker
         private bool MatchesDutyFilters(DutyRecord record, DateTime now)
         {
             return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(record.DutyType)) &&
+                (record.DutyType != "PvP" || selectedPvpModes.Count == 0 || selectedPvpModes.Contains(record.PvPMode)) &&
                 MatchesGlobalDutySearch(record) &&
                 (selectedTimeRange switch
                 {

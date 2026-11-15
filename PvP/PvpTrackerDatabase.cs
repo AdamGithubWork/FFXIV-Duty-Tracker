@@ -122,7 +122,8 @@ public static class PvpTrackerDatabase
                         {
                             if (!value.IsDocument || !TryAlias(value["Player"], out var name, out var world))
                                 continue;
-                            AddPlayer(result, name, world, ReadJob(value.AsDocument), ReadDeaths(value["Deaths"]));
+                            AddPlayer(result, name, world, ReadJob(value.AsDocument), ReadDeaths(value["Deaths"]),
+                                ReadTeam(new BsonValue(team.Key), mode), value.AsDocument);
                         }
                     }
                 }
@@ -135,7 +136,7 @@ public static class PvpTrackerDatabase
                         foreach (var value in match["Players"].AsArray)
                         {
                             if (value.IsDocument && TryAlias(value["Name"], out var name, out var world))
-                                AddPlayer(result, name, world, ReadJob(value.AsDocument), null);
+                                AddPlayer(result, name, world, ReadJob(value.AsDocument), null, ReadTeam(value["Team"], mode));
                         }
                     }
                     foreach (var entry in match["PlayerScoreboards"].AsDocument)
@@ -143,11 +144,31 @@ public static class PvpTrackerDatabase
                         var separator = entry.Key.LastIndexOf(' ');
                         if (!entry.Value.IsDocument || separator <= 0 || separator == entry.Key.Length - 1)
                             continue;
-                        AddPlayer(result, entry.Key[..separator], entry.Key[(separator + 1)..], "Unknown", ReadDeaths(entry.Value["Deaths"]));
+                        AddPlayer(result, entry.Key[..separator], entry.Key[(separator + 1)..], "Unknown",
+                            ReadDeaths(entry.Value["Deaths"]), scoreboard: entry.Value.AsDocument);
                     }
                 }
                 if (result.Players.Count == 0 || !result.Players.Values.Any(player => player.Deaths.HasValue))
                     return null;
+                var placements = new Dictionary<string, int>(StringComparer.Ordinal);
+                if (mode == PvpMode.Frontline && match["Teams"].IsDocument)
+                {
+                    foreach (var team in match["Teams"].AsDocument)
+                    {
+                        var name = ReadTeam(new BsonValue(team.Key), mode);
+                        if (name.Length > 0 && team.Value.IsDocument &&
+                            ReadDeaths(team.Value["Placement"]) is >= 0 and <= 2 and var place)
+                            placements[name] = place + 1;
+                    }
+                }
+                var winner = ReadTeam(match["MatchWinner"], mode);
+                if (winner.Length == 0 && mode == PvpMode.CrystallineConflict && match["PostMatch"].IsDocument)
+                    winner = ReadTeam(match["PostMatch"]["MatchWinner"], mode);
+                foreach (var player in result.Players.Values)
+                    player.Placement = mode == PvpMode.Frontline
+                        ? placements.TryGetValue(player.Team, out var place) ? place : null
+                        : winner.Length > 0 && player.Team.Length > 0 ? player.Team == winner ? 1 : 2 : null;
+                result.Placement = result.Players.GetValueOrDefault($"{result.RecorderName}@{result.RecorderWorld}")?.Placement;
                 log.Information($"{collection} scoreboard loaded: {result.Players.Count} players.");
                 return result;
             }
@@ -204,7 +225,35 @@ public static class PvpTrackerDatabase
     private static bool ValidPlayer(string name, string world) => !string.IsNullOrWhiteSpace(name) &&
         !string.IsNullOrWhiteSpace(world) && name != "_UNKNOWN_" && world != "_UNKNOWN_";
 
-    private static void AddPlayer(PvpMatchResult result, string name, string world, string job, int? deaths)
+    private static string ReadTeam(BsonValue value, PvpMode mode)
+    {
+        string[] teams = mode switch
+        {
+            PvpMode.CrystallineConflict => ["", "Astra", "Umbra"],
+            PvpMode.Frontline => ["Maelstrom", "Adders", "Flames"],
+            PvpMode.RivalWings => ["Falcons", "Ravens"],
+            _ => []
+        };
+        if (value.IsString)
+        {
+            var text = value.AsString;
+            if (!int.TryParse(text, out var index))
+                return teams.FirstOrDefault(team => team.Length > 0 && string.Equals(team, text, StringComparison.OrdinalIgnoreCase)) ?? "";
+            return index >= 0 && index < teams.Length ? teams[index] : "";
+        }
+        if (value.IsInt32 || value.IsInt64)
+        {
+            var index = value.AsInt64;
+            return index >= 0 && index < teams.Length ? teams[(int)index] : "";
+        }
+        return "";
+    }
+
+    private static long? ReadDamage(BsonValue value) =>
+        (value.IsInt32 || value.IsInt64) && value.AsInt64 >= 0 ? value.AsInt64 : null;
+
+    private static void AddPlayer(PvpMatchResult result, string name, string world, string job, int? deaths,
+        string team = "", BsonDocument? scoreboard = null)
     {
         name = name.Trim();
         world = world.Trim();
@@ -217,5 +266,13 @@ public static class PvpTrackerDatabase
             player.Job = job;
         if (deaths.HasValue)
             player.Deaths = deaths;
+        if (team.Length > 0)
+            player.Team = team;
+        if (scoreboard != null)
+        {
+            player.Kills ??= ReadDeaths(scoreboard["Kills"]);
+            player.Assists ??= ReadDeaths(scoreboard["Assists"]);
+            player.DamageDealt ??= ReadDamage(scoreboard["DamageDealt"]);
+        }
     }
 }

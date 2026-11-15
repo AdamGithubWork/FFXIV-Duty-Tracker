@@ -29,6 +29,7 @@ namespace MentorRouletteTracker
         {
             var dutyFilterKey = string.Join("|",
                 string.Join(",", selectedDutyTypes.OrderBy(x => x, StringComparer.Ordinal)),
+                string.Join(",", selectedPvpModes.Order()),
                 globalDutySearchText.Trim(),
                 selectedTimeRange.ToString(),
                 customStartDate.Date.ToString("yyyyMMdd"),
@@ -62,6 +63,7 @@ namespace MentorRouletteTracker
                 DrawSectionHeading("Milestones");
                 ImGui.TextDisabled("Completed duties only. Duty and date filters apply; player filters don't.");
                 ImGui.TextDisabled("Death totals only include known counts. Duty death records need a count for every included player. '-' means unknown.");
+                ImGui.TextDisabled("Your PvP results count once per duty. Other PvP stats count included player encounters. Unknown results don't affect percentages.");
                 ImGui.Separator();
 
                 if (milestoneSections.Count == 0)
@@ -237,6 +239,42 @@ namespace MentorRouletteTracker
                 ("Total duties joined in progress", records.Count(r => r.JoinedInProgress).ToString()),
                 ("Different duties completed", records.Select(r => r.DutyName).Distinct().Count().ToString())
             });
+
+            if (records.Any(record => record.DutyType == "PvP"))
+            {
+                var pvpEncounters = encounters.Where(encounter => encounter.Record.DutyType == "PvP").ToList();
+                var pvpTotals = BuildPvpStatistics(pvpEncounters.Select(encounter =>
+                    new PlayerEncounter { Record = encounter.Record, Player = encounter.Player }));
+                var yourPvpResults = BuildPvpStatistics(records.Where(record => record.DutyType == "PvP")
+                    .Select(record => (Record: record, Player: RecorderPvpPlayer(record)))
+                    .Where(entry => entry.Player != null)
+                    .Select(entry => new PlayerEncounter { Record = entry.Record, Player = entry.Player! }));
+
+                Add("PvP player stats", new()
+                {
+                    ("Damage dealt (PvP)", PvpStatisticText(pvpTotals, 0)),
+                    ("Kills (PvP)", PvpStatisticText(pvpTotals, 1)),
+                    ("Assists (PvP)", PvpStatisticText(pvpTotals, 2)),
+                    ("Highest damage dealt in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPDamageDealt.HasValue),
+                        e => e.Player.PvPDamageDealt!.Value, e => $"{e.Player.PvPDamageDealt:N0} damage")),
+                    ("Most kills in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPKills.HasValue),
+                        e => e.Player.PvPKills!.Value, e => $"{e.Player.PvPKills} kills")),
+                    ("Most assists in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPAssists.HasValue),
+                        e => e.Player.PvPAssists!.Value, e => $"{e.Player.PvPAssists} assists"))
+                });
+                Add("Your PvP results", new()
+                {
+                    ("Wins (PvP)", PvpStatisticText(yourPvpResults, 3)),
+                    ("Losses (PvP)", PvpStatisticText(yourPvpResults, 4)),
+                    ("Win rate (PvP)", PvpStatisticText(yourPvpResults, 5)),
+                    ("1st (Frontline)", PvpStatisticText(yourPvpResults, 6)),
+                    ("1st % (Frontline)", PvpStatisticText(yourPvpResults, 7)),
+                    ("2nd (Frontline)", PvpStatisticText(yourPvpResults, 8)),
+                    ("2nd % (Frontline)", PvpStatisticText(yourPvpResults, 9)),
+                    ("3rd (Frontline)", PvpStatisticText(yourPvpResults, 10)),
+                    ("3rd % (Frontline)", PvpStatisticText(yourPvpResults, 11))
+                });
+            }
 
             Add("Duty Records", new()
             {

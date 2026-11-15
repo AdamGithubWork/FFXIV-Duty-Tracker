@@ -31,8 +31,12 @@ Keep the dependency DLLs and the `runtimes` folder alongside the plugin. Load
 
 You can choose which duty types to record and whether to track alliance members.
 PvPStats results add the full scoreboard roster: up to 72 players in Frontline,
-10 in Crystalline Conflict, and 48 in Rival Wings. Names, home worlds, jobs, and
-scoreboard deaths are imported after the match. Players already recorded keep
+10 in Crystalline Conflict, and 48 in Rival Wings. Names, home worlds, jobs,
+damage dealt, kills, deaths, assists, and teams are imported after the match.
+Duty details show whether each player was a teammate or enemy, with your team's
+placement when available. Each player keeps their own team's result, including
+opponents. Damage is the scoreboard's total damage dealt, including
+damage to non-player targets where the mode counts it. Players already recorded keep
 their observed race, gender, and status. During PvP, Duty Tracker also checks nearby
 players once a second for those details when their full name and home world are
 available. Hidden identities are skipped. Players who weren't observed use Unknown
@@ -46,8 +50,44 @@ versions without the match-saved callback. First checks are after about one minu
 for CC and five minutes for Frontline/Rival Wings, then every 30 seconds if needed.
 Recent matches keep their 30-minute retry window; older unfinished imports get one
 check after reload. Partial results add available players without marking the
-roster complete. Fully imported rosters aren't imported again after reload.
+roster complete. Fully imported scoreboards aren't imported again after reload.
+Previously imported full rosters get another lookup to add missing combat scores,
+teams, and player results when PvPStats still has them.
 Older records with known deaths aren't bulk-backfilled automatically.
+
+Settings > PvP has **Track opposing members in PvP matches**, enabled by default.
+Turn it off before entering a duty to capture and import teammates only. Players
+whose side can't be confirmed are skipped while it's off. The choice is saved with
+each duty, so delayed imports use that duty's setting. Existing history isn't deleted.
+PvPStats imports your whole team regardless of the alliance-tracking setting.
+
+Choose scoreboard columns under Settings > Table columns > PvP players. Records
+also has optional columns for your PvP scores and placement. People has optional
+PvP damage, kills, assists, and teammate/enemy encounter totals. Those totals use
+the current filters and only include known scores; '-' means unknown.
+
+Statistics tables, People, and Duty Analysis have optional PvP columns under
+Settings > Table columns. Choose damage dealt, kills, assists, wins, losses, win
+rate, and separate Frontline 1st/2nd/3rd counts and percentages. Statistics and
+People count each matching player encounter. Duty Analysis counts your result and
+scores once per matching duty. These are results from recorded encounters, not a
+player's lifetime win rate.
+
+Statistics uses average damage, kills, and assists for every group, including
+race, gender, job, status, home world, and datacenter. Each average combines the
+group's scores and divides by encounters with a known score. Missing scores are
+skipped; zero scores count. Damage and combat averages are numbers, while win rate
+and placement rates are percentages. People, Duty Analysis, and Summary keep totals.
+
+1st place counts as a win. Frontline 2nd and 3rd count as losses for win rate while
+keeping their own counts and percentages. Win rate uses known PvP results only;
+Frontline placement percentages use known Frontline results only. Missing results
+don't count as losses. CC and Rival Wings show Win/Loss in duty details.
+
+Summary adds toggleable PvP damage, kill, and assist milestones, plus your win rate
+and Frontline placements. Choose them under Settings > Milestones. Summary uses
+duty/date filters, and your results count once per duty. Player milestones follow
+the Include yourself setting.
 
 Interrupted duties stay pending while login and loading states settle. A pending
 duty resumes only for the same character name and home world. If its recorder
@@ -59,8 +99,10 @@ Resumed duty durations include time spent offline.
 ### Records
 
 Browse completed and incomplete runs. Click a duty to see the party, add a note,
-or edit the wipe count and joined-in-progress flag. You can delete records and
-export your history to CSV.
+or edit the wipe count and joined-in-progress flag. You can delete individual
+records here. Export CSV and Clear all records are in Settings > History & exports.
+Both actions cover all saved records regardless of filters. Clearing records still
+requires confirmation.
 
 ### Statistics
 
@@ -126,9 +168,15 @@ Choose which duty types show the window in Settings.
 Expand the Filters panel below the active data tab. Duty/date and player controls
 are grouped separately, with multi-select dropdowns for categories. The panel is
 hidden in Settings. Summary shows only the duty and date controls it uses.
+An end-of-filters divider stays below the panel, outside its scrolling area.
 
 Filter by duty type, duty name, player name or home world, job, race, gender,
 status, and date. You can use a preset date range or enter your own dates.
+Under Duty types > PvP, select Frontline, Crystalline Conflict, or Rival Wings.
+Multiple modes can be selected, alongside other duty types. All PvP modes removes
+the mode restriction. Matches without an identified mode appear with All PvP modes
+but are excluded when specific modes are selected. Clear filters resets both duty
+types and modes.
 Job and world dropdowns allow multiple selections. Choose a role or North American
 datacenter to select its whole group, or pick individual jobs and home worlds.
 Choose All Jobs or All Worlds to clear that selection.

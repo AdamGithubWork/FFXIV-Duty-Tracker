@@ -289,6 +289,7 @@ namespace MentorRouletteTracker.DutyTracking
                 DutyName = dutyName,
                 DutyType = dutyType,
                 PvPRosterComplete = dutyType == "PvP" ? false : null,
+                TrackPvpEnemies = config.TrackPvpEnemies,
                 RecorderName = localPlayer?.Name.TextValue ?? string.Empty,
                 RecorderWorld = localPlayer?.HomeWorld.Value.Name.ExtractText() ?? string.Empty,
                 JoinedInProgress = true,
@@ -371,6 +372,7 @@ namespace MentorRouletteTracker.DutyTracking
             var localPlayerGender = GenderIdToName(localPlayer.Customize[(int)CustomizeIndex.Gender]);
             var localPlayerStatus = localPlayer.OnlineStatus.Value.Name.ExtractText();
             ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayerStatus);
+            MarkPvpTeammate(localPlayerName, localPlayerWorld);
 
             current.LalafellCount = current.Party.Count(x =>
                 x.Race == "Lalafell" && (x.Name != localPlayerName || x.World != localPlayerWorld));
@@ -398,6 +400,13 @@ namespace MentorRouletteTracker.DutyTracking
                 if (string.IsNullOrWhiteSpace(world))
                     continue;
 
+                var self = name == current.RecorderName && world == current.RecorderWorld;
+                var flags = player.StatusFlags;
+                bool? enemy = self || (flags & (StatusFlags.PartyMember | StatusFlags.AllianceMember)) != 0
+                    ? false : (flags & StatusFlags.Hostile) != 0 ? true : null;
+                if (!current.TrackPvpEnemies && enemy != false)
+                    continue;
+
                 var customize = player.Customize;
                 if (customize.Length <= Math.Max((int)CustomizeIndex.Race, (int)CustomizeIndex.Gender))
                     continue;
@@ -407,6 +416,8 @@ namespace MentorRouletteTracker.DutyTracking
                 if (string.IsNullOrWhiteSpace(status))
                     status = "Unknown";
                 ProcessPlayer(name, job.Abbreviation.ExtractText(), race, gender, world, status);
+                if (enemy.HasValue)
+                    FindPlayerSnapshot(name, world)!.PvPIsEnemy = enemy;
             }
 
             current.LalafellCount = current.Party.Count(player => player.Race == "Lalafell" &&
@@ -436,8 +447,14 @@ namespace MentorRouletteTracker.DutyTracking
             }
 
             ProcessPlayer(name, job, race, gender, world, status);
+            MarkPvpTeammate(name, world);
         }
 
+        private void MarkPvpTeammate(string name, string world)
+        {
+            if (current?.DutyType == "PvP" && FindPlayerSnapshot(name, world) is { } snapshot)
+                snapshot.PvPIsEnemy = false;
+        }
 
         private void ProcessPlayer(string name, string job, string race, string gender, string world, string status)
         {

@@ -11,13 +11,23 @@ namespace MentorRouletteTracker
 
         private static readonly Dictionary<string, TableColumnOption[]> TableColumnOptions = new()
         {
+            ["PvP players"] =
+            [
+                new("name", "Name", Required: true), new("world", "World"), new("job", "Job"),
+                new("side", "Side"), new("team", "Team"), new("damage", "Damage dealt"),
+                new("kills", "Kills"), new("deaths", "Deaths"), new("assists", "Assists"),
+                new("race", "Race", false), new("gender", "Gender", false), new("status", "Status", false),
+                new("result", "Result")
+            ],
             ["Records"] =
             [
                 new("duty", "Duty", Required: true), new("type", "Type"), new("job", "Job"),
                 new("started", "Started"), new("time", "Time"), new("joined", "Joined in progress"),
                 new("wipes", "Wipes"), new("lalafell", "Lalafell"), new("completed", "Completed"),
                 new("sprouts", "Sprouts seen", false), new("mentors", "Mentors seen", false),
-                new("players", "Players seen", false), new("deaths", "Known deaths", false)
+                new("players", "Players seen", false), new("deaths", "Known deaths", false),
+                new("pvpPlacement", "PvP placement", false), new("pvpDamage", "Your PvP damage", false),
+                new("pvpKills", "Your PvP kills", false), new("pvpAssists", "Your PvP assists", false)
             ],
             ["People"] =
             [
@@ -26,7 +36,10 @@ namespace MentorRouletteTracker
                 new("average", "Deaths / encounter"), new("first", "First seen", false),
                 new("last", "Last seen", false), new("duties", "Different duties", false),
                 new("known", "Known death encounters", false), new("deathless", "Deathless encounters", false),
-                new("sprouts", "Sprout encounters", false), new("mentors", "Mentor encounters", false)
+                new("sprouts", "Sprout encounters", false), new("mentors", "Mentor encounters", false),
+                new("pvpDamage", "Damage dealt (PvP)", false), new("pvpKills", "Kills (PvP)", false),
+                new("pvpAssists", "Assists (PvP)", false), new("teammates", "Teammate encounters", false),
+                new("enemies", "Enemy encounters", false), ..PvpResultColumns()
             ],
             ["Duty Analysis"] =
             [
@@ -34,7 +47,7 @@ namespace MentorRouletteTracker
                 new("averageDeaths", "Deaths / run"), new("wipes", "Total wipes"),
                 new("averageWipes", "Wipes / run"), new("time", "Average time"), new("joined", "Joined in progress"),
                 new("sprouts", "Sprouts seen", false), new("mentors", "Mentors seen", false),
-                new("players", "Players seen", false), new("lalafell", "Lalafell seen", false)
+                new("players", "Players seen", false), new("lalafell", "Lalafell seen", false), ..PvpStatisticColumns()
             ],
             ["Statistics: Race"] = StatisticColumns("Race"),
             ["Statistics: Race and gender"] = StatisticColumns("Race"),
@@ -49,7 +62,7 @@ namespace MentorRouletteTracker
         [
             new("group", name, Required: true), new("detail", "Gender", Required: true),
             new("seen", "Encounters"), new("deaths", "Known deaths", !percentage),
-            new("average", "Deaths / encounter"), new("percentage", "Percentage", percentage)
+            new("average", "Deaths / encounter"), new("percentage", "Percentage", percentage), ..PvpStatisticColumns(averages: true)
         ];
 
         private static string StatisticTableKey(PlayerStatistic statistic) =>
@@ -215,6 +228,7 @@ namespace MentorRouletteTracker
             config.TableColumns ??= new();
             ImGui.PushTextWrapPos();
             ImGui.TextDisabled("Choose which columns to show. Click a header to sort. Player counts use the current filters and Include yourself setting. Mentor counts include Trade Mentors.");
+            ImGui.TextDisabled("PvP columns include damage, kills, assists, win rate, and separate Frontline 1st/2nd/3rd counts and percentages. Duty Analysis shows your results once per duty; Statistics and People count player encounters.");
             ImGui.PopTextWrapPos();
             foreach (var (table, columns) in TableColumnOptions)
             {

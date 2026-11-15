@@ -343,6 +343,7 @@ namespace MentorRouletteTracker
             TimeSpan AverageTime, int InProgress, int Sprouts, int Mentors, int Players, int Lalafell)
         {
             public double WipesPerRun => Runs == 0 ? 0 : (double)TotalWipes / Runs;
+            public PvpStatistics Pvp { get; init; } = new();
         }
 
         private List<DutyAnalysisRow> BuildDutyAnalysisRows(IEnumerable<DutyRecord> records)
@@ -355,7 +356,13 @@ namespace MentorRouletteTracker
                     TotalKnownDeaths(counts.Select(count => count.Deaths)), AverageKnownDeathsPerRun(runs),
                     runs.Sum(record => record.WipeCount), TimeSpan.FromTicks((long)runs.Average(record => record.TimeInDuty.Ticks)),
                     runs.Count(record => record.JoinedInProgress), counts.Sum(count => count.Sprouts),
-                    counts.Sum(count => count.Mentors), counts.Sum(count => count.Players), counts.Sum(count => count.Lalafell));
+                    counts.Sum(count => count.Mentors), counts.Sum(count => count.Players), counts.Sum(count => count.Lalafell))
+                {
+                    Pvp = BuildPvpStatistics(runs.Where(record => record.DutyType == "PvP")
+                        .Select(record => (Record: record, Player: RecorderPvpPlayer(record)))
+                        .Where(entry => entry.Player != null)
+                        .Select(entry => new PlayerEncounter { Record = entry.Record, Player = entry.Player! }))
+                };
             }).ToList();
         }
 
@@ -364,6 +371,7 @@ namespace MentorRouletteTracker
             DrawSectionHeading("Stats by duty");
             ImGui.PushTextWrapPos();
             ImGui.TextDisabled("Player counts use the current filters. Death totals only include known counts; Deaths / run skips runs with missing counts. Choose columns in Settings.");
+            ImGui.TextDisabled("PvP columns show your scores and your team's results, once per matching duty. Frontline placements stay separate.");
             ImGui.PopTextWrapPos();
             ImGui.Spacing();
             var stats = BuildDutyAnalysisRows(records);
@@ -396,6 +404,7 @@ namespace MentorRouletteTracker
                         9 => row.Mentors,
                         10 => row.Players,
                         11 => row.Lalafell,
+                        >= 12 and <= 23 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 12),
                         _ => row.Duty
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
                     sortSpecs.SpecsDirty = false;
@@ -415,6 +424,7 @@ namespace MentorRouletteTracker
                     DrawTableCell(9, row.Mentors.ToString());
                     DrawTableCell(10, row.Players.ToString());
                     DrawTableCell(11, row.Lalafell.ToString());
+                    DrawPvpStatisticCells(12, row.Pvp);
                 }
                 EndStyledTable();
             }

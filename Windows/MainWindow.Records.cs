@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
@@ -37,64 +37,6 @@ namespace MentorRouletteTracker
             ImGui.TextDisabled(tracker.Armed
                 ? "Recording is on."
                 : "Recording is off. You can turn it back on in Settings.");
-            ImGui.Spacing();
-
-            if (ImGui.Button("Export CSV"))
-            {
-                var path = Path.Combine(
-                    exportDirectory,
-                    $"mentor_roulette_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-                CsvExporter.Export(config.History.Records, path);
-
-                lastExportMessage =
-                    $"Exported {config.History.Records.Count} records to {path}";
-            }
-
-            ImGui.SameLine();
-
-            if (ImGui.Button("Clear all records"))
-            {
-                ImGui.OpenPopup("ConfirmClear");
-            }
-
-            if (ImGui.BeginPopup("ConfirmClear"))
-            {
-                ImGui.Text(
-                    "Clear all duty records? You can't undo this.");
-
-                ImGui.Spacing();
-
-                if (ImGui.Button("Yes, clear"))
-                {
-                    config.History.Records.Clear();
-                    config.History.Save();
-
-                    selectedRecord = null;
-                    showDetailWindow = false;
-
-                    ImGui.CloseCurrentPopup();
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel"))
-                {
-                    ImGui.CloseCurrentPopup();
-                }
-
-                ImGui.EndPopup();
-            }
-
-            if (!string.IsNullOrEmpty(lastExportMessage))
-            {
-                ImGui.Spacing();
-
-                ImGui.TextColored(
-                    new Vector4(0.4f, 1f, 0.4f, 1f),
-                    lastExportMessage);
-            }
-
             ImGui.Spacing();
 
             ImGui.TextDisabled(
@@ -178,6 +120,10 @@ namespace MentorRouletteTracker
                         10 => Counts(record).Mentors,
                         11 => Counts(record).Players,
                         12 => Counts(record).Deaths,
+                        13 => record.PvPPlacement,
+                        14 => RecorderPvpPlayer(record)?.PvPDamageDealt,
+                        15 => RecorderPvpPlayer(record)?.PvPKills,
+                        16 => RecorderPvpPlayer(record)?.PvPAssists,
                         _ => record.DutyName
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, record => record.DutyName);
                     sortSpecs.SpecsDirty = false;
@@ -241,6 +187,10 @@ namespace MentorRouletteTracker
                         ImGui.TextUnformatted(Counts(r).Players.ToString());
                     if (ImGui.TableSetColumnIndex(12))
                         ImGui.TextUnformatted(Counts(r).Deaths?.ToString() ?? "-");
+                    DrawTableCell(13, r.DutyType == "PvP" ? PvpPlacementLabel(r.PvPPlacement) : "-");
+                    DrawTableCell(14, RecorderPvpPlayer(r)?.PvPDamageDealt?.ToString("N0") ?? "-");
+                    DrawTableCell(15, RecorderPvpPlayer(r)?.PvPKills?.ToString() ?? "-");
+                    DrawTableCell(16, RecorderPvpPlayer(r)?.PvPAssists?.ToString() ?? "-");
                 }
 
                 EndStyledTable();
@@ -407,6 +357,8 @@ namespace MentorRouletteTracker
 
                 ImGui.Text($"Type: {r.DutyType}");
                 ImGui.Text($"Your job: {r.PlayerJob}");
+                if (r.DutyType == "PvP")
+                    ImGui.Text($"Your team's placement: {PvpPlacementLabel(r.PvPPlacement)}");
 
                 ImGui.Text(
                     $"Started: {r.Timestamp:yyyy-MM-dd HH:mm:ss}");
@@ -432,14 +384,21 @@ namespace MentorRouletteTracker
                 {
                     ImGui.PushTextWrapPos();
                     ImGui.TextDisabled(r.PvPRosterComplete.Value
-                        ? "Full PvPStats roster imported. Some character details may be unknown."
-                        : "PvPStats roster not complete yet.");
+                        ? r.TrackPvpEnemies ? "PvPStats roster imported. Some character details may be unknown."
+                            : "PvPStats teammate roster imported. Opposing members weren't tracked for this duty."
+                        : "Waiting for the full PvPStats scoreboard.");
                     ImGui.PopTextWrapPos();
                 }
+                if (r.PvPRosterComplete == true && (!r.PvPCombatStatsComplete || !r.PvPResultsComplete))
+                    ImGui.TextDisabled("Checking PvPStats for missing scores, teams, and results.");
 
                 ImGui.Spacing();
 
-                if (r.Party.Count > 0)
+                if (r.DutyType == "PvP")
+                {
+                    DrawPvpPlayers(r);
+                }
+                else if (r.Party.Count > 0)
                 {
                     var localPlayerName =
                         objectTable.LocalPlayer?.Name.TextValue;

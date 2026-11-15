@@ -38,13 +38,17 @@ namespace MentorRouletteTracker
         }
 
         private sealed record PlayerStatisticRow(
-            string Name, string Detail, int Seen, int? Deaths, double? AverageDeaths);
+            string Name, string Detail, int Seen, int? Deaths, double? AverageDeaths)
+        {
+            public PvpStatistics Pvp { get; init; } = new();
+        }
 
         private PlayerViewData GetPlayerViewData()
         {
             var filterKey = JsonSerializer.Serialize(new
             {
                 DutyTypes = selectedDutyTypes.Order(StringComparer.Ordinal),
+                PvpModes = selectedPvpModes.Order(),
                 Races = selectedPlayerRaces.Order(StringComparer.Ordinal),
                 Genders = selectedPlayerGenders.Order(StringComparer.Ordinal),
                 Statuses = selectedPlayerStatuses.Order(StringComparer.Ordinal),
@@ -132,7 +136,8 @@ namespace MentorRouletteTracker
             }).Select(group => new PlayerStatisticRow(
                 group.Key.Item1, group.Key.Item2, group.Count(),
                 TotalKnownDeaths(group.Select(encounter => EffectiveDeaths(encounter.Record, encounter.Player))),
-                group.Average(encounter => EffectiveDeaths(encounter.Record, encounter.Player))));
+                group.Average(encounter => EffectiveDeaths(encounter.Record, encounter.Player)))
+                { Pvp = BuildPvpStatistics(group) });
 
             var result = statistic is PlayerStatistic.Status or PlayerStatistic.World or PlayerStatistic.Datacenter
                 ? rows.OrderByDescending(row => row.Seen).ToList()

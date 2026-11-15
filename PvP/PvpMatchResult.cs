@@ -16,6 +16,11 @@ public sealed class PvpPlayerResult
     public string World { get; init; } = string.Empty;
     public string Job { get; set; } = "Unknown";
     public int? Deaths { get; set; }
+    public string Team { get; set; } = string.Empty;
+    public long? DamageDealt { get; set; }
+    public int? Kills { get; set; }
+    public int? Assists { get; set; }
+    public int? Placement { get; set; }
 }
 
 public class PvpMatchResult
@@ -26,6 +31,7 @@ public class PvpMatchResult
     public string RecorderName { get; set; } = string.Empty;
     public string RecorderWorld { get; set; } = string.Empty;
     public int ExpectedPlayerCount { get; set; }
+    public int? Placement { get; set; }
     public bool RosterComplete => ExpectedPlayerCount > 0 && Players.Count >= ExpectedPlayerCount;
     public Dictionary<string, PvpPlayerResult> Players { get; set; } = new(StringComparer.Ordinal);
 }

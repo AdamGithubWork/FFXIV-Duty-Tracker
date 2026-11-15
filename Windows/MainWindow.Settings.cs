@@ -1,4 +1,4 @@
-﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Bindings.ImGui;
 using System.Numerics;
 
 namespace MentorRouletteTracker
@@ -104,8 +104,22 @@ namespace MentorRouletteTracker
                     config.TrackAllianceMembers = trackAlliance;
                     config.Save();
                 }
+                EndSettingsSection();
+            }
+
+            ImGui.Spacing();
+            if (BeginSettingsSection("PvP", defaultOpen: true))
+            {
+                var trackEnemies = config.TrackPvpEnemies;
+                if (ImGui.Checkbox("Track opposing members in PvP matches", ref trackEnemies))
+                {
+                    config.TrackPvpEnemies = trackEnemies;
+                    config.Save();
+                }
                 ImGui.PushTextWrapPos();
-                ImGui.TextDisabled("PvPStats imports all teams even when alliance tracking is off.");
+                ImGui.TextDisabled("Applies to new duties. Turn this off to record teammates only. Existing history stays saved.");
+                ImGui.TextDisabled("PvPStats adds team labels, damage dealt, kills, deaths, assists, and placement after a match. Teammates include your whole team, even when alliance tracking is off.");
+                ImGui.TextDisabled("Nearby players can have race, gender, and status recorded. Hidden identities and missing scores stay unknown.");
                 ImGui.PopTextWrapPos();
                 EndSettingsSection();
             }
@@ -163,7 +177,77 @@ namespace MentorRouletteTracker
                 EndSettingsSection();
             }
 
+            ImGui.Spacing();
+            if (BeginSettingsSection("History & exports"))
+            {
+                DrawHistorySettings();
+                EndSettingsSection();
+            }
+
             settingsExpansion = null;
+        }
+
+        private void DrawHistorySettings()
+        {
+            ImGui.TextWrapped("Export all saved records to CSV, or clear saved duty history. Filters don't limit these actions.");
+            ImGui.Spacing();
+            if (ImGui.Button("Export CSV"))
+            {
+                var path = Path.Combine(
+                    exportDirectory,
+                    $"mentor_roulette_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+
+                CsvExporter.Export(config.History.Records, path);
+
+                lastExportMessage =
+                    $"Exported {config.History.Records.Count} records to {path}";
+            }
+
+            ImGui.SameLine();
+
+            if (ImGui.Button("Clear all records"))
+            {
+                ImGui.OpenPopup("ConfirmClear");
+            }
+
+            if (ImGui.BeginPopup("ConfirmClear"))
+            {
+                ImGui.Text(
+                    "Clear all duty records? You can't undo this.");
+
+                ImGui.Spacing();
+
+                if (ImGui.Button("Yes, clear"))
+                {
+                    config.History.Records.Clear();
+                    config.History.Save();
+
+                    selectedRecord = null;
+                    showDetailWindow = false;
+
+                    ImGui.CloseCurrentPopup();
+                }
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Cancel"))
+                {
+                    ImGui.CloseCurrentPopup();
+                }
+
+                ImGui.EndPopup();
+            }
+
+            if (!string.IsNullOrEmpty(lastExportMessage))
+            {
+                ImGui.Spacing();
+
+                ImGui.TextColored(
+                    new Vector4(0.4f, 1f, 0.4f, 1f),
+                    lastExportMessage);
+            }
+
+            ImGui.Spacing();
         }
 
         private bool BeginSettingsSection(string title, bool defaultOpen = false)

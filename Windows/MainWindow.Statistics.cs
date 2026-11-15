@@ -24,6 +24,8 @@ namespace MentorRouletteTracker
                     "Players from completed duties matching the filters above.");
                 ImGui.TextDisabled("A drought is a streak of runs with no matching players.");
                 ImGui.TextDisabled("Death totals only include known counts. '-' means unknown and isn't included in averages.");
+                ImGui.TextDisabled("Optional PvP columns count player encounters. Win rate uses known results; Frontline placement percentages use known Frontline results only. 1st is a win, while 2nd and 3rd stay separate.");
+                ImGui.TextDisabled("Average damage, kills, and assists combine matching players' scores and divide by encounters with a known score. Missing scores are skipped; zero scores count.");
                 ImGui.PopTextWrapPos();
                 ImGui.Separator();
                 ImGui.Spacing();
@@ -169,6 +171,7 @@ namespace MentorRouletteTracker
                         2 or 5 => row.Seen,
                         3 => row.Deaths,
                         4 => row.AverageDeaths,
+                        >= 6 and <= 17 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 6, averages: true),
                         _ => row.Name
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Name + " " + row.Detail);
                     sortSpecs.SpecsDirty = false;
@@ -183,6 +186,7 @@ namespace MentorRouletteTracker
                     DrawTableCell(3, row.Deaths?.ToString() ?? "-");
                     DrawTableCell(4, row.AverageDeaths?.ToString("F2") ?? "-");
                     DrawTableCell(5, $"{(double)row.Seen / total * 100:F1}%");
+                    DrawPvpStatisticCells(6, row.Pvp, averages: true);
                 }
                 EndStyledTable();
             }

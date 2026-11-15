@@ -21,6 +21,7 @@ namespace MentorRouletteTracker
         private readonly HashSet<string> selectedPlayerJobs = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> selectedPlayerWorlds = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> selectedDutyTypes = new();
+        private readonly HashSet<PvP.PvpMode> selectedPvpModes = new();
 
         private string globalPlayerSearchText = string.Empty;
         private string globalDutySearchText = string.Empty;
@@ -114,6 +115,7 @@ namespace MentorRouletteTracker
             globalPlayerSearchText = string.Empty;
             globalDutySearchText = string.Empty;
             selectedDutyTypes.Clear();
+            selectedPvpModes.Clear();
             selectedPlayerRaces.Clear();
             selectedPlayerGenders.Clear();
             selectedPlayerStatuses.Clear();

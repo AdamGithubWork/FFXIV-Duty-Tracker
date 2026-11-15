@@ -9,7 +9,7 @@ backend; JSON is used for settings and recovery files.
 
 ## Schema
 
-New databases create schema 9 directly:
+New databases create schema 11 directly:
 
 - `duty_runs`: duty records, including the pending duty and its checkpoint.
 - `duty_players`: party snapshots in their recorded order.
@@ -21,12 +21,22 @@ Checkpoints stay in UTC. Durations use .NET ticks, and unknown scoreboard deaths
 stay null rather than becoming zero.
 
 `pvp_roster_complete` tracks whether a new PvP scoreboard roster was fully imported.
-False imports can resume after reload. True imports are finished. Null keeps older
-records unchanged unless they already need missing scoreboard results recovered.
+False imports can resume after reload. `pvp_combat_stats_complete` records whether
+the full source scoreboard also supplied teams, damage, kills, and assists. Previously
+imported full rosters can gain those fields on reload. Null keeps older records
+unchanged unless they already need missing scoreboard results recovered.
+
+Player snapshots store the team, enemy/teammate relationship to the recording
+player, damage dealt, kills, and assists. Missing scores and sides stay null.
+Each duty stores its enemy-tracking choice, PvP mode, and the recording team's
+placement. Each player also stores their own team's placement, rather than
+inheriting the recorder's result. `pvp_results_complete` tracks finished player
+results separately from combat scores. Older complete scoreboards get another
+lookup for missing results; absent results stay null.
 
 ## Development database transition
 
-The owner's schema-6, schema-7, and schema-8 databases upgrade to schema 9.
+The owner's schema-6 through schema-10 databases upgrade to schema 11.
 Before changing it, the plugin writes a complete SQLite backup to the `backups`
 subfolder. If that backup fails, the transition stops.
 
@@ -34,8 +44,10 @@ For schemas 6 and 7, the transition removes the embedded JSON archive, import-or
 unused upload queue. It keeps duty/player values, IDs, row order, and the write
 revision. The backup retains the original database, including the old JSON archive.
 Older development schemas and JSON history imports aren't supported by this build.
-Schema 8 adds only the nullable roster-import flag. Existing duty/player values
-and revisions stay unchanged. Backups are named `history-before-v9-*.sqlite`.
+Schemas 6 through 8 also gain the nullable roster-import flag. All supported schemas
+gain the PvP fields. Existing duty/player values and revisions stay unchanged.
+Schema 10 gains only the mode, results-complete flag, and per-player placement.
+Backups are named `history-before-v11-*.sqlite`.
 
 Backups are separate files. Clearing records leaves those backup files in place.
 

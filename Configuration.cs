@@ -11,6 +11,7 @@ namespace MentorRouletteTracker
         public List<uint> TrackedContentTypeIds { get; set; } = new();
         public List<uint> TimerVisibleContentTypeIds { get; set; } = new();
         public bool TrackAllianceMembers { get; set; }
+        public bool TrackPvpEnemies { get; set; } = true;
         public bool IncludeSelfInStatistics { get; set; }
         public bool ShowStatisticsOverview { get; set; } = true;
         public bool ShowRaceStatistics { get; set; } = true;

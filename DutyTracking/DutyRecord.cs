@@ -18,5 +18,10 @@ namespace MentorRouletteTracker.DutyTracking
         public string Note { get; set; } = string.Empty;
         public int? PvPDeaths { get; set; }
         public bool? PvPRosterComplete { get; set; }
+        public bool TrackPvpEnemies { get; set; } = true;
+        public int? PvPPlacement { get; set; }
+        public bool PvPCombatStatsComplete { get; set; }
+        public PvP.PvpMode PvPMode { get; set; }
+        public bool PvPResultsComplete { get; set; }
     }
 }

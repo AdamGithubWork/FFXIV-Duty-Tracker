@@ -33,6 +33,12 @@ namespace MentorRouletteTracker
             public required int DeathlessEncounters { get; init; }
             public required int SproutEncounters { get; init; }
             public required int MentorEncounters { get; init; }
+            public long? PvpDamage { get; init; }
+            public long? PvpKills { get; init; }
+            public long? PvpAssists { get; init; }
+            public int TeammateEncounters { get; init; }
+            public int EnemyEncounters { get; init; }
+            public PvpStatistics Pvp { get; init; } = new();
             public double? AverageDeaths => KnownDeathEncounters == 0 ? null : (double?)TotalDeaths / KnownDeathEncounters;
         }
 
@@ -72,6 +78,7 @@ namespace MentorRouletteTracker
                 .Select(group =>
                 {
                     var entries = group.ToList();
+                    var pvp = BuildPvpStatistics(entries);
                     return new PeopleTableRow
                     {
                         Name = group.Key.Name,
@@ -86,7 +93,13 @@ namespace MentorRouletteTracker
                         DifferentDuties = entries.Select(entry => entry.Record.DutyName).Distinct().Count(),
                         DeathlessEncounters = entries.Count(entry => EffectiveDeaths(entry.Record, entry.Player) == 0),
                         SproutEncounters = entries.Count(entry => GetPlayerStatus(entry.Player) == "Sprout"),
-                        MentorEncounters = entries.Count(entry => IsMentor(entry.Player))
+                        MentorEncounters = entries.Count(entry => IsMentor(entry.Player)),
+                        Pvp = pvp,
+                        PvpDamage = pvp.Damage,
+                        PvpKills = pvp.Kills,
+                        PvpAssists = pvp.Assists,
+                        TeammateEncounters = entries.Count(entry => entry.Record.DutyType == "PvP" && entry.Player.PvPIsEnemy == false),
+                        EnemyEncounters = entries.Count(entry => entry.Record.DutyType == "PvP" && entry.Player.PvPIsEnemy == true)
                     };
                 })
                 .ToList();
@@ -110,6 +123,7 @@ namespace MentorRouletteTracker
             ImGui.PushTextWrapPos();
             ImGui.TextDisabled("Click a player to view recorded duties with them. Click a header to sort.");
             ImGui.TextDisabled("Death totals only include known counts. '-' means unknown and isn't included in averages.");
+            ImGui.TextDisabled("PvP results cover matches recorded here. Frontline 1st, 2nd, and 3rd have separate counts and percentages; unknown results don't affect win rate.");
             ImGui.PopTextWrapPos();
             ImGui.Spacing();
 
@@ -143,6 +157,12 @@ namespace MentorRouletteTracker
                         11 => player.DeathlessEncounters,
                         12 => player.SproutEncounters,
                         13 => player.MentorEncounters,
+                        14 => player.PvpDamage,
+                        15 => player.PvpKills,
+                        16 => player.PvpAssists,
+                        17 => player.TeammateEncounters,
+                        18 => player.EnemyEncounters,
+                        >= 19 and <= 27 => PvpStatisticValue(player.Pvp, sortColumn - 16),
                         _ => player.Name
                     }, direction == ImGuiSortDirection.Ascending, player => player.Name);
                     data.People = people;
@@ -174,6 +194,12 @@ namespace MentorRouletteTracker
                     DrawTableCell(11, player.DeathlessEncounters.ToString());
                     DrawTableCell(12, player.SproutEncounters.ToString());
                     DrawTableCell(13, player.MentorEncounters.ToString());
+                    DrawTableCell(14, player.PvpDamage?.ToString("N0") ?? "-");
+                    DrawTableCell(15, player.PvpKills?.ToString("N0") ?? "-");
+                    DrawTableCell(16, player.PvpAssists?.ToString("N0") ?? "-");
+                    DrawTableCell(17, player.TeammateEncounters.ToString());
+                    DrawTableCell(18, player.EnemyEncounters.ToString());
+                    DrawPvpStatisticCells(19, player.Pvp, includeScores: false);
                 }
                 EndStyledTable();
             }
