@@ -48,7 +48,8 @@ public sealed partial class SqliteHistoryStore
                     Completed = (long)reader["completed"] != 0, PlayerJob = (string)reader["player_job"],
                     RecorderName = (string)reader["recorder_name"], RecorderWorld = (string)reader["recorder_world"],
                     TimeInDuty = TimeSpan.FromTicks((long)reader["duration_ticks"]), Note = (string)reader["note"],
-                    PvPDeaths = reader["legacy_pvp_deaths"] is DBNull ? null : checked((int)(long)reader["legacy_pvp_deaths"])
+                    PvPDeaths = reader["legacy_pvp_deaths"] is DBNull ? null : checked((int)(long)reader["legacy_pvp_deaths"]),
+                    PvPRosterComplete = reader["pvp_roster_complete"] is DBNull ? null : (long)reader["pvp_roster_complete"] != 0
                 };
                 string id = (string)reader["id"];
                 bool pending = (long)reader["is_pending"] != 0;
@@ -164,6 +165,7 @@ public sealed partial class SqliteHistoryStore
                 ["player_job"] = record.PlayerJob ?? string.Empty, ["recorder_name"] = record.RecorderName ?? string.Empty,
                 ["recorder_world"] = record.RecorderWorld ?? string.Empty, ["duration_ticks"] = record.TimeInDuty.Ticks,
                 ["note"] = record.Note ?? string.Empty, ["legacy_pvp_deaths"] = record.PvPDeaths,
+                ["pvp_roster_complete"] = record.PvPRosterComplete.HasValue ? (record.PvPRosterComplete.Value ? 1 : 0) : null,
                 ["is_pending"] = row.Pending ? 1 : 0,
                 ["checkpoint_utc"] = record.CheckpointUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
             };

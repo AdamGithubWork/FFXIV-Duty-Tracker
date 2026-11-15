@@ -104,6 +104,9 @@ namespace MentorRouletteTracker
                     config.TrackAllianceMembers = trackAlliance;
                     config.Save();
                 }
+                ImGui.PushTextWrapPos();
+                ImGui.TextDisabled("PvPStats imports all teams even when alliance tracking is off.");
+                ImGui.PopTextWrapPos();
                 EndSettingsSection();
             }
 

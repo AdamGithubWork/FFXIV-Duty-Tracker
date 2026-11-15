@@ -427,7 +427,15 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                ImGui.Text("Party");
+                ImGui.Text(r.DutyType == "PvP" ? $"Players ({r.Party.Count})" : $"Party ({r.Party.Count})");
+                if (r.PvPRosterComplete.HasValue)
+                {
+                    ImGui.PushTextWrapPos();
+                    ImGui.TextDisabled(r.PvPRosterComplete.Value
+                        ? "Full PvPStats roster imported. Some character details may be unknown."
+                        : "PvPStats roster not complete yet.");
+                    ImGui.PopTextWrapPos();
+                }
 
                 ImGui.Spacing();
 

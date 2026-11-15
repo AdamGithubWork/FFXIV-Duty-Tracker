@@ -17,5 +17,6 @@ namespace MentorRouletteTracker.DutyTracking
         public List<PartyMemberSnapshot> Party { get; set; } = new();
         public string Note { get; set; } = string.Empty;
         public int? PvPDeaths { get; set; }
+        public bool? PvPRosterComplete { get; set; }
     }
 }

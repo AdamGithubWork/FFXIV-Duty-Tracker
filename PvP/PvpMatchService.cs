@@ -1,4 +1,4 @@
-﻿using Dalamud.Plugin;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using MentorRouletteTracker.DutyTracking;
@@ -12,8 +12,9 @@ namespace MentorRouletteTracker.PvP
         private readonly IFramework framework;
         private readonly ICallGateSubscriber<string, bool> pvpMatchSaved;
         private readonly Configuration config;
-        private readonly Func<string, bool?> readMode;
+        private readonly Func<string, PvpMode> readMode;
         private readonly Func<string, PvpMatchResult?> readScoreboard;
+        private readonly Func<DateTime[], List<PvpMatchReference>?> findMatches;
         private readonly Dictionary<string, PendingMatch> pendingPvpMatches = new();
         private readonly HashSet<string> processedPvpMatches = new();
         private readonly Queue<string> processedMatchOrder = new();
@@ -24,6 +25,7 @@ namespace MentorRouletteTracker.PvP
         private Task<List<PvpMatchReference>?>? restoreTask;
         private DateTime[]? restoreTimes;
         private bool restoreNeeded = true;
+        private int observedRecordCount;
         private DateTime nextRestoreAttempt = DateTime.MinValue;
         private DateTime nextPvpCheck = DateTime.MinValue;
         private static readonly TimeSpan PvpRetryInterval =
@@ -31,23 +33,16 @@ namespace MentorRouletteTracker.PvP
         private static readonly TimeSpan PvpRetryLimit =
             TimeSpan.FromMinutes(30);
 
-        private enum PvpMode
-        {
-            Unknown,
-            CrystallineConflict,
-            Frontline
-        }
-
         private sealed class PendingMatch
         {
             public DateTime QueuedAt { get; }
             public DateTime NextCheck { get; set; }
             public PvpMode Mode { get; set; }
             public bool AllowCatchUp { get; set; }
-            public Task<bool?>? ModeRead { get; set; }
+            public Task<PvpMode>? ModeRead { get; set; }
             public Task<PvpMatchResult?>? ScoreboardRead { get; set; }
             public bool ReadInProgress => ModeRead != null || ScoreboardRead != null;
-            public DateTime FirstCheck => QueuedAt.AddMinutes(Mode == PvpMode.Frontline ? 5 : 1);
+            public DateTime FirstCheck => QueuedAt.AddMinutes(Mode is PvpMode.Frontline or PvpMode.RivalWings ? 5 : 1);
 
             public PendingMatch(DateTime queuedAt, PvpMode mode = PvpMode.Unknown)
             {
@@ -56,13 +51,6 @@ namespace MentorRouletteTracker.PvP
                 NextCheck = FirstCheck;
             }
         }
-
-        private static PvpMode GetMode(bool? isFrontline) => isFrontline switch
-        {
-            true => PvpMode.Frontline,
-            false => PvpMode.CrystallineConflict,
-            _ => PvpMode.Unknown
-        };
 
         private void RememberProcessedMatch(string matchId)
         {
@@ -82,8 +70,10 @@ namespace MentorRouletteTracker.PvP
             this.framework = framework;
             this.log = log;
             this.config = config;
-            readMode = matchId => PvpTrackerDatabase.IsFrontlineMatch(matchId, log);
+            readMode = matchId => PvpTrackerDatabase.GetMatchMode(matchId, log);
+            observedRecordCount = config.StorageAvailable ? config.History.Records.Count : 0;
             readScoreboard = matchId => PvpTrackerDatabase.GetMatch(matchId, log);
+            findMatches = times => PvpTrackerDatabase.FindMatches(times, log);
 
             pvpMatchSaved =
                 pluginInterface.GetIpcSubscriber<string, bool>(
@@ -116,12 +106,11 @@ namespace MentorRouletteTracker.PvP
                 IEnumerable<DutyRecord> records = config.History.Records;
                 if (config.History.PendingDuty is { } pending)
                     records = records.Append(pending);
-                restoreTimes ??= records.Where(record => record.DutyType == "PvP" &&
-                        record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue))
+                restoreTimes ??= records.Where(NeedsPvpLookup)
                     .Select(record => record.Timestamp).ToArray();
                 var times = restoreTimes;
                 // Only the timestamp copy goes to the worker. History stays on the game thread.
-                restoreTask = Task.Run(() => PvpTrackerDatabase.FindMatches(times, log));
+                restoreTask = Task.Run(() => findMatches(times));
                 return;
             }
             if (!restoreTask.IsCompleted)
@@ -131,6 +120,8 @@ namespace MentorRouletteTracker.PvP
             restoreTask = null;
             if (matches == null)
             {
+                restoreTimes = (restoreTimes ?? Array.Empty<DateTime>()).Where(time => CanKeepLooking(time, now)).ToArray();
+                restoreNeeded = restoreTimes.Length > 0;
                 nextRestoreAttempt = now.Add(PvpRetryInterval);
                 return;
             }
@@ -139,14 +130,14 @@ namespace MentorRouletteTracker.PvP
                 if (processedPvpMatches.Contains(match.MatchId) || pendingPvpMatches.ContainsKey(match.MatchId))
                     continue;
                 var record = FindMatchingRecord(match.DutyStartTime, includePending: true);
-                if (record == null || !record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue))
+                if (record == null || !NeedsPvpLookup(record))
                     continue;
 
                 var queuedAt = ReferenceEquals(record, config.History.PendingDuty)
                     ? now : record.Timestamp.ToUniversalTime() + record.TimeInDuty;
                 if (queuedAt > now)
                     queuedAt = now;
-                var pending = new PendingMatch(queuedAt, GetMode(match.IsFrontline));
+                var pending = new PendingMatch(queuedAt, match.Mode);
                 pending.NextCheck = pending.FirstCheck > now ? pending.FirstCheck : now;
                 // Older duties get one lookup for results that are already available.
                 pending.AllowCatchUp = true;
@@ -160,10 +151,7 @@ namespace MentorRouletteTracker.PvP
                 if (matches.Any(match => Math.Abs(
                     (match.DutyStartTime.ToUniversalTime() - time.ToUniversalTime()).TotalSeconds) < 30))
                     return false;
-                var record = FindMatchingRecord(time, includePending: true);
-                return record != null && record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue) &&
-                    (ReferenceEquals(record, config.History.PendingDuty) ||
-                     now - (record.Timestamp.ToUniversalTime() + record.TimeInDuty) < PvpRetryLimit);
+                return CanKeepLooking(time, now);
             }).ToArray();
             restoreNeeded = restoreTimes.Length > 0;
             nextRestoreAttempt = now.Add(PvpRetryInterval);
@@ -198,11 +186,11 @@ namespace MentorRouletteTracker.PvP
                     pending.ModeRead = null;
                     try
                     {
-                        pending.Mode = GetMode(modeRead.GetAwaiter().GetResult());
+                        pending.Mode = modeRead.GetAwaiter().GetResult();
                         if (pending.Mode != PvpMode.Unknown)
                         {
                             pending.NextCheck = pending.FirstCheck > now ? pending.FirstCheck : now;
-                            log.Information($"PvP scoreboard {matchId}: mode identified as {(pending.Mode == PvpMode.Frontline ? "Frontline" : "CC")}.");
+                            log.Information($"PvP scoreboard {matchId}: mode identified as {pending.Mode}.");
                         }
                         else
                         {
@@ -244,92 +232,107 @@ namespace MentorRouletteTracker.PvP
             }
         }
 
+        private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" &&
+            record.PvPRosterComplete != true && (record.PvPRosterComplete == false ||
+                record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue));
+
+        private bool CanKeepLooking(DateTime time, DateTime now)
+        {
+            var record = FindMatchingRecord(time, includePending: true);
+            return record != null && NeedsPvpLookup(record) &&
+                (ReferenceEquals(record, config.History.PendingDuty) ||
+                 now - (record.Timestamp.ToUniversalTime() + record.TimeInDuty) < PvpRetryLimit);
+        }
+
+        private void DiscoverNewDuties()
+        {
+            var count = config.History.Records.Count;
+            if (count == observedRecordCount)
+                return;
+            var start = count > observedRecordCount ? observedRecordCount : 0;
+            observedRecordCount = count;
+            var times = config.History.Records.Skip(start).Where(NeedsPvpLookup).Select(record => record.Timestamp).ToArray();
+            if (times.Length == 0)
+                return;
+            restoreTimes = (restoreTimes ?? Array.Empty<DateTime>()).Concat(times).Distinct().ToArray();
+            restoreNeeded = true;
+            nextRestoreAttempt = DateTime.MinValue;
+        }
+
         private bool ApplyPvpMatchResult(PvpMatchResult result)
         {
-            if (disposed || !config.StorageAvailable)
+            if (disposed || !config.StorageAvailable || result.Mode == PvpMode.Unknown)
                 return false;
-            var matchId = result.MatchId;
-            var matchingRecord = FindMatchingRecord(result.DutyStartTime);
-
-            if (matchingRecord == null)
+            var record = FindMatchingRecord(result.DutyStartTime);
+            if (record == null)
             {
-                log.Warning(
-                    $"PvP scoreboard {matchId}: " +
-                    "no matching duty record. " +
-                    $"PvP start: " +
-                    $"{result.DutyStartTime:yyyy-MM-dd HH:mm:ss}");
-
+                log.Warning($"PvP scoreboard {result.MatchId}: no matching duty record.");
+                return false;
+            }
+            if (!string.IsNullOrWhiteSpace(result.RecorderName) && !string.IsNullOrWhiteSpace(record.RecorderName) &&
+                !string.IsNullOrWhiteSpace(record.RecorderWorld) &&
+                (result.RecorderName != record.RecorderName || result.RecorderWorld != record.RecorderWorld))
+            {
+                log.Warning($"PvP scoreboard {result.MatchId}: recorder does not match the duty.");
                 return false;
             }
 
-            int updatedPlayers = 0;
-
-            foreach (var player in matchingRecord.Party)
+            var recorderKey = $"{record.RecorderName}@{record.RecorderWorld}";
+            if (!result.Players.ContainsKey(recorderKey) &&
+                !record.Party.Any(player => result.Players.ContainsKey($"{player.Name}@{player.World}")))
             {
-                var playerKey =
-                    $"{player.Name}@{player.World}";
+                log.Warning($"PvP scoreboard {result.MatchId}: no recorded players matched the roster.");
+                return false;
+            }
+            if (record.PvPRosterComplete == true)
+                return true;
 
-                if (result.PlayerDeaths.TryGetValue(
-                    playerKey,
-                    out int deaths))
+            var changed = false;
+            var byIdentity = record.Party.GroupBy(player => $"{player.Name}@{player.World}")
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+            foreach (var (key, player) in result.Players)
+            {
+                if (!byIdentity.TryGetValue(key, out var existing))
                 {
-                    player.PvPScoreboardDeaths = deaths;
-                    updatedPlayers++;
-                }
-            }
-
-            if (updatedPlayers == 0)
-            {
-                log.Warning(
-                    $"PvP scoreboard {matchId}: no players matched " +
-                    $"in {matchingRecord.DutyName}.");
-
-                return false;
-            }
-
-            if (result.IsFrontline)
-            {
-                var unmatchedPlayers = matchingRecord.Party
-                    .Where(player =>
-                        !result.PlayerDeaths.ContainsKey(
-                            $"{player.Name}@{player.World}"))
-                    .ToList();
-
-                // A partial scoreboard may be missing players who were actually there.
-                if (unmatchedPlayers.Count > 0 &&
-                    updatedPlayers >= matchingRecord.Party.Count * 0.8)
-                {
-                    foreach (var player in unmatchedPlayers)
+                    var added = new PartyMemberSnapshot
                     {
-                        log.Information(
-                            $"Frontline cleanup: removing {player.Name}@{player.World}");
-                    }
-
-                    matchingRecord.Party.RemoveAll(player =>
-                        unmatchedPlayers.Contains(player));
-
-                    log.Information(
-                        $"Frontline cleanup: removed {unmatchedPlayers.Count} " +
-                        $"players absent from the final scoreboard.");
+                        Name = player.Name, World = player.World, Job = player.Job,
+                        Race = "Unknown", Gender = "Unknown", Status = "Unknown",
+                        PvPScoreboardDeaths = player.Deaths
+                    };
+                    record.Party.Add(added);
+                    byIdentity.Add(key, existing = new List<PartyMemberSnapshot> { added });
+                    changed = true;
                 }
-                else if (unmatchedPlayers.Count > 0)
+                foreach (var snapshot in existing)
                 {
-                    log.Warning(
-                        $"Frontline cleanup skipped: only {updatedPlayers}/" +
-                        $"{matchingRecord.Party.Count} players matched.");
+                    if (player.Deaths.HasValue && snapshot.PvPScoreboardDeaths != player.Deaths)
+                    {
+                        snapshot.PvPScoreboardDeaths = player.Deaths;
+                        changed = true;
+                    }
+                    if ((string.IsNullOrWhiteSpace(snapshot.Job) || snapshot.Job == "Unknown") && player.Job != "Unknown")
+                    {
+                        snapshot.Job = player.Job;
+                        changed = true;
+                    }
                 }
             }
 
-            config.History.Save();
-
-            log.Information(
-                $"PvP scoreboard applied: " +
-                $"{matchingRecord.DutyName} | " +
-                $"Matched {updatedPlayers}/" +
-                $"{matchingRecord.Party.Count} players.");
-
-            return true;
+            var complete = result.RosterComplete && result.Players.Values.All(player => player.Deaths.HasValue);
+            if (record.PvPRosterComplete != complete)
+            {
+                record.PvPRosterComplete = complete;
+                changed = true;
+            }
+            if (changed)
+            {
+                config.History.Save();
+                log.Information($"PvP scoreboard applied: {record.DutyName} | {result.Players.Count} scoreboard players, {record.Party.Count} recorded players.");
+            }
+            return complete;
         }
+
         private void OnFrameworkUpdate(IFramework framework)
         {
             lock (lifecycleGate)
@@ -343,6 +346,7 @@ namespace MentorRouletteTracker.PvP
 
             var now = DateTime.UtcNow;
 
+            DiscoverNewDuties();
             while (savedMatches.TryDequeue(out var saved))
                 QueueSavedMatch(saved.MatchId, saved.QueuedAt);
             RestorePendingPvpMatches(now);

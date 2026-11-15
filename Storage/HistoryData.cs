@@ -23,7 +23,8 @@ internal readonly record struct DutyRow(
     string RecorderWorld,
     TimeSpan TimeInDuty,
     string Note,
-    int? PvPDeaths);
+    int? PvPDeaths,
+    bool? PvPRosterComplete);
 
 internal readonly record struct PlayerRow(
     string Name,
@@ -53,7 +54,8 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             record.RecorderWorld ?? string.Empty,
             record.TimeInDuty,
             record.Note ?? string.Empty,
-            record.PvPDeaths);
+            record.PvPDeaths,
+            record.PvPRosterComplete);
         var party = record.Party.Select(player => new PlayerRow(
             player.Name ?? string.Empty,
             player.Job ?? string.Empty,
@@ -93,6 +95,7 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             TimeInDuty = Record.TimeInDuty,
             Note = Record.Note,
             PvPDeaths = Record.PvPDeaths,
+            PvPRosterComplete = Record.PvPRosterComplete,
             Party = Party.Select(player => new PartyMemberSnapshot
             {
                 Name = player.Name,

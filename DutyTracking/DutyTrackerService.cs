@@ -1,5 +1,6 @@
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.DutyState;
@@ -22,8 +23,10 @@ namespace MentorRouletteTracker.DutyTracking
         private static readonly TimeSpan InitialPartyRefreshPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InitialPartyRefreshInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan PvpPlayerRefreshInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan HistorySaveInterval = TimeSpan.FromSeconds(15);
         private DateTime nextPartyRefresh = DateTime.MinValue;
+        private DateTime nextPvpPlayerRefresh = DateTime.MinValue;
         private DateTime nextHistorySave = DateTime.MinValue;
         private DutyRecord? current;
         private bool pendingRestoreNeeded;
@@ -136,6 +139,7 @@ namespace MentorRouletteTracker.DutyTracking
         private void OnDutyCompleted(IDutyStateEventArgs args)
         {
             dutyStartedWhileWaiting = false;
+            CaptureNearbyPvpPlayers();
             FinalizeCurrent(completed: true);
         }
         private void OnFrameworkUpdate(IFramework fw)
@@ -187,6 +191,11 @@ namespace MentorRouletteTracker.DutyTracking
 
                 nextPartyRefresh = now + refreshInterval;
                 PopulatePartyDetails();
+            }
+            if (current.DutyType == "PvP" && now >= nextPvpPlayerRefresh)
+            {
+                nextPvpPlayerRefresh = now + PvpPlayerRefreshInterval;
+                CaptureNearbyPvpPlayers();
             }
             UpdateDeathStates();
             if (now >= nextHistorySave)
@@ -279,6 +288,7 @@ namespace MentorRouletteTracker.DutyTracking
             {
                 DutyName = dutyName,
                 DutyType = dutyType,
+                PvPRosterComplete = dutyType == "PvP" ? false : null,
                 RecorderName = localPlayer?.Name.TextValue ?? string.Empty,
                 RecorderWorld = localPlayer?.HomeWorld.Value.Name.ExtractText() ?? string.Empty,
                 JoinedInProgress = true,
@@ -287,6 +297,7 @@ namespace MentorRouletteTracker.DutyTracking
 
             previousDeathStates.Clear();
             nextPartyRefresh = DateTime.MinValue;
+            nextPvpPlayerRefresh = DateTime.MinValue;
             config.History.PendingDuty = current;
             config.History.Save();
         }
@@ -362,9 +373,50 @@ namespace MentorRouletteTracker.DutyTracking
             ProcessPlayer(localPlayerName, localPlayerJob, localPlayerRace, localPlayerGender, localPlayerWorld, localPlayerStatus);
 
             current.LalafellCount = current.Party.Count(x =>
-                x.Race == "Lalafell" && x.Name != localPlayerName);
+                x.Race == "Lalafell" && (x.Name != localPlayerName || x.World != localPlayerWorld));
             current.PlayerJob = localPlayerJob;
         }
+
+        private void CaptureNearbyPvpPlayers()
+        {
+            if (current?.DutyType != "PvP" || pendingRestoreNeeded || territoryCheckNeeded || !CanCheckDutyState() ||
+                !condition[ConditionFlag.BoundByDuty] || !IsRecordedByCurrentPlayer(current))
+                return;
+
+            foreach (var player in objectTable.OfType<IPlayerCharacter>())
+            {
+                if (!player.IsValid() || player.HomeWorld.RowId == 0 || !player.HomeWorld.IsValid ||
+                    player.ClassJob.RowId == 0 || !player.ClassJob.IsValid)
+                    continue;
+
+                var name = player.Name.TextValue.Trim();
+                var job = player.ClassJob.Value;
+                // PvP can hide identities behind initials or job names. Don't invent a roster entry for those.
+                if (!CanIdentifyPvpPlayer(name, job.Name.ExtractText(), job.NameEnglish.ToString()))
+                    continue;
+                var world = player.HomeWorld.Value.Name.ExtractText();
+                if (string.IsNullOrWhiteSpace(world))
+                    continue;
+
+                var customize = player.Customize;
+                if (customize.Length <= Math.Max((int)CustomizeIndex.Race, (int)CustomizeIndex.Gender))
+                    continue;
+                var race = RaceIdToName(customize[(int)CustomizeIndex.Race]);
+                var gender = race == "Unknown" ? "Unknown" : GenderIdToName(customize[(int)CustomizeIndex.Gender]);
+                var status = player.OnlineStatus.IsValid ? player.OnlineStatus.Value.Name.ExtractText() : "Unknown";
+                if (string.IsNullOrWhiteSpace(status))
+                    status = "Unknown";
+                ProcessPlayer(name, job.Abbreviation.ExtractText(), race, gender, world, status);
+            }
+
+            current.LalafellCount = current.Party.Count(player => player.Race == "Lalafell" &&
+                (player.Name != current.RecorderName || player.World != current.RecorderWorld));
+        }
+
+        private static bool CanIdentifyPvpPlayer(string name, string jobName, string englishJobName) =>
+            !string.IsNullOrWhiteSpace(name) && name.IndexOf(' ') > 0 && !name.Contains('.') && !name.Any(char.IsDigit) &&
+            !string.Equals(name, jobName, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(name, englishJobName, StringComparison.OrdinalIgnoreCase);
 
         private void ProcessPartyMember(IPartyMember member)
         {

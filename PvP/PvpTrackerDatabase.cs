@@ -1,18 +1,27 @@
-﻿using Dalamud.Plugin.Services;
+using Dalamud.Plugin.Services;
 using LiteDB;
 
 namespace MentorRouletteTracker.PvP;
 
 public static class PvpTrackerDatabase
 {
+    private static readonly (string Collection, PvpMode Mode)[] MatchCollections =
+    [
+        ("ccmatch", PvpMode.CrystallineConflict),
+        ("flmatch", PvpMode.Frontline),
+        ("rwmatch", PvpMode.RivalWings)
+    ];
+
+    // PvPStats uses these enum ordinals when jobs are stored as numbers.
+    private static readonly string[] Jobs =
+        ["PLD", "WAR", "DRK", "GNB", "WHM", "SCH", "AST", "SGE", "MNK", "DRG", "NIN", "SAM", "RPR", "VPR", "BRD", "MCH", "DNC", "BLM", "SMN", "RDM", "PCT"];
+
     private static string DatabasePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "XIVLauncher", "pluginConfigs", "PvpStats", "data.db");
 
-    public static List<PvpMatchReference>? FindMatches(IEnumerable<DateTime> dutyStartTimes, IPluginLog log)
-    {
-        return FindMatches(DatabasePath, dutyStartTimes, log);
-    }
+    public static List<PvpMatchReference>? FindMatches(IEnumerable<DateTime> dutyStartTimes, IPluginLog log) =>
+        FindMatches(DatabasePath, dutyStartTimes, log);
 
     internal static List<PvpMatchReference>? FindMatches(
         string databasePath, IEnumerable<DateTime> dutyStartTimes, IPluginLog log)
@@ -22,22 +31,18 @@ public static class PvpTrackerDatabase
             return new();
         if (!File.Exists(databasePath))
             return null;
-
         try
         {
-            using var db = new LiteDatabase(new ConnectionString { Filename = databasePath, ReadOnly = true });
+            using var db = Open(databasePath);
             var matches = new List<PvpMatchReference>();
-            var ranges = times.Select(time => Query.Between("DutyStartTime",
-                time.AddSeconds(-30), time.AddSeconds(30))).ToArray();
+            var ranges = times.Select(time => Query.Between("DutyStartTime", time.AddSeconds(-30), time.AddSeconds(30))).ToArray();
             var query = ranges.Length == 1 ? ranges[0] : Query.Or(ranges);
-
-            foreach (var collectionName in new[] { "ccmatch", "flmatch" })
+            foreach (var (collection, mode) in MatchCollections)
             {
-                foreach (var match in db.GetCollection<BsonDocument>(collectionName).Find(query))
+                foreach (var match in db.GetCollection<BsonDocument>(collection).Find(query))
                 {
-                    if (match["_id"].IsObjectId && match["DutyStartTime"].IsDateTime)
-                        matches.Add(new(match["_id"].AsObjectId.ToString(),
-                            match["DutyStartTime"].AsDateTime, collectionName == "flmatch"));
+                    if (match["_id"].IsObjectId && match["DutyStartTime"].IsDateTime && !IsDeleted(match))
+                        matches.Add(new(match["_id"].AsObjectId.ToString(), match["DutyStartTime"].AsDateTime, mode));
                 }
             }
             return matches;
@@ -49,41 +54,46 @@ public static class PvpTrackerDatabase
         }
     }
 
-    public static PvpMatchResult? GetMatch(string matchId, IPluginLog log)
+    public static PvpMode GetMatchMode(string matchId, IPluginLog log) => GetMatchMode(DatabasePath, matchId, log);
+
+    internal static PvpMode GetMatchMode(string databasePath, string matchId, IPluginLog log)
     {
-        return GetMatch(DatabasePath, matchId, log);
+        if (!ValidId(matchId) || !File.Exists(databasePath))
+            return PvpMode.Unknown;
+        try
+        {
+            using var db = Open(databasePath);
+            var id = new ObjectId(matchId);
+            foreach (var (collection, mode) in MatchCollections)
+            {
+                var match = db.GetCollection<BsonDocument>(collection).FindById(id);
+                if (match != null && !IsDeleted(match))
+                    return mode;
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"Could not identify PvP match {matchId}: {ex.Message}");
+        }
+        return PvpMode.Unknown;
     }
+
+    public static PvpMatchResult? GetMatch(string matchId, IPluginLog log) => GetMatch(DatabasePath, matchId, log);
 
     internal static PvpMatchResult? GetMatch(string databasePath, string matchId, IPluginLog log)
     {
-        if (!File.Exists(databasePath) ||
-            string.IsNullOrWhiteSpace(matchId) ||
-            matchId.Length != 24 ||
-            !matchId.All(Uri.IsHexDigit))
+        if (!ValidId(matchId) || !File.Exists(databasePath))
             return null;
-
         try
         {
-            using var db = new LiteDatabase(new ConnectionString
-            {
-                Filename = databasePath,
-                ReadOnly = true
-            });
-
+            using var db = Open(databasePath);
             var id = new ObjectId(matchId);
-
-            foreach (var collectionName in new[] { "ccmatch", "flmatch" })
+            foreach (var (collection, mode) in MatchCollections)
             {
-                var collection = db.GetCollection<BsonDocument>(collectionName);
-                var match = collection.FindById(id);
-
+                var match = db.GetCollection<BsonDocument>(collection).FindById(id);
                 if (match == null)
                     continue;
-
-                if (!match.ContainsKey("IsCompleted") ||
-                    !match["IsCompleted"].IsBoolean ||
-                    !match["IsCompleted"].AsBoolean ||
-                    !match.ContainsKey("DutyStartTime") ||
+                if (IsDeleted(match) || !match["IsCompleted"].IsBoolean || !match["IsCompleted"].AsBoolean ||
                     !match["DutyStartTime"].IsDateTime)
                     return null;
 
@@ -91,153 +101,121 @@ public static class PvpTrackerDatabase
                 {
                     MatchId = matchId,
                     DutyStartTime = match["DutyStartTime"].AsDateTime,
-                    IsFrontline = collectionName == "flmatch"
+                    Mode = mode,
+                    ExpectedPlayerCount = mode == PvpMode.CrystallineConflict ? 10 :
+                        PositiveCount(match["PlayerCount"]) ?? (mode == PvpMode.Frontline ? 72 : 48)
                 };
-
-                if (result.IsFrontline)
+                if (TryAlias(match["LocalPlayer"], out var recorder, out var recorderWorld))
                 {
-                    if (!match.ContainsKey("PlayerScoreboards") ||
-                        !match["PlayerScoreboards"].IsDocument)
+                    result.RecorderName = recorder;
+                    result.RecorderWorld = recorderWorld;
+                }
+                if (mode == PvpMode.CrystallineConflict)
+                {
+                    if (!match["PostMatch"].IsDocument || !match["PostMatch"]["Teams"].IsDocument)
                         return null;
-
-                    ParseFrontlineDeaths(match, result);
+                    foreach (var team in match["PostMatch"]["Teams"].AsDocument)
+                    {
+                        if (!team.Value.IsDocument || !team.Value["PlayerStats"].IsArray)
+                            continue;
+                        foreach (var value in team.Value["PlayerStats"].AsArray)
+                        {
+                            if (!value.IsDocument || !TryAlias(value["Player"], out var name, out var world))
+                                continue;
+                            AddPlayer(result, name, world, ReadJob(value.AsDocument), ReadDeaths(value["Deaths"]));
+                        }
+                    }
                 }
                 else
                 {
-                    if (!match.ContainsKey("PostMatch") ||
-                        !match["PostMatch"].IsDocument)
+                    if (!match["PlayerScoreboards"].IsDocument)
                         return null;
-
-                    var postMatch = match["PostMatch"].AsDocument;
-                    if (!postMatch.ContainsKey("Teams") ||
-                        !postMatch["Teams"].IsDocument)
-                        return null;
-
-                    ParseCrystallineConflictDeaths(postMatch, result);
+                    if (match["Players"].IsArray)
+                    {
+                        foreach (var value in match["Players"].AsArray)
+                        {
+                            if (value.IsDocument && TryAlias(value["Name"], out var name, out var world))
+                                AddPlayer(result, name, world, ReadJob(value.AsDocument), null);
+                        }
+                    }
+                    foreach (var entry in match["PlayerScoreboards"].AsDocument)
+                    {
+                        var separator = entry.Key.LastIndexOf(' ');
+                        if (!entry.Value.IsDocument || separator <= 0 || separator == entry.Key.Length - 1)
+                            continue;
+                        AddPlayer(result, entry.Key[..separator], entry.Key[(separator + 1)..], "Unknown", ReadDeaths(entry.Value["Deaths"]));
+                    }
                 }
-
-                if (result.PlayerDeaths.Count == 0)
-                {
-                    log.Warning(
-                        $"{collectionName}: no player death counts found.");
+                if (result.Players.Count == 0 || !result.Players.Values.Any(player => player.Deaths.HasValue))
                     return null;
-                }
-
-                log.Information(
-                    $"{collectionName} scoreboard loaded: " +
-                    $"{result.PlayerDeaths.Count} players.");
-
+                log.Information($"{collection} scoreboard loaded: {result.Players.Count} players.");
                 return result;
             }
-
-            return null;
         }
         catch (Exception ex)
         {
             log.Error(ex, "Could not read PvP match results.");
-            return null;
         }
-    }
-
-    public static bool? IsFrontlineMatch(string matchId, IPluginLog log)
-    {
-        if (string.IsNullOrWhiteSpace(matchId) ||
-            matchId.Length != 24 || !matchId.All(Uri.IsHexDigit))
-            return null;
-
-        if (!File.Exists(DatabasePath))
-            return null;
-
-        try
-        {
-            using var db = new LiteDatabase(new ConnectionString
-            {
-                Filename = DatabasePath,
-                ReadOnly = true
-            });
-
-            var id = new ObjectId(matchId);
-
-            if (db.GetCollection<BsonDocument>("flmatch").FindById(id) != null)
-                return true;
-
-            if (db.GetCollection<BsonDocument>("ccmatch").FindById(id) != null)
-                return false;
-        }
-        catch (Exception ex)
-        {
-            log.Warning($"Could not identify PvP match {matchId}: {ex.Message}");
-        }
-
         return null;
     }
 
-    private static void ParseFrontlineDeaths(BsonDocument match, PvpMatchResult result)
+    private static LiteDatabase Open(string path) => new(new ConnectionString { Filename = path, ReadOnly = true });
+    private static bool ValidId(string id) => !string.IsNullOrWhiteSpace(id) && id.Length == 24 && id.All(Uri.IsHexDigit);
+    private static bool IsDeleted(BsonDocument match) => match["IsDeleted"].IsBoolean && match["IsDeleted"].AsBoolean;
+    private static int? PositiveCount(BsonValue value)
     {
-        foreach (var entry in match["PlayerScoreboards"].AsDocument)
-        {
-            if (!entry.Value.IsDocument)
-                continue;
-
-            var player = entry.Value.AsDocument;
-            if (!player.ContainsKey("Deaths"))
-                continue;
-
-            var deathValue = player["Deaths"];
-            if (!deathValue.IsInt32 && !deathValue.IsInt64)
-                continue;
-
-            var deaths = checked((int)deathValue.AsInt64);
-            var key = entry.Key;
-            var lastSpace = key.LastIndexOf(' ');
-            if (lastSpace <= 0 || lastSpace >= key.Length - 1)
-                continue;
-
-            var name = key.Substring(0, lastSpace);
-            var world = key.Substring(lastSpace + 1);
-            result.PlayerDeaths[$"{name}@{world}"] = deaths;
-        }
+        var count = ReadDeaths(value);
+        return count > 0 ? count : null;
     }
 
-    private static void ParseCrystallineConflictDeaths(BsonDocument postMatch, PvpMatchResult result)
+    private static int? ReadDeaths(BsonValue value)
     {
-        foreach (var team in postMatch["Teams"].AsDocument)
+        if (!value.IsInt32 && !value.IsInt64)
+            return null;
+        var count = value.AsInt64;
+        return count >= 0 && count <= int.MaxValue ? (int)count : null;
+    }
+
+    private static string ReadJob(BsonDocument player)
+    {
+        var value = player["Job"];
+        if (value.IsString)
+            return Jobs.FirstOrDefault(job => string.Equals(job, value.AsString, StringComparison.OrdinalIgnoreCase)) ?? "Unknown";
+        if (value.IsInt32 || value.IsInt64)
         {
-            if (!team.Value.IsDocument)
-                continue;
-
-            var teamData = team.Value.AsDocument;
-            if (!teamData.ContainsKey("PlayerStats") ||
-                !teamData["PlayerStats"].IsArray)
-                continue;
-
-            foreach (var playerValue in teamData["PlayerStats"].AsArray)
-            {
-                if (!playerValue.IsDocument)
-                    continue;
-
-                var player = playerValue.AsDocument;
-                if (!player.ContainsKey("Player") ||
-                    !player["Player"].IsDocument ||
-                    !player.ContainsKey("Deaths"))
-                    continue;
-
-                var alias = player["Player"].AsDocument;
-                if (!alias.ContainsKey("Name") ||
-                    !alias["Name"].IsString ||
-                    !alias.ContainsKey("HomeWorld") ||
-                    !alias["HomeWorld"].IsString)
-                    continue;
-
-                var deathValue = player["Deaths"];
-                if (!deathValue.IsInt32 && !deathValue.IsInt64)
-                    continue;
-
-                var name = alias["Name"].AsString;
-                var world = alias["HomeWorld"].AsString;
-                var deaths = checked((int)deathValue.AsInt64);
-                result.PlayerDeaths[$"{name}@{world}"] = deaths;
-            }
+            var index = value.AsInt64;
+            if (index >= 0 && index < Jobs.Length)
+                return Jobs[(int)index];
         }
+        return "Unknown";
+    }
+
+    private static bool TryAlias(BsonValue value, out string name, out string world)
+    {
+        name = string.Empty;
+        world = string.Empty;
+        if (!value.IsDocument || !value["Name"].IsString || !value["HomeWorld"].IsString)
+            return false;
+        name = value["Name"].AsString.Trim();
+        world = value["HomeWorld"].AsString.Trim();
+        return ValidPlayer(name, world);
+    }
+
+    private static bool ValidPlayer(string name, string world) => !string.IsNullOrWhiteSpace(name) &&
+        !string.IsNullOrWhiteSpace(world) && name != "_UNKNOWN_" && world != "_UNKNOWN_";
+
+    private static void AddPlayer(PvpMatchResult result, string name, string world, string job, int? deaths)
+    {
+        name = name.Trim();
+        world = world.Trim();
+        if (!ValidPlayer(name, world))
+            return;
+        var key = $"{name}@{world}";
+        if (!result.Players.TryGetValue(key, out var player))
+            result.Players.Add(key, player = new PvpPlayerResult { Name = name, World = world });
+        if (job != "Unknown")
+            player.Job = job;
+        if (deaths.HasValue)
+            player.Deaths = deaths;
     }
 }

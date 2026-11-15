@@ -4,7 +4,7 @@ namespace MentorRouletteTracker.Storage
 {
     public sealed partial class SqliteHistoryStore
     {
-        public const int CurrentSchemaVersion = 8;
+        public const int CurrentSchemaVersion = 9;
         private const int ApplicationId = 0x44555459;
 
         public string DatabasePath { get; }
@@ -31,7 +31,7 @@ namespace MentorRouletteTracker.Storage
 
             var applicationId = ReadInteger(connection, null, "PRAGMA application_id;");
             var version = ReadInteger(connection, null, "PRAGMA user_version;");
-            if (applicationId == ApplicationId && version is 6 or 7)
+            if (applicationId == ApplicationId && version is 6 or 7 or 8)
                 BackupBeforeUpgrade(connection);
 
             using (var transaction = connection.BeginTransaction())
@@ -50,7 +50,7 @@ namespace MentorRouletteTracker.Storage
                 }
                 else
                 {
-                    if (applicationId != ApplicationId || version is not (6 or 7 or CurrentSchemaVersion))
+                    if (applicationId != ApplicationId || version is not (6 or 7 or 8 or CurrentSchemaVersion))
                         throw new InvalidDataException("The history database version is not supported.");
 
                     if (version is 6 or 7)
@@ -64,6 +64,16 @@ namespace MentorRouletteTracker.Storage
                             DROP TABLE legacy_imports;
                             DROP TABLE IF EXISTS upload_queue;
                             PRAGMA user_version = 8;
+                            """;
+                        migration.ExecuteNonQuery();
+                    }
+                    if (version is 6 or 7 or 8)
+                    {
+                        using var migration = connection.CreateCommand();
+                        migration.Transaction = transaction;
+                        migration.CommandText = """
+                            ALTER TABLE duty_runs ADD COLUMN pvp_roster_complete INTEGER CHECK (pvp_roster_complete IN (0, 1));
+                            PRAGMA user_version = 9;
                             """;
                         migration.ExecuteNonQuery();
                     }
@@ -87,7 +97,7 @@ namespace MentorRouletteTracker.Storage
         {
             var directory = Path.Combine(Path.GetDirectoryName(DatabasePath)!, "backups");
             Directory.CreateDirectory(directory);
-            var path = Path.Combine(directory, $"history-before-v8-{DateTime.UtcNow:yyyyMMddTHHmmssfffffffZ}-{Guid.NewGuid():N}.sqlite");
+            var path = Path.Combine(directory, $"history-before-v{CurrentSchemaVersion}-{DateTime.UtcNow:yyyyMMddTHHmmssfffffffZ}-{Guid.NewGuid():N}.sqlite");
             using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = path,
@@ -125,6 +135,7 @@ namespace MentorRouletteTracker.Storage
                 duration_ticks INTEGER NOT NULL DEFAULT 0,
                 note TEXT NOT NULL DEFAULT '',
                 legacy_pvp_deaths INTEGER,
+                pvp_roster_complete INTEGER CHECK (pvp_roster_complete IN (0, 1)),
                 is_pending INTEGER NOT NULL DEFAULT 0 CHECK (is_pending IN (0, 1)),
                 checkpoint_utc TEXT,
                 CHECK (is_pending = 0 OR completed = 0)

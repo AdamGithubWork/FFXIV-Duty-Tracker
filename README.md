@@ -10,7 +10,7 @@ The plugin started as Mentor Roulette Tracker. It now tracks other duty types to
 ## Requirements
 
 - FFXIV with XIVLauncher and Dalamud, using API 15.
-- PvP Tracker (PvPStats) for PvP scoreboard deaths. Other tracking works without it.
+- PvP Tracker (PvPStats) for full PvP rosters and scoreboard deaths. Other tracking works without it.
 
 ## Installation
 
@@ -30,9 +30,24 @@ Keep the dependency DLLs and the `runtimes` folder alongside the plugin. Load
 - Party members: name, home world, job, race, gender, status, and recorded deaths
 
 You can choose which duty types to record and whether to track alliance members.
-PvP scoreboard deaths come from PvPStats. If Duty Tracker reloads before those
-results arrive, it looks up unfinished scoreboards again. Recent matches keep
-their 30-minute retry window; older matches get one check for saved results.
+PvPStats results add the full scoreboard roster: up to 72 players in Frontline,
+10 in Crystalline Conflict, and 48 in Rival Wings. Names, home worlds, jobs, and
+scoreboard deaths are imported after the match. Players already recorded keep
+their observed race, gender, and status. During PvP, Duty Tracker also checks nearby
+players once a second for those details when their full name and home world are
+available. Hidden identities are skipped. Players who weren't observed use Unknown
+for those details; the scoreboard doesn't provide them. This also applies to older
+matches, which can't have appearance details filled in afterward.
+Observed players absent from a final result
+are kept, so replacements or leavers can make a recorded roster larger.
+
+Duty Tracker checks for saved results when a PvP duty finishes, including PvPStats
+versions without the match-saved callback. First checks are after about one minute
+for CC and five minutes for Frontline/Rival Wings, then every 30 seconds if needed.
+Recent matches keep their 30-minute retry window; older unfinished imports get one
+check after reload. Partial results add available players without marking the
+roster complete. Fully imported rosters aren't imported again after reload.
+Older records with known deaths aren't bulk-backfilled automatically.
 
 Interrupted duties stay pending while login and loading states settle. A pending
 duty resumes only for the same character name and home world. If its recorder
