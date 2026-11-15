@@ -395,16 +395,7 @@ namespace MentorRouletteTracker.DutyTracking
 
         private void GetOrCreatePlayerSnapshot(string name, string job, string race, string gender, string world, string status)
         {
-            PartyMemberSnapshot? snapshot = null;
-
-            foreach (var player in current!.Party)
-            {
-                if (player.Name == name && player.World == world)
-                {
-                    snapshot = player;
-                    break;
-                }
-            }
+            var snapshot = FindPlayerSnapshot(name, world);
             if (snapshot == null)
             {
                 snapshot = new PartyMemberSnapshot
@@ -417,7 +408,7 @@ namespace MentorRouletteTracker.DutyTracking
                     Status = status,
                     DeathCount = 0
                 };
-                current.Party.Add(snapshot);
+                current!.Party.Add(snapshot);
             }
             else
             {
@@ -481,15 +472,13 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void UpdatePlayerDeath(string name, string world, bool isDead)
         {
-            foreach (var snapshot in current!.Party)
-            {
-                if (snapshot.Name == name && snapshot.World == world)
-                {
-                    TrackDeath(snapshot, $"{name}@{world}", isDead);
-                    break;
-                }
-            }
+            var snapshot = FindPlayerSnapshot(name, world);
+            if (snapshot != null)
+                TrackDeath(snapshot, $"{name}@{world}", isDead);
         }
+
+        private PartyMemberSnapshot? FindPlayerSnapshot(string name, string world) =>
+            current!.Party.Find(player => player.Name == name && player.World == world);
 
         private void TrackDeath(PartyMemberSnapshot snapshot, string playerKey, bool isDead)
         {
