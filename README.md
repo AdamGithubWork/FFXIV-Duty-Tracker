@@ -7,6 +7,20 @@ runs, see who you've played with before, or check your stats over time.
 
 The plugin started as Mentor Roulette Tracker. It now tracks other duty types too.
 
+## Requirements
+
+- FFXIV with XIVLauncher and Dalamud, using API 15.
+- PvP Tracker (PvPStats) for PvP scoreboard deaths. Other tracking works without it.
+
+## Installation
+
+Duty Tracker is being prepared for its first public release. An installer
+repository hasn't been published yet.
+
+For a manual test build, extract the whole release archive into its own folder.
+Keep the dependency DLLs and the `runtimes` folder alongside the plugin. Load
+`MentorRouletteTracker.dll` as a development plugin in Dalamud. Open `/dt` once loaded.
+
 ## What's recorded
 
 - Duty name, type, start time, and duration
@@ -115,17 +129,27 @@ There are no uploads.
 
 - Death tracking can miss deaths when party or character data isn't available,
   especially outside your own party.
-- Unknown death counts are left out of the player death averages that support them.
-  Some other views still treat missing counts as zero.
+- Death totals include known counts only. Unknown counts aren't treated as confirmed
+  zeros, and death averages leave them out.
 - Your history only includes duties recorded while tracking was on.
 - Jobs, statuses, and other player details reflect what the plugin saw during the run.
 
-## Development
+## Building
 
-Built with C#, .NET 10, Dalamud, and ImGui. This is still a personal project in
-development.
+Open `MentorRouletteTracker.slnx` in Visual Studio with the .NET 10 SDK installed.
+Build **Release / x64**. The build reads Dalamud reference assemblies from
+`%APPDATA%\XIVLauncher\addon\Hooks\dev`, or from `DALAMUD_HOME` when set.
+
+DalamudPackager creates a `MentorRouletteTracker` folder inside the build output.
+It contains `latest.zip` and the generated manifest. Distribute that archive with
+all of its contents; the native SQLite library is in `runtimes`.
+
+Unload Duty Tracker before rebuilding into a folder that Dalamud is watching.
+Back up your existing settings and history before testing a new release build.
 
 ## Credits
+
+Duty Tracker is licensed under the [MIT License](LICENSE).
 
 By **Adalith**. See [third-party notices](THIRD_PARTY_NOTICES.md) for dependencies
 and borrowed code.

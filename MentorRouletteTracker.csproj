@@ -23,6 +23,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="MainWindow.cs" />
+    <None Update="README.md;THIRD_PARTY_NOTICES.md;LICENSE;Storage\README.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
