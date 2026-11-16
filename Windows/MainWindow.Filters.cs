@@ -52,11 +52,14 @@ namespace MentorRouletteTracker
                 : string.Equals(record.DutyName, dutyHistoryFilter, StringComparison.OrdinalIgnoreCase));
         }
 
+        private bool MatchesDutyCategoryFilters(DutyRecord record) =>
+            (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(DutyClassification.DutyType(record))) &&
+            (record.DutyType != "PvP" || selectedPvpModes.Count == 0 || selectedPvpModes.Contains(DutyClassification.Mode(record))) &&
+            MatchesGlobalDutySearch(record);
+
         private bool MatchesDutyFilters(DutyRecord record, DateTime now)
         {
-            return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(DutyClassification.DutyType(record))) &&
-                (record.DutyType != "PvP" || selectedPvpModes.Count == 0 || selectedPvpModes.Contains(DutyClassification.Mode(record))) &&
-                MatchesGlobalDutySearch(record) &&
+            return MatchesDutyCategoryFilters(record) &&
                 (selectedTimeRange switch
                 {
                     1 => record.Timestamp >= now.AddDays(-7),

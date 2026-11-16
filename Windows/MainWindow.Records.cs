@@ -111,7 +111,7 @@ namespace MentorRouletteTracker
                     records = SortTableRows(records, record => spec.ColumnIndex switch
                     {
                         0 => record.DutyName,
-                        1 => DutyClassification.DutyType(record),
+                        1 => DutyClassification.DisplayType(record),
                         2 => record.PlayerJob,
                         3 => record.Timestamp,
                         4 => record.TimeInDuty,
@@ -127,6 +127,8 @@ namespace MentorRouletteTracker
                         14 => RecorderPvpPlayer(record)?.PvPDamageDealt,
                         15 => RecorderPvpPlayer(record)?.PvPKills,
                         16 => RecorderPvpPlayer(record)?.PvPAssists,
+                        17 => RecorderPvpPlayer(record)?.PvPDamageTaken,
+                        18 => RecorderPvpPlayer(record)?.PvPHealingDone,
                         _ => record.DutyName
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, record => record.DutyName);
                     sortSpecs.SpecsDirty = false;
@@ -173,7 +175,7 @@ namespace MentorRouletteTracker
                         ImGui.EndPopup();
                     }
 
-                    DrawTableCell(1, DutyClassification.DutyType(r));
+                    DrawTableCell(1, DutyClassification.DisplayType(r));
                     DrawTableCell(2, r.PlayerJob);
                     DrawTableCell(3, r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
                     DrawTableCell(4, FormatDuration(r.TimeInDuty));
@@ -194,6 +196,8 @@ namespace MentorRouletteTracker
                     DrawTableCell(14, RecorderPvpPlayer(r)?.PvPDamageDealt?.ToString("N0") ?? "-");
                     DrawTableCell(15, RecorderPvpPlayer(r)?.PvPKills?.ToString() ?? "-");
                     DrawTableCell(16, RecorderPvpPlayer(r)?.PvPAssists?.ToString() ?? "-");
+                    DrawTableCell(17, RecorderPvpPlayer(r)?.PvPDamageTaken?.ToString("N0") ?? "-");
+                    DrawTableCell(18, RecorderPvpPlayer(r)?.PvPHealingDone?.ToString("N0") ?? "-");
                 }
 
                 EndStyledTable();
@@ -358,7 +362,7 @@ namespace MentorRouletteTracker
 
                 ImGui.Separator();
 
-                ImGui.Text($"Type: {DutyClassification.DutyType(r)}");
+                ImGui.Text($"Type: {DutyClassification.DisplayType(r)}");
                 ImGui.Text($"Your job: {r.PlayerJob}");
                 if (r.DutyType == "PvP")
                     ImGui.Text($"Your team's placement: {PvpPlacementLabel(r.PvPPlacement)}");
@@ -392,7 +396,7 @@ namespace MentorRouletteTracker
                         : "Waiting for the full PvPStats scoreboard.");
                     ImGui.PopTextWrapPos();
                 }
-                if (r.PvPRosterComplete == true && (!r.PvPCombatStatsComplete || !r.PvPResultsComplete))
+                if (r.PvPRosterComplete == true && (!r.PvPCombatStatsComplete || !r.PvPResultsComplete || !r.PvPExtendedStatsComplete))
                     ImGui.TextDisabled("Checking PvPStats for missing scores, teams, and results.");
 
                 ImGui.Spacing();

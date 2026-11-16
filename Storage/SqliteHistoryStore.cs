@@ -4,7 +4,7 @@ namespace MentorRouletteTracker.Storage
 {
     public sealed partial class SqliteHistoryStore
     {
-        public const int CurrentSchemaVersion = 11;
+        public const int CurrentSchemaVersion = 12;
         private const int ApplicationId = 0x44555459;
 
         public string DatabasePath { get; }
@@ -31,7 +31,7 @@ namespace MentorRouletteTracker.Storage
 
             var applicationId = ReadInteger(connection, null, "PRAGMA application_id;");
             var version = ReadInteger(connection, null, "PRAGMA user_version;");
-            if (applicationId == ApplicationId && version is 6 or 7 or 8 or 9 or 10)
+            if (applicationId == ApplicationId && version is 6 or 7 or 8 or 9 or 10 or 11)
                 BackupBeforeUpgrade(connection);
 
             using (var transaction = connection.BeginTransaction())
@@ -50,7 +50,7 @@ namespace MentorRouletteTracker.Storage
                 }
                 else
                 {
-                    if (applicationId != ApplicationId || version is not (6 or 7 or 8 or 9 or 10 or CurrentSchemaVersion))
+                    if (applicationId != ApplicationId || version is not (6 or 7 or 8 or 9 or 10 or 11 or CurrentSchemaVersion))
                         throw new InvalidDataException("The history database version is not supported.");
 
                     if (version is 6 or 7)
@@ -104,6 +104,18 @@ namespace MentorRouletteTracker.Storage
                             ALTER TABLE duty_runs ADD COLUMN pvp_results_complete INTEGER NOT NULL DEFAULT 0 CHECK (pvp_results_complete IN (0, 1));
                             ALTER TABLE duty_players ADD COLUMN pvp_placement INTEGER CHECK (pvp_placement BETWEEN 1 AND 3);
                             PRAGMA user_version = 11;
+                            """;
+                        migration.ExecuteNonQuery();
+                    }
+                    if (version is 6 or 7 or 8 or 9 or 10 or 11)
+                    {
+                        using var migration = connection.CreateCommand();
+                        migration.Transaction = transaction;
+                        migration.CommandText = """
+                            ALTER TABLE duty_runs ADD COLUMN pvp_extended_stats_complete INTEGER NOT NULL DEFAULT 0 CHECK (pvp_extended_stats_complete IN (0, 1));
+                            ALTER TABLE duty_players ADD COLUMN pvp_damage_taken INTEGER CHECK (pvp_damage_taken >= 0);
+                            ALTER TABLE duty_players ADD COLUMN pvp_healing_done INTEGER CHECK (pvp_healing_done >= 0);
+                            PRAGMA user_version = 12;
                             """;
                         migration.ExecuteNonQuery();
                     }
@@ -171,6 +183,7 @@ namespace MentorRouletteTracker.Storage
                 pvp_combat_stats_complete INTEGER NOT NULL DEFAULT 0 CHECK (pvp_combat_stats_complete IN (0, 1)),
                 pvp_mode INTEGER NOT NULL DEFAULT 0 CHECK (pvp_mode BETWEEN 0 AND 3),
                 pvp_results_complete INTEGER NOT NULL DEFAULT 0 CHECK (pvp_results_complete IN (0, 1)),
+                pvp_extended_stats_complete INTEGER NOT NULL DEFAULT 0 CHECK (pvp_extended_stats_complete IN (0, 1)),
                 is_pending INTEGER NOT NULL DEFAULT 0 CHECK (is_pending IN (0, 1)),
                 checkpoint_utc TEXT,
                 CHECK (is_pending = 0 OR completed = 0)
@@ -192,6 +205,8 @@ namespace MentorRouletteTracker.Storage
                 pvp_damage_dealt INTEGER CHECK (pvp_damage_dealt >= 0),
                 pvp_kills INTEGER CHECK (pvp_kills >= 0),
                 pvp_assists INTEGER CHECK (pvp_assists >= 0),
+                pvp_damage_taken INTEGER CHECK (pvp_damage_taken >= 0),
+                pvp_healing_done INTEGER CHECK (pvp_healing_done >= 0),
                 pvp_placement INTEGER CHECK (pvp_placement BETWEEN 1 AND 3),
                 PRIMARY KEY (duty_id, party_index)
             ) STRICT;

@@ -61,9 +61,7 @@ namespace MentorRouletteTracker
                     ImGuiWindowFlags.HorizontalScrollbar))
             {
                 DrawSectionHeading("Milestones");
-                ImGui.TextDisabled("Completed duties only. Duty and date filters apply; player filters don't.");
-                ImGui.TextDisabled("Death totals only include known counts. Duty death records need a count for every included player. '-' means unknown.");
-                ImGui.TextDisabled("Your PvP results count once per duty. Other PvP stats count included player encounters. Unknown results don't affect percentages.");
+                ImGui.TextDisabled("Your PvP stats cover all dates. Duty filters still apply.");
                 ImGui.Separator();
 
                 if (milestoneSections.Count == 0)
@@ -79,7 +77,7 @@ namespace MentorRouletteTracker
                             continue;
                         anyVisible = true;
                         ImGui.Spacing();
-                        if (ImGui.CollapsingHeader($"{section.Title}##Lifetime{section.Title}",
+                        if (ImGui.CollapsingHeader($"{MilestoneTitle(section.Title)}##Lifetime{section.Title}",
                                 ImGuiTreeNodeFlags.DefaultOpen))
                         {
                             if (BeginStyledTable($"LifetimeTable##{section.Title}", 2,
@@ -127,6 +125,8 @@ namespace MentorRouletteTracker
             ImGui.EndChild();
         }
 
+        private static string MilestoneTitle(string title) => title == "PvP player stats" ? "Your lifetime PvP stats" : title;
+
         private static string MilestoneKey(string category, string label) => $"{category}/{label}";
 
         private void RebuildMilestones(string? localName)
@@ -137,8 +137,38 @@ namespace MentorRouletteTracker
                 .OrderBy(r => r.Timestamp)
                 .ToList();
 
+            var lifetimePvpRecords = config.History.Records.Where(record => record.Completed && record.DutyType == "PvP" && MatchesDutyCategoryFilters(record)).ToList();
+            var personalPvp = lifetimePvpRecords
+                .Select(record => (Record: record, Player: RecorderPvpPlayer(record)))
+                .Where(entry => entry.Player != null)
+                .Select(entry => new PlayerEncounter { Record = entry.Record, Player = entry.Player! }).ToList();
+            var lifetimePvpTotals = BuildPvpStatistics(personalPvp);
+            MilestoneResult PersonalBest(Func<PartyMemberSnapshot, long?> score, string unit)
+            {
+                var best = personalPvp.Where(entry => score(entry.Player).HasValue).MaxBy(entry => score(entry.Player));
+                return best == null ? new MilestoneResult("N/A") : new MilestoneResult(
+                    $"{score(best.Player):N0} {unit} — {best.Player.Name}@{best.Player.World} — {best.Record.DutyName} — {best.Record.Timestamp:yyyy-MM-dd HH:mm}", best.Record);
+            }
+            var lifetimePvpRows = new List<(string Label, MilestoneResult Value)>
+            {
+                ("Damage dealt (PvP)", PvpStatisticText(lifetimePvpTotals, 0)),
+                ("Kills (PvP)", PvpStatisticText(lifetimePvpTotals, 1)),
+                ("Assists (PvP)", PvpStatisticText(lifetimePvpTotals, 2)),
+                ("Deaths (PvP)", lifetimePvpTotals.Deaths?.ToString("N0") ?? "-"),
+                ("Damage taken (PvP)", PvpStatisticText(lifetimePvpTotals, 12)),
+                ("Healing done (PvP)", PvpStatisticText(lifetimePvpTotals, 13)),
+                ("Highest damage dealt in one match (PvP)", PersonalBest(player => player.PvPDamageDealt, "damage")),
+                ("Most kills in one match (PvP)", PersonalBest(player => player.PvPKills, "kills")),
+                ("Most assists in one match (PvP)", PersonalBest(player => player.PvPAssists, "assists")),
+                ("Highest damage taken in one match (PvP)", PersonalBest(player => player.PvPDamageTaken, "damage taken")),
+                ("Most healing in one match (PvP)", PersonalBest(player => player.PvPHealingDone, "healing"))
+            };
             if (records.Count == 0)
+            {
+                if (lifetimePvpRecords.Count > 0)
+                    milestoneSections.Add(("PvP player stats", lifetimePvpRows));
                 return;
+            }
 
             var encounters = records
                 .SelectMany(r => r.Party
@@ -240,28 +270,14 @@ namespace MentorRouletteTracker
                 ("Different duties completed", records.Select(r => r.DutyName).Distinct().Count().ToString())
             });
 
+            if (lifetimePvpRecords.Count > 0)
+                Add("PvP player stats", lifetimePvpRows);
             if (records.Any(record => record.DutyType == "PvP"))
             {
-                var pvpEncounters = encounters.Where(encounter => encounter.Record.DutyType == "PvP").ToList();
-                var pvpTotals = BuildPvpStatistics(pvpEncounters.Select(encounter =>
-                    new PlayerEncounter { Record = encounter.Record, Player = encounter.Player }));
                 var yourPvpResults = BuildPvpStatistics(records.Where(record => record.DutyType == "PvP")
                     .Select(record => (Record: record, Player: RecorderPvpPlayer(record)))
                     .Where(entry => entry.Player != null)
                     .Select(entry => new PlayerEncounter { Record = entry.Record, Player = entry.Player! }));
-
-                Add("PvP player stats", new()
-                {
-                    ("Damage dealt (PvP)", PvpStatisticText(pvpTotals, 0)),
-                    ("Kills (PvP)", PvpStatisticText(pvpTotals, 1)),
-                    ("Assists (PvP)", PvpStatisticText(pvpTotals, 2)),
-                    ("Highest damage dealt in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPDamageDealt.HasValue),
-                        e => e.Player.PvPDamageDealt!.Value, e => $"{e.Player.PvPDamageDealt:N0} damage")),
-                    ("Most kills in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPKills.HasValue),
-                        e => e.Player.PvPKills!.Value, e => $"{e.Player.PvPKills} kills")),
-                    ("Most assists in one match (PvP)", PlayerExt(pvpEncounters.Where(e => e.Player.PvPAssists.HasValue),
-                        e => e.Player.PvPAssists!.Value, e => $"{e.Player.PvPAssists} assists"))
-                });
                 Add("Your PvP results", new()
                 {
                     ("Wins (PvP)", PvpStatisticText(yourPvpResults, 3)),

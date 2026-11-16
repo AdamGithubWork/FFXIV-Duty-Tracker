@@ -14,6 +14,8 @@
         public string PvPTeam { get; set; } = string.Empty;
         public bool? PvPIsEnemy { get; set; }
         public long? PvPDamageDealt { get; set; }
+        public long? PvPDamageTaken { get; set; }
+        public long? PvPHealingDone { get; set; }
         public int? PvPKills { get; set; }
         public int? PvPAssists { get; set; }
         public int? PvPPlacement { get; set; }

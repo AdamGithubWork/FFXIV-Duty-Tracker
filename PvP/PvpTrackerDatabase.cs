@@ -273,6 +273,8 @@ public static class PvpTrackerDatabase
             player.Kills ??= ReadDeaths(scoreboard["Kills"]);
             player.Assists ??= ReadDeaths(scoreboard["Assists"]);
             player.DamageDealt ??= ReadDamage(scoreboard["DamageDealt"]);
+            player.DamageTaken ??= ReadDamage(scoreboard["DamageTaken"]);
+            player.HealingDone ??= ReadDamage(scoreboard["HPRestored"]);
         }
     }
 }

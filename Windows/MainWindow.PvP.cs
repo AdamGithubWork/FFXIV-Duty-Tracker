@@ -31,7 +31,7 @@ public partial class MainWindow
         var unknown = record.Party.Count - teammates - enemies;
         ImGui.Text($"Teammates: {teammates}    Enemies: {enemies}    Side unknown: {unknown}");
         ImGui.PushTextWrapPos();
-        ImGui.TextDisabled("Scores and teammate/enemy labels come from PvPStats. '-' means the score isn't available. Choose columns in Settings > Table columns > PvP players.");
+        ImGui.TextDisabled("Scores come from PvPStats. '-' means unknown.");
         ImGui.PopTextWrapPos();
         if (record.Party.Count == 0)
         {
@@ -55,6 +55,8 @@ public partial class MainWindow
             4 => player.PvPDamageDealt, 5 => player.PvPKills, 6 => EffectiveDeaths(record, player),
             7 => player.PvPAssists, 8 => player.Race, 9 => player.Gender, 10 => GetPlayerStatus(player),
             11 => player.PvPPlacement,
+            12 => player.PvPDamageTaken,
+            13 => player.PvPHealingDone,
             _ => player.Name
         }, ascending, player => player.Name);
         specs.SpecsDirty = false;
@@ -74,6 +76,8 @@ public partial class MainWindow
             DrawTableCell(9, player.Gender);
             DrawTableCell(10, GetPlayerStatus(player));
             DrawTableCell(11, PvpPlayerResultLabel(record, player));
+            DrawTableCell(12, player.PvPDamageTaken?.ToString("N0") ?? "-");
+            DrawTableCell(13, player.PvPHealingDone?.ToString("N0") ?? "-");
         }
         EndStyledTable();
     }

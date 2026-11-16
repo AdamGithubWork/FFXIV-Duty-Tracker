@@ -95,7 +95,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             var typeCounts = records
-                .GroupBy(DutyClassification.DutyType)
+                .GroupBy(DutyClassification.DisplayType)
                 .OrderByDescending(x => x.Count())
                 .ThenBy(x => x.Key)
                 .ToList();
@@ -370,8 +370,7 @@ namespace MentorRouletteTracker
         {
             DrawSectionHeading("Stats by duty");
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Player counts use the current filters. Death totals only include known counts; Deaths / run skips runs with missing counts. Choose columns in Settings.");
-            ImGui.TextDisabled("PvP columns show your scores and your team's results, once per matching duty. Frontline placements stay separate.");
+            ImGui.TextDisabled("Choose columns in Settings. '-' means unknown.");
             ImGui.PopTextWrapPos();
             ImGui.Spacing();
             var stats = BuildDutyAnalysisRows(records);
@@ -404,7 +403,7 @@ namespace MentorRouletteTracker
                         9 => row.Mentors,
                         10 => row.Players,
                         11 => row.Lalafell,
-                        >= 12 and <= 23 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 12),
+                        >= 12 and <= 25 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 12),
                         _ => row.Duty
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
                     sortSpecs.SpecsDirty = false;

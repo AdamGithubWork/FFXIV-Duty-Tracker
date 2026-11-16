@@ -122,8 +122,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
             ImGui.PushTextWrapPos();
             ImGui.TextDisabled("Click a player to view recorded duties with them. Click a header to sort.");
-            ImGui.TextDisabled("Death totals only include known counts. '-' means unknown and isn't included in averages.");
-            ImGui.TextDisabled("PvP results cover matches recorded here. Frontline 1st, 2nd, and 3rd have separate counts and percentages; unknown results don't affect win rate.");
+            ImGui.TextDisabled("'-' means unknown.");
             ImGui.PopTextWrapPos();
             ImGui.Spacing();
 
@@ -162,7 +161,7 @@ namespace MentorRouletteTracker
                         16 => player.PvpAssists,
                         17 => player.TeammateEncounters,
                         18 => player.EnemyEncounters,
-                        >= 19 and <= 27 => PvpStatisticValue(player.Pvp, sortColumn - 16),
+                        >= 19 and <= 29 => PvpStatisticValue(player.Pvp, sortColumn - 16),
                         _ => player.Name
                     }, direction == ImGuiSortDirection.Ascending, player => player.Name);
                     data.People = people;
@@ -261,7 +260,7 @@ namespace MentorRouletteTracker
                                 isOpen = false;
                             }
                             ImGui.TableSetColumnIndex(1);
-                            ImGui.TextUnformatted(DutyClassification.DutyType(entry.Record));
+                            ImGui.TextUnformatted(DutyClassification.DisplayType(entry.Record));
                             ImGui.TableSetColumnIndex(2);
                             ImGui.TextUnformatted(entry.Record.Timestamp.ToString("yyyy-MM-dd HH:mm"));
                             ImGui.TableSetColumnIndex(3);

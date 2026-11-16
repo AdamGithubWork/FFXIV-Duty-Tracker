@@ -17,7 +17,7 @@ namespace MentorRouletteTracker
                 new("side", "Side"), new("damage", "Damage dealt"),
                 new("kills", "Kills"), new("deaths", "Deaths"), new("assists", "Assists"),
                 new("race", "Race", false), new("gender", "Gender", false), new("status", "Status", false),
-                new("result", "Result")
+                new("result", "Result"), new("taken", "Damage taken", false), new("healing", "Healing done", false)
             ],
             ["Records"] =
             [
@@ -27,7 +27,7 @@ namespace MentorRouletteTracker
                 new("sprouts", "Sprouts seen", false), new("mentors", "Mentors seen", false),
                 new("players", "Players seen", false), new("deaths", "Known deaths", false),
                 new("pvpPlacement", "PvP placement", false), new("pvpDamage", "Your PvP damage", false),
-                new("pvpKills", "Your PvP kills", false), new("pvpAssists", "Your PvP assists", false)
+                new("pvpKills", "Your PvP kills", false), new("pvpAssists", "Your PvP assists", false), ..PvpSupportColumns()
             ],
             ["People"] =
             [
@@ -39,7 +39,7 @@ namespace MentorRouletteTracker
                 new("sprouts", "Sprout encounters", false), new("mentors", "Mentor encounters", false),
                 new("pvpDamage", "Damage dealt (PvP)", false), new("pvpKills", "Kills (PvP)", false),
                 new("pvpAssists", "Assists (PvP)", false), new("teammates", "Teammate encounters", false),
-                new("enemies", "Enemy encounters", false), ..PvpResultColumns()
+                new("enemies", "Enemy encounters", false), ..PvpResultColumns(), ..PvpSupportColumns()
             ],
             ["Duty Analysis"] =
             [
@@ -227,8 +227,7 @@ namespace MentorRouletteTracker
         {
             config.TableColumns ??= new();
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Choose which columns to show. Click a header to sort. Player counts use the current filters and Include yourself setting. Mentor counts include Trade Mentors.");
-            ImGui.TextDisabled("PvP columns include damage, kills, assists, win rate, and separate Frontline 1st/2nd/3rd counts and percentages. Duty Analysis shows your results once per duty; Statistics and People count player encounters.");
+            ImGui.TextDisabled("Choose which columns to show. Click a table header to sort.");
             ImGui.PopTextWrapPos();
             foreach (var (table, columns) in TableColumnOptions)
             {

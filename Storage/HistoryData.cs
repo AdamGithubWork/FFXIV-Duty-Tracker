@@ -29,7 +29,8 @@ internal readonly record struct DutyRow(
     int? PvPPlacement,
     bool PvPCombatStatsComplete,
     PvP.PvpMode PvPMode,
-    bool PvPResultsComplete);
+    bool PvPResultsComplete,
+    bool PvPExtendedStatsComplete);
 
 internal readonly record struct PlayerRow(
     string Name,
@@ -45,7 +46,9 @@ internal readonly record struct PlayerRow(
     long? PvPDamageDealt,
     int? PvPKills,
     int? PvPAssists,
-    int? PvPPlacement);
+    int? PvPPlacement,
+    long? PvPDamageTaken,
+    long? PvPHealingDone);
 
 internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<PlayerRow> Party, bool Pending)
 {
@@ -71,7 +74,8 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             record.PvPPlacement,
             record.PvPCombatStatsComplete,
             record.PvPMode,
-            record.PvPResultsComplete);
+            record.PvPResultsComplete,
+            record.PvPExtendedStatsComplete);
         var party = record.Party.Select(player => new PlayerRow(
             player.Name ?? string.Empty,
             player.Job ?? string.Empty,
@@ -86,7 +90,9 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             player.PvPDamageDealt,
             player.PvPKills,
             player.PvPAssists,
-            player.PvPPlacement)).ToArray();
+            player.PvPPlacement,
+            player.PvPDamageTaken,
+            player.PvPHealingDone)).ToArray();
         return new DutyWrite(id, row, party, pending);
     }
 
@@ -123,6 +129,7 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
             PvPCombatStatsComplete = Record.PvPCombatStatsComplete,
             PvPMode = Record.PvPMode,
             PvPResultsComplete = Record.PvPResultsComplete,
+            PvPExtendedStatsComplete = Record.PvPExtendedStatsComplete,
             Party = Party.Select(player => new PartyMemberSnapshot
             {
                 Name = player.Name,
@@ -138,7 +145,9 @@ internal sealed record DutyWrite(string Id, DutyRow Record, IReadOnlyList<Player
                 PvPDamageDealt = player.PvPDamageDealt,
                 PvPKills = player.PvPKills,
                 PvPAssists = player.PvPAssists,
-                PvPPlacement = player.PvPPlacement
+                PvPPlacement = player.PvPPlacement,
+                PvPDamageTaken = player.PvPDamageTaken,
+                PvPHealingDone = player.PvPHealingDone
             }).ToList()
         };
     }

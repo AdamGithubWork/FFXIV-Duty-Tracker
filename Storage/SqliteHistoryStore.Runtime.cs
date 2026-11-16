@@ -54,6 +54,7 @@ public sealed partial class SqliteHistoryStore
                     PvPCombatStatsComplete = (long)reader["pvp_combat_stats_complete"] != 0,
                     PvPMode = (PvP.PvpMode)checked((int)(long)reader["pvp_mode"]),
                     PvPResultsComplete = (long)reader["pvp_results_complete"] != 0,
+                    PvPExtendedStatsComplete = (long)reader["pvp_extended_stats_complete"] != 0,
                     PvPPlacement = reader["pvp_placement"] is DBNull ? null : checked((int)(long)reader["pvp_placement"])
                 };
                 string id = (string)reader["id"];
@@ -83,6 +84,8 @@ public sealed partial class SqliteHistoryStore
                     DeathCount = checked((int)(long)reader["death_count"]),
                     PvPScoreboardDeaths = reader["pvp_scoreboard_deaths"] is DBNull ? null : checked((int)(long)reader["pvp_scoreboard_deaths"]),
                     PvPTeam = (string)reader["pvp_team"],
+                    PvPDamageTaken = reader["pvp_damage_taken"] is DBNull ? null : (long)reader["pvp_damage_taken"],
+                    PvPHealingDone = reader["pvp_healing_done"] is DBNull ? null : (long)reader["pvp_healing_done"],
                     PvPIsEnemy = reader["pvp_is_enemy"] is DBNull ? null : (long)reader["pvp_is_enemy"] != 0,
                     PvPDamageDealt = reader["pvp_damage_dealt"] is DBNull ? null : (long)reader["pvp_damage_dealt"],
                     PvPKills = reader["pvp_kills"] is DBNull ? null : checked((int)(long)reader["pvp_kills"]),
@@ -182,6 +185,7 @@ public sealed partial class SqliteHistoryStore
                 ["pvp_combat_stats_complete"] = record.PvPCombatStatsComplete ? 1 : 0,
                 ["pvp_mode"] = (int)record.PvPMode,
                 ["pvp_results_complete"] = record.PvPResultsComplete ? 1 : 0,
+                ["pvp_extended_stats_complete"] = record.PvPExtendedStatsComplete ? 1 : 0,
                 ["is_pending"] = row.Pending ? 1 : 0,
                 ["checkpoint_utc"] = record.CheckpointUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
             };
@@ -196,8 +200,8 @@ public sealed partial class SqliteHistoryStore
                 var player = row.Party[index];
                 Execute(connection, transaction, """
                     INSERT INTO duty_players(duty_id,party_index,name,world,job,race,gender,status,death_count,pvp_scoreboard_deaths,
-                        pvp_team,pvp_is_enemy,pvp_damage_dealt,pvp_kills,pvp_assists,pvp_placement)
-                    VALUES ($duty,$idx,$name,$world,$job,$race,$gender,$status,$deaths,$scoreboard,$team,$enemy,$damage,$kills,$assists,$placement);
+                        pvp_team,pvp_is_enemy,pvp_damage_dealt,pvp_kills,pvp_assists,pvp_placement,pvp_damage_taken,pvp_healing_done)
+                    VALUES ($duty,$idx,$name,$world,$job,$race,$gender,$status,$deaths,$scoreboard,$team,$enemy,$damage,$kills,$assists,$placement,$damageTaken,$healingDone);
                     """, new()
                 {
                     ["duty"] = row.Id, ["idx"] = index, ["name"] = player.Name ?? string.Empty, ["world"] = player.World ?? string.Empty,
@@ -205,7 +209,7 @@ public sealed partial class SqliteHistoryStore
                     ["status"] = player.Status ?? string.Empty, ["deaths"] = player.DeathCount, ["scoreboard"] = player.PvPScoreboardDeaths,
                     ["team"] = player.PvPTeam, ["enemy"] = player.PvPIsEnemy.HasValue ? (player.PvPIsEnemy.Value ? 1 : 0) : null,
                     ["damage"] = player.PvPDamageDealt, ["kills"] = player.PvPKills, ["assists"] = player.PvPAssists,
-                    ["placement"] = player.PvPPlacement
+                    ["placement"] = player.PvPPlacement, ["damageTaken"] = player.PvPDamageTaken, ["healingDone"] = player.PvPHealingDone
                 });
             }
         }

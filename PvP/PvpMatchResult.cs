@@ -18,6 +18,8 @@ public sealed class PvpPlayerResult
     public int? Deaths { get; set; }
     public string Team { get; set; } = string.Empty;
     public long? DamageDealt { get; set; }
+    public long? DamageTaken { get; set; }
+    public long? HealingDone { get; set; }
     public int? Kills { get; set; }
     public int? Assists { get; set; }
     public int? Placement { get; set; }

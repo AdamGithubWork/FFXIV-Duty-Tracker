@@ -455,7 +455,7 @@ namespace MentorRouletteTracker
                 ImGui.PushID(section.Title);
                 if (milestoneExpansion.HasValue)
                     ImGui.SetNextItemOpen(milestoneExpansion.Value, ImGuiCond.Always);
-                if (ImGui.TreeNodeEx(section.Title, ImGuiTreeNodeFlags.SpanAvailWidth))
+                if (ImGui.TreeNodeEx(MilestoneTitle(section.Title), ImGuiTreeNodeFlags.SpanAvailWidth))
                 {
                     foreach (var row in section.Rows)
                     {

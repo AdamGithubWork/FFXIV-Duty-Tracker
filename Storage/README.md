@@ -9,7 +9,7 @@ backend; JSON is used for settings and recovery files.
 
 ## Schema
 
-New databases create schema 11 directly:
+New databases create schema 12 directly:
 
 - `duty_runs`: duty records, including the pending duty and its checkpoint.
 - `duty_players`: party snapshots in their recorded order.
@@ -36,7 +36,7 @@ lookup for missing results; absent results stay null.
 
 ## Development database transition
 
-The owner's schema-6 through schema-10 databases upgrade to schema 11.
+The owner's schema-6 through schema-11 databases upgrade to schema 12.
 Before changing it, the plugin writes a complete SQLite backup to the `backups`
 subfolder. If that backup fails, the transition stops.
 
@@ -46,8 +46,11 @@ revision. The backup retains the original database, including the old JSON archi
 Older development schemas and JSON history imports aren't supported by this build.
 Schemas 6 through 8 also gain the nullable roster-import flag. All supported schemas
 gain the PvP fields. Existing duty/player values and revisions stay unchanged.
-Schema 10 gains only the mode, results-complete flag, and per-player placement.
-Backups are named `history-before-v11-*.sqlite`.
+Schema 10 also gains the mode, results-complete flag, and per-player placement.
+Schema 11 gains nullable damage taken and healing done per player, plus
+`pvp_extended_stats_complete` on each duty. The flag lets older completed imports
+receive those scores without repeatedly importing completed scoreboards. Missing
+scores stay null. Backups are named `history-before-v12-*.sqlite`.
 
 Backups are separate files. Clearing records leaves those backup files in place.
 

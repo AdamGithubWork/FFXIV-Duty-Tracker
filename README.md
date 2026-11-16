@@ -90,9 +90,19 @@ Frontline placement percentages use known Frontline results only. Missing result
 don't count as losses. CC and Rival Wings show Win/Loss in duty details.
 
 Summary adds toggleable PvP damage, kill, and assist milestones, plus your win rate
-and Frontline placements. Choose them under Settings > Milestones. Summary uses
-duty/date filters, and your results count once per duty. Player milestones follow
-the Include yourself setting.
+and Frontline placements. Choose them under Settings > Milestones. Damage dealt,
+kills, and assists under Your lifetime PvP stats show your personal totals and
+single-match bests across completed recorded PvP duties. Lifetime deaths, damage
+taken, and healing are available too. Duty type, PvP mode, and duty-name filters
+apply; date ranges and Include yourself do not. They use each duty's recording character and home world, not
+teammates or enemies. Other milestones use duty/date filters, and your results
+count once per duty.
+
+Damage taken and Healing done are optional columns alongside damage dealt in
+Records, PvP details, People, Duty Analysis, and grouped Statistics. Statistics
+uses averages; the other tables use totals. Healing uses PvPStats' HP restored
+score. Missing scores stay unknown and don't count as zero. Older imported matches
+get another lookup for these scores when PvPStats still has them.
 
 Interrupted duties stay pending while login and loading states settle. A pending
 duty resumes only for the same character name and home world. If its recorder
@@ -207,7 +217,8 @@ aren't affected by this minimum.
 Player filters must match the same player. Records and Duty Analysis keep duties
 with at least one matching player; Statistics and People count matching players.
 Statistics keeps duties without a match when calculating encounter droughts.
-Summary uses duty and date filters only.
+Summary uses duty and date filters. Personal lifetime PvP stats use duty filters
+across all dates.
 
 ## Supported duties
 

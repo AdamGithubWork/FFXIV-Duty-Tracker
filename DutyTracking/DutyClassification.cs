@@ -15,6 +15,13 @@ internal static class DutyClassification
     };
     internal static string DutyType(DutyRecord record) =>
         record.DutyName.Contains("(Ultimate)", StringComparison.OrdinalIgnoreCase) ? "Ultimate Raids" : record.DutyType;
+    internal static string DisplayType(DutyRecord record) => record.DutyType == "PvP" ? Mode(record) switch
+    {
+        PvpMode.Frontline => "PvP (Frontlines)",
+        PvpMode.CrystallineConflict => "PvP (Crystalline Conflict)",
+        PvpMode.RivalWings => "PvP (Rival Wings)",
+        _ => "PvP"
+    } : DutyType(record);
     internal static PvpMode Mode(DutyRecord record)
     {
         if (record.DutyType != "PvP")

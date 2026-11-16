@@ -234,7 +234,7 @@ namespace MentorRouletteTracker.PvP
 
         private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" &&
             (record.PvPRosterComplete == true
-                ? !record.PvPCombatStatsComplete || !record.PvPResultsComplete
+                ? !record.PvPCombatStatsComplete || !record.PvPResultsComplete || !record.PvPExtendedStatsComplete
                 : record.PvPRosterComplete == false || record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue));
 
         private bool CanKeepLooking(DateTime time, DateTime now)
@@ -329,6 +329,16 @@ namespace MentorRouletteTracker.PvP
                         snapshot.PvPTeam = player.Team;
                     snapshot.PvPIsEnemy = enemy ?? snapshot.PvPIsEnemy;
                     snapshot.PvPDamageDealt = player.DamageDealt ?? snapshot.PvPDamageDealt;
+                    if (player.DamageTaken.HasValue && snapshot.PvPDamageTaken != player.DamageTaken)
+                    {
+                        snapshot.PvPDamageTaken = player.DamageTaken;
+                        changed = true;
+                    }
+                    if (player.HealingDone.HasValue && snapshot.PvPHealingDone != player.HealingDone)
+                    {
+                        snapshot.PvPHealingDone = player.HealingDone;
+                        changed = true;
+                    }
                     snapshot.PvPKills = player.Kills ?? snapshot.PvPKills;
                     snapshot.PvPAssists = player.Assists ?? snapshot.PvPAssists;
                     changed |= before != (snapshot.PvPTeam, snapshot.PvPIsEnemy, snapshot.PvPDamageDealt, snapshot.PvPKills, snapshot.PvPAssists);
@@ -359,6 +369,12 @@ namespace MentorRouletteTracker.PvP
                 changed = true;
             }
             var resultsComplete = result.RosterComplete && result.Players.Values.All(player => player.Placement.HasValue);
+            var extendedComplete = result.RosterComplete && result.Players.Values.All(player => player.DamageTaken.HasValue && player.HealingDone.HasValue);
+            if (record.PvPExtendedStatsComplete != extendedComplete)
+            {
+                record.PvPExtendedStatsComplete = extendedComplete;
+                changed = true;
+            }
             if (record.PvPResultsComplete != resultsComplete)
             {
                 record.PvPResultsComplete = resultsComplete;
@@ -374,7 +390,7 @@ namespace MentorRouletteTracker.PvP
                 config.History.Save();
                 log.Information($"PvP scoreboard applied: {record.DutyName} | {result.Players.Count} scoreboard players, {record.Party.Count} recorded players.");
             }
-            return complete && resultsComplete;
+            return complete && resultsComplete && extendedComplete;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
