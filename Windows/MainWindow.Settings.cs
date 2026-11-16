@@ -30,6 +30,22 @@ namespace MentorRouletteTracker
                 milestoneExpansion = true;
                 tableColumnsExpansion = true;
             }
+            ImGui.SameLine();
+            if (ImGui.Button("Reset all settings"))
+                ImGui.OpenPopup("ResetAllSettings");
+            if (ImGui.BeginPopup("ResetAllSettings"))
+            {
+                ImGui.TextWrapped("Reset settings, colors, columns, and filters to their defaults? Duty records and notes stay saved.");
+                if (ImGui.Button("Reset settings"))
+                {
+                    ResetAllSettings();
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Cancel##ResetSettings"))
+                    ImGui.CloseCurrentPopup();
+                ImGui.EndPopup();
+            }
             ImGui.Spacing();
 
             var contentTypes = new (uint Id, string Name)[]
@@ -64,6 +80,8 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
                 foreach (var contentType in contentTypes)
                 {
+                    var missingPvpStats = contentType.Id == 6 && !tracker.PvpTrackingAvailable;
+                    ImGui.BeginDisabled(missingPvpStats);
                     var isTracked =
                         config.TrackedContentTypeIds.Contains(contentType.Id);
 
@@ -78,6 +96,9 @@ namespace MentorRouletteTracker
 
                         config.Save();
                     }
+                    ImGui.EndDisabled();
+                    if (missingPvpStats)
+                        ImGui.TextWrapped("Enable PvP Tracker (PvPStats) in /xlplugins to record PvP duties.");
                 }
                 EndSettingsSection();
             }
@@ -110,6 +131,9 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
             if (BeginSettingsSection("PvP", defaultOpen: true))
             {
+                ImGui.TextWrapped(tracker.PvpTrackingAvailable
+                    ? "PvPStats is enabled. PvP recording is available."
+                    : "PvP recording is disabled. Enable PvP Tracker (PvPStats) in /xlplugins first.");
                 var trackEnemies = config.TrackPvpEnemies;
                 if (ImGui.Checkbox("Track opposing members in PvP matches", ref trackEnemies))
                 {
@@ -118,7 +142,7 @@ namespace MentorRouletteTracker
                 }
                 ImGui.PushTextWrapPos();
                 ImGui.TextDisabled("Applies to new duties. Turn this off to record teammates only. Existing history stays saved.");
-                ImGui.TextDisabled("PvPStats adds team labels, damage dealt, kills, deaths, assists, and placement after a match. Teammates include your whole team, even when alliance tracking is off.");
+                ImGui.TextDisabled("PvPStats adds teammate/enemy labels, damage dealt, kills, deaths, assists, and placement after a match. Teammates include your whole team, even when alliance tracking is off.");
                 ImGui.TextDisabled("Nearby players can have race, gender, and status recorded. Hidden identities and missing scores stay unknown.");
                 ImGui.PopTextWrapPos();
                 EndSettingsSection();
@@ -185,6 +209,17 @@ namespace MentorRouletteTracker
             }
 
             settingsExpansion = null;
+        }
+
+        private void ResetAllSettings()
+        {
+            config.ResetPreferences();
+            tracker.Armed = config.StorageAvailable;
+            ClearFilters();
+            selectedHeatmapMetric = 0;
+            settingsExpansion = false;
+            milestoneExpansion = false;
+            tableColumnsExpansion = false;
         }
 
         private void DrawHistorySettings()

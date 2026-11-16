@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
@@ -95,7 +95,7 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
 
             var typeCounts = records
-                .GroupBy(x => x.DutyType)
+                .GroupBy(DutyClassification.DutyType)
                 .OrderByDescending(x => x.Count())
                 .ThenBy(x => x.Key)
                 .ToList();

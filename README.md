@@ -30,6 +30,11 @@ Keep the dependency DLLs and the `runtimes` folder alongside the plugin. Load
 - Party members: name, home world, job, race, gender, status, and recorded deaths
 
 You can choose which duty types to record and whether to track alliance members.
+PvP recording requires PvP Tracker (PvPStats) to be enabled in Dalamud. Having an
+old PvPStats database isn't enough. Settings shows whether PvP recording is available;
+PvE recording works without PvPStats. If PvPStats unloads during a recorded duty,
+player capture pauses and the duty already in progress is kept.
+
 PvPStats results add the full scoreboard roster: up to 72 players in Frontline,
 10 in Crystalline Conflict, and 48 in Rival Wings. Names, home worlds, jobs,
 damage dealt, kills, deaths, assists, and teams are imported after the match.
@@ -136,6 +141,14 @@ Turn duty recording on or off, choose what to record and when to show the duty
 timer, and set player tracking preferences. Choose your visible statistics and
 milestones here. The heatmap metric selector is in Duty Analysis.
 
+Reset all settings restores recording preferences, colors, columns, milestones,
+and filters after confirmation. Completed records, pending duties, and notes stay
+saved. PvP recording still requires PvPStats to be enabled after a reset.
+
+PvP duty details show teammate/enemy labels and results without team names such as
+Astra or Umbra. Duty tables size themselves to their rows, with scrolling for
+larger lists.
+
 Settings > Appearance lets you change window and panel backgrounds, table headers,
 and row colors, with a separate Opacity slider and a live table preview. New custom
 colors start fully opaque. Make colors opaque keeps the selected colors and sets
@@ -168,15 +181,20 @@ Choose which duty types show the window in Settings.
 Expand the Filters panel below the active data tab. Duty/date and player controls
 are grouped separately, with multi-select dropdowns for categories. The panel is
 hidden in Settings. Summary shows only the duty and date controls it uses.
-An end-of-filters divider stays below the panel, outside its scrolling area.
+A colored end-of-filters bar stays below the panel, outside its scrolling area.
 
 Filter by duty type, duty name, player name or home world, job, race, gender,
 status, and date. You can use a preset date range or enter your own dates.
 Under Duty types > PvP, select Frontline, Crystalline Conflict, or Rival Wings.
-Multiple modes can be selected, alongside other duty types. All PvP modes removes
-the mode restriction. Matches without an identified mode appear with All PvP modes
-but are excluded when specific modes are selected. Clear filters resets both duty
-types and modes.
+Multiple modes can be selected, alongside other duty types. The PvP checkbox selects
+all modes; its indented checkboxes narrow the selection. Known Frontline and Rival
+Wings map names identify existing records before a scoreboard is imported; remaining
+named PvP duties without an imported mode are treated as CC. Clear filters resets
+both duty types and modes.
+
+Duty types start with Dungeons, Trials, Extreme Trials, Raids, Savage Raids,
+Ultimate Raids, Alliance Raids, PvP, and Guildhests. Additional recorded categories
+follow those. Names containing (Ultimate) match Ultimate Raids even in older records.
 Job and world dropdowns allow multiple selections. Choose a role or North American
 datacenter to select its whole group, or pick individual jobs and home worlds.
 Choose All Jobs or All Worlds to clear that selection.

@@ -8,8 +8,8 @@ namespace MentorRouletteTracker
     public class Configuration : IPluginConfiguration
     {
         public int Version { get; set; } = 1;
-        public List<uint> TrackedContentTypeIds { get; set; } = new();
-        public List<uint> TimerVisibleContentTypeIds { get; set; } = new();
+        public List<uint> TrackedContentTypeIds { get; set; } = [2, 3, 4, 5, 6, 21, 28, 30, 37];
+        public List<uint> TimerVisibleContentTypeIds { get; set; } = [2, 3, 4, 5, 6, 21, 28, 30, 37];
         public bool TrackAllianceMembers { get; set; }
         public bool TrackPvpEnemies { get; set; } = true;
         public bool IncludeSelfInStatistics { get; set; }
@@ -66,6 +66,15 @@ namespace MentorRouletteTracker
         public void Save()
         {
             pluginInterface?.SavePluginConfig(this);
+        }
+
+        internal void ResetPreferences()
+        {
+            var defaults = new Configuration();
+            foreach (var property in typeof(Configuration).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                if (property.CanRead && property.CanWrite)
+                    property.SetValue(this, property.GetValue(defaults));
+            Save();
         }
 
         public void DisposeHistory() => history?.Dispose();

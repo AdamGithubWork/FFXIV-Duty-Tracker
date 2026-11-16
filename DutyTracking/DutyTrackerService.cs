@@ -20,6 +20,7 @@ namespace MentorRouletteTracker.DutyTracking
         private readonly IFramework framework;
         private readonly IPluginLog log;
         private readonly Configuration config;
+        private readonly Func<bool> pvpStatsEnabled;
         private static readonly TimeSpan InitialPartyRefreshPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InitialPartyRefreshInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan PartyRefreshInterval = TimeSpan.FromSeconds(30);
@@ -36,6 +37,7 @@ namespace MentorRouletteTracker.DutyTracking
         public uint? ActiveContentTypeId { get; private set; }
         private readonly Dictionary<string, bool> previousDeathStates = new();
         public bool Armed { get; set; } = true;
+        public bool PvpTrackingAvailable => pvpStatsEnabled();
 
         public DutyTrackerService(
             IClientState clientState,
@@ -46,7 +48,8 @@ namespace MentorRouletteTracker.DutyTracking
             IDataManager dataManager,
             IFramework framework,
             IPluginLog log,
-            Configuration config)
+            Configuration config,
+            Func<bool>? pvpStatsEnabled = null)
         {
             this.clientState = clientState;
             this.dutyState = dutyState;
@@ -57,6 +60,7 @@ namespace MentorRouletteTracker.DutyTracking
             this.framework = framework;
             this.log = log;
             this.config = config;
+            this.pvpStatsEnabled = pvpStatsEnabled ?? (() => false);
 
             this.clientState.TerritoryChanged += OnTerritoryChanged;
             this.dutyState.DutyStarted += OnDutyStarted;
@@ -176,6 +180,9 @@ namespace MentorRouletteTracker.DutyTracking
             if (!condition[ConditionFlag.BoundByDuty])
                 return;
 
+            if (current.DutyType == "PvP" && !PvpTrackingAvailable)
+                return;
+
             if (objectTable.LocalPlayer == null)
                 return;
 
@@ -271,11 +278,18 @@ namespace MentorRouletteTracker.DutyTracking
         }
         private void StartNewDuty(ContentFinderCondition duty)
         {
+            if (duty.ContentType.RowId == 6 && !PvpTrackingAvailable)
+            {
+                log.Warning("PvP recording is disabled until PvP Tracker (PvPStats) is enabled.");
+                return;
+            }
             ActiveContentTypeId = duty.ContentType.RowId;
             var dutyName = CapitalizeFirstLetter(duty.Name.ExtractText());
             var dutyType = duty.ContentType.Value.Name.ExtractText();
 
-            if (dutyName.Contains("Savage"))
+            if (dutyName.Contains("(Ultimate)", StringComparison.OrdinalIgnoreCase))
+                dutyType = "Ultimate Raids";
+            else if (dutyName.Contains("Savage"))
                 dutyType = "Savage Raids";
             else if (dutyName.Contains("(Extreme)") ||
                      dutyName.Contains("The Minstrel's Ballad:"))
@@ -295,6 +309,7 @@ namespace MentorRouletteTracker.DutyTracking
                 JoinedInProgress = true,
                 CheckpointUtc = DateTime.UtcNow
             };
+            current.PvPMode = DutyClassification.Mode(current);
 
             previousDeathStates.Clear();
             nextPartyRefresh = DateTime.MinValue;
@@ -381,7 +396,7 @@ namespace MentorRouletteTracker.DutyTracking
 
         private void CaptureNearbyPvpPlayers()
         {
-            if (current?.DutyType != "PvP" || pendingRestoreNeeded || territoryCheckNeeded || !CanCheckDutyState() ||
+            if (current?.DutyType != "PvP" || !PvpTrackingAvailable || pendingRestoreNeeded || territoryCheckNeeded || !CanCheckDutyState() ||
                 !condition[ConditionFlag.BoundByDuty] || !IsRecordedByCurrentPlayer(current))
                 return;
 

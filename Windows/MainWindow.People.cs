@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
@@ -261,7 +261,7 @@ namespace MentorRouletteTracker
                                 isOpen = false;
                             }
                             ImGui.TableSetColumnIndex(1);
-                            ImGui.TextUnformatted(entry.Record.DutyType);
+                            ImGui.TextUnformatted(DutyClassification.DutyType(entry.Record));
                             ImGui.TableSetColumnIndex(2);
                             ImGui.TextUnformatted(entry.Record.Timestamp.ToString("yyyy-MM-dd HH:mm"));
                             ImGui.TableSetColumnIndex(3);

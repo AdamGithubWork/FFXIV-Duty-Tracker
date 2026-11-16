@@ -14,7 +14,7 @@ namespace MentorRouletteTracker
             ["PvP players"] =
             [
                 new("name", "Name", Required: true), new("world", "World"), new("job", "Job"),
-                new("side", "Side"), new("team", "Team"), new("damage", "Damage dealt"),
+                new("side", "Side"), new("damage", "Damage dealt"),
                 new("kills", "Kills"), new("deaths", "Deaths"), new("assists", "Assists"),
                 new("race", "Race", false), new("gender", "Gender", false), new("status", "Status", false),
                 new("result", "Result")

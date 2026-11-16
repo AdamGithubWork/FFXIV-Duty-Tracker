@@ -96,7 +96,10 @@ namespace MentorRouletteTracker
                 return counts;
             }
 
-            if (BeginConfiguredTable("Records", completed ? "completedRecords" : "incompleteRecords", verticalScroll: true))
+            var recordRowHeight = ImGui.GetTextLineHeight() + TableCellVerticalPadding * 2;
+            var tableHeight = Math.Min(Math.Max(1, ImGui.GetContentRegionAvail().Y),
+                recordRowHeight * (records.Count + 2) + ImGui.GetStyle().ScrollbarSize);
+            if (BeginConfiguredTable("Records", completed ? "completedRecords" : "incompleteRecords", verticalScroll: true, height: tableHeight))
             {
                 SetupConfiguredColumns("Records", scrollable: true);
 
@@ -108,7 +111,7 @@ namespace MentorRouletteTracker
                     records = SortTableRows(records, record => spec.ColumnIndex switch
                     {
                         0 => record.DutyName,
-                        1 => record.DutyType,
+                        1 => DutyClassification.DutyType(record),
                         2 => record.PlayerJob,
                         3 => record.Timestamp,
                         4 => record.TimeInDuty,
@@ -170,7 +173,7 @@ namespace MentorRouletteTracker
                         ImGui.EndPopup();
                     }
 
-                    DrawTableCell(1, r.DutyType);
+                    DrawTableCell(1, DutyClassification.DutyType(r));
                     DrawTableCell(2, r.PlayerJob);
                     DrawTableCell(3, r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
                     DrawTableCell(4, FormatDuration(r.TimeInDuty));
@@ -355,7 +358,7 @@ namespace MentorRouletteTracker
 
                 ImGui.Separator();
 
-                ImGui.Text($"Type: {r.DutyType}");
+                ImGui.Text($"Type: {DutyClassification.DutyType(r)}");
                 ImGui.Text($"Your job: {r.PlayerJob}");
                 if (r.DutyType == "PvP")
                     ImGui.Text($"Your team's placement: {PvpPlacementLabel(r.PvPPlacement)}");

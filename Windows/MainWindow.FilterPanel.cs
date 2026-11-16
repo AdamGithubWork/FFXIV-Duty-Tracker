@@ -1,5 +1,6 @@
 using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.PvP;
+using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
 
 namespace MentorRouletteTracker
@@ -72,8 +73,15 @@ namespace MentorRouletteTracker
             ImGui.EndChild();
             ImGui.PopStyleVar();
             ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.TextColored(new Vector4(0.65f, 0.8f, 1f, 1f), $"End of filters — {tab} below");
+            ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.10f, 0.18f, 0.27f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.40f, 0.62f, 0.85f, 1f));
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
+            if (ImGui.BeginChild("FilterBoundary", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
+                ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+                ImGui.TextUnformatted($"End of filters — {tab} below");
+            ImGui.EndChild();
+            ImGui.PopStyleVar();
+            ImGui.PopStyleColor(2);
             ImGui.Spacing();
         }
 
@@ -86,9 +94,8 @@ namespace MentorRouletteTracker
             ImGui.InputTextWithHint("##GlobalDutySearch", "Search duties...", ref globalDutySearchText, 100);
             ImGui.Spacing();
 
-            var dutyTypes = config.History.Records.Select(record => record.DutyType)
-                .Where(type => !string.IsNullOrWhiteSpace(type))
-                .Concat(new[] { "Extreme Trials", "Savage Raids" });
+            var dutyTypes = config.History.Records.Select(DutyClassification.DutyType)
+                .Where(type => !string.IsNullOrWhiteSpace(type));
             DrawDutyTypeFilter(dutyTypes);
 
             ImGui.TextUnformatted("Date range");
@@ -111,11 +118,22 @@ namespace MentorRouletteTracker
             (PvpMode.RivalWings, "Rival Wings")
         ];
 
+        private static readonly string[] OrderedDutyTypes =
+        [
+            "Dungeons", "Trials", "Extreme Trials", "Raids", "Savage Raids", "Ultimate Raids",
+            "Alliance Raids", "PvP", "Guildhests"
+        ];
+
         private void TogglePvpMode(PvpMode mode)
         {
+            if (selectedDutyTypes.Contains("PvP") && selectedPvpModes.Count == 0)
+                selectedPvpModes.UnionWith(PvpModeOptions.Select(option => option.Mode));
             if (!selectedPvpModes.Remove(mode))
                 selectedPvpModes.Add(mode);
-            selectedDutyTypes.Add("PvP");
+            if (selectedPvpModes.Count == 0)
+                selectedDutyTypes.Remove("PvP");
+            else
+                selectedDutyTypes.Add("PvP");
         }
 
         private void DrawDutyTypeFilter(IEnumerable<string> dutyTypes)
@@ -136,22 +154,25 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
                 return;
             }
-            if (ImGui.Selectable("All duty types", selectedDutyTypes.Count == 0, ImGuiSelectableFlags.DontClosePopups))
+            var allTypes = selectedDutyTypes.Count == 0;
+            if (ImGui.Checkbox("All duty types", ref allTypes))
             {
                 selectedDutyTypes.Clear();
                 selectedPvpModes.Clear();
             }
             ImGui.Separator();
             ImGui.TextDisabled("Duty types");
-            foreach (var dutyType in dutyTypes.Concat(selectedDutyTypes).Append("PvP")
-                .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase).ToList())
+            var additional = dutyTypes.Concat(selectedDutyTypes).Except(OrderedDutyTypes, StringComparer.Ordinal)
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase);
+            foreach (var dutyType in OrderedDutyTypes.Concat(additional).ToList())
             {
                 if (dutyType != "PvP")
                 {
                     DrawFilterOption(dutyType, selectedDutyTypes);
                     continue;
                 }
-                if (ImGui.Selectable("PvP", selectedDutyTypes.Contains("PvP"), ImGuiSelectableFlags.DontClosePopups))
+                var pvpSelected = selectedDutyTypes.Contains("PvP");
+                if (ImGui.Checkbox("PvP", ref pvpSelected))
                 {
                     if (!selectedDutyTypes.Remove("PvP"))
                         selectedDutyTypes.Add("PvP");
@@ -159,15 +180,13 @@ namespace MentorRouletteTracker
                 }
                 ImGui.Indent();
                 ImGui.TextDisabled("PvP modes");
-                if (ImGui.Selectable("All PvP modes", selectedDutyTypes.Contains("PvP") && selectedPvpModes.Count == 0,
-                    ImGuiSelectableFlags.DontClosePopups))
-                {
-                    selectedDutyTypes.Add("PvP");
-                    selectedPvpModes.Clear();
-                }
                 foreach (var (mode, label) in PvpModeOptions)
-                    if (ImGui.Selectable(label, selectedPvpModes.Contains(mode), ImGuiSelectableFlags.DontClosePopups))
+                {
+                    var selected = selectedDutyTypes.Contains("PvP") &&
+                        (selectedPvpModes.Count == 0 || selectedPvpModes.Contains(mode));
+                    if (ImGui.Checkbox(label, ref selected))
                         TogglePvpMode(mode);
+                }
                 ImGui.Unindent();
             }
             ImGui.EndCombo();

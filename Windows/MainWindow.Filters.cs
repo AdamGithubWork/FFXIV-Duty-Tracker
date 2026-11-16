@@ -1,4 +1,4 @@
-﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 
 namespace MentorRouletteTracker
@@ -54,8 +54,8 @@ namespace MentorRouletteTracker
 
         private bool MatchesDutyFilters(DutyRecord record, DateTime now)
         {
-            return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(record.DutyType)) &&
-                (record.DutyType != "PvP" || selectedPvpModes.Count == 0 || selectedPvpModes.Contains(record.PvPMode)) &&
+            return (selectedDutyTypes.Count == 0 || selectedDutyTypes.Contains(DutyClassification.DutyType(record))) &&
+                (record.DutyType != "PvP" || selectedPvpModes.Count == 0 || selectedPvpModes.Contains(DutyClassification.Mode(record))) &&
                 MatchesGlobalDutySearch(record) &&
                 (selectedTimeRange switch
                 {

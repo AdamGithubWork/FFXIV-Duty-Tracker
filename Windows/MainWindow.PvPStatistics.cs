@@ -28,7 +28,7 @@ public partial class MainWindow
     }
 
     private static bool HasPvpResult(PlayerEncounter encounter) => encounter.Record.DutyType == "PvP" &&
-        (encounter.Record.PvPMode switch
+        (DutyClassification.Mode(encounter.Record) switch
         {
             PvpMode.Frontline => encounter.Player.PvPPlacement is >= 1 and <= 3,
             PvpMode.CrystallineConflict or PvpMode.RivalWings => encounter.Player.PvPPlacement is 1 or 2,
@@ -39,7 +39,7 @@ public partial class MainWindow
     {
         var pvp = encounters.Where(encounter => encounter.Record.DutyType == "PvP").ToList();
         var results = pvp.Where(HasPvpResult).ToList();
-        var frontline = results.Where(encounter => encounter.Record.PvPMode == PvpMode.Frontline).ToList();
+        var frontline = results.Where(encounter => DutyClassification.Mode(encounter.Record) == PvpMode.Frontline).ToList();
         return new PvpStatistics
         {
             Damage = SumPvpScores(pvp.Select(encounter => encounter.Player.PvPDamageDealt)),
@@ -111,7 +111,7 @@ public partial class MainWindow
     }
 
     private static string PvpPlayerResultLabel(DutyRecord record, PartyMemberSnapshot player) =>
-        record.PvPMode == PvpMode.Frontline ? PvpPlacementLabel(player.PvPPlacement) : player.PvPPlacement switch
+        DutyClassification.Mode(record) == PvpMode.Frontline ? PvpPlacementLabel(player.PvPPlacement) : player.PvPPlacement switch
         {
             1 => "Win", 2 => "Loss", _ => "Unknown"
         };

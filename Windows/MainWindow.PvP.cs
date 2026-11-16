@@ -31,14 +31,17 @@ public partial class MainWindow
         var unknown = record.Party.Count - teammates - enemies;
         ImGui.Text($"Teammates: {teammates}    Enemies: {enemies}    Side unknown: {unknown}");
         ImGui.PushTextWrapPos();
-        ImGui.TextDisabled("Team labels and scores come from PvPStats. '-' means the score isn't available. Choose columns in Settings > Table columns > PvP players.");
+        ImGui.TextDisabled("Scores and teammate/enemy labels come from PvPStats. '-' means the score isn't available. Choose columns in Settings > Table columns > PvP players.");
         ImGui.PopTextWrapPos();
         if (record.Party.Count == 0)
         {
             ImGui.TextDisabled("No players have been recorded yet.");
             return;
         }
-        if (!BeginConfiguredTable("PvP players", "pvpPlayerDetail", height: ImGui.GetTextLineHeightWithSpacing() * 14, verticalScroll: true))
+        var rowHeight = ImGui.GetTextLineHeight() + TableCellVerticalPadding * 2;
+        var desiredHeight = rowHeight * (Math.Min(record.Party.Count, 12) + 2) + ImGui.GetStyle().ScrollbarSize;
+        var availableHeight = Math.Max(rowHeight * 3, ImGui.GetContentRegionAvail().Y - ImGui.GetTextLineHeightWithSpacing() * 5);
+        if (!BeginConfiguredTable("PvP players", "pvpPlayerDetailV2", height: Math.Min(desiredHeight, availableHeight), verticalScroll: true))
             return;
         SetupConfiguredColumns("PvP players", scrollable: true);
         var specs = ImGui.TableGetSortSpecs();
@@ -49,10 +52,9 @@ public partial class MainWindow
         {
             0 => player.Name, 1 => player.World, 2 => player.Job,
             3 => player.PvPIsEnemy.HasValue ? (player.PvPIsEnemy.Value ? 1 : 0) : (int?)null,
-            4 => string.IsNullOrEmpty(player.PvPTeam) ? null : player.PvPTeam,
-            5 => player.PvPDamageDealt, 6 => player.PvPKills, 7 => EffectiveDeaths(record, player),
-            8 => player.PvPAssists, 9 => player.Race, 10 => player.Gender, 11 => GetPlayerStatus(player),
-            12 => player.PvPPlacement,
+            4 => player.PvPDamageDealt, 5 => player.PvPKills, 6 => EffectiveDeaths(record, player),
+            7 => player.PvPAssists, 8 => player.Race, 9 => player.Gender, 10 => GetPlayerStatus(player),
+            11 => player.PvPPlacement,
             _ => player.Name
         }, ascending, player => player.Name);
         specs.SpecsDirty = false;
@@ -64,15 +66,14 @@ public partial class MainWindow
             DrawTableCell(1, player.World);
             DrawTableCell(2, player.Job);
             DrawTableCell(3, self ? "You" : PvpSideLabel(player));
-            DrawTableCell(4, string.IsNullOrEmpty(player.PvPTeam) ? "Unknown" : player.PvPTeam);
-            DrawTableCell(5, player.PvPDamageDealt?.ToString("N0") ?? "-");
-            DrawTableCell(6, player.PvPKills?.ToString() ?? "-");
-            DrawTableCell(7, EffectiveDeaths(record, player)?.ToString() ?? "-");
-            DrawTableCell(8, player.PvPAssists?.ToString() ?? "-");
-            DrawTableCell(9, player.Race);
-            DrawTableCell(10, player.Gender);
-            DrawTableCell(11, GetPlayerStatus(player));
-            DrawTableCell(12, PvpPlayerResultLabel(record, player));
+            DrawTableCell(4, player.PvPDamageDealt?.ToString("N0") ?? "-");
+            DrawTableCell(5, player.PvPKills?.ToString() ?? "-");
+            DrawTableCell(6, EffectiveDeaths(record, player)?.ToString() ?? "-");
+            DrawTableCell(7, player.PvPAssists?.ToString() ?? "-");
+            DrawTableCell(8, player.Race);
+            DrawTableCell(9, player.Gender);
+            DrawTableCell(10, GetPlayerStatus(player));
+            DrawTableCell(11, PvpPlayerResultLabel(record, player));
         }
         EndStyledTable();
     }
