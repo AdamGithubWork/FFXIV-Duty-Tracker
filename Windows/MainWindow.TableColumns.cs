@@ -7,6 +7,10 @@ namespace MentorRouletteTracker
     public partial class MainWindow
     {
         private const float TableCellVerticalPadding = 3f;
+        private int[]? configuredColumnOrder;
+        private int[]? configuredColumnPositions;
+        private string? draggedColumnTable;
+        private string? draggedColumnId;
         private sealed record TableColumnOption(string Id, string Label, bool DefaultVisible = true, bool Required = false);
 
         private static readonly Dictionary<string, TableColumnOption[]> TableColumnOptions = new()
@@ -85,9 +89,50 @@ namespace MentorRouletteTracker
             if (horizontalScroll)
                 flags |= ImGuiTableFlags.ScrollX;
 
-            return BeginStyledTable(id, TableColumnOptions[table].Length, flags,
-                new Vector2(0, height), horizontalScroll ? minimumWidth : 0);
+            var order = GetConfiguredColumnOrder(table);
+            var tableId = order.Where((index, position) => index != position).Any()
+                ? id + "##order:" + string.Join(',', order) : id;
+            if (!BeginStyledTable(tableId, TableColumnOptions[table].Length, flags,
+                new Vector2(0, height), horizontalScroll ? minimumWidth : 0))
+                return false;
+            configuredColumnOrder = order;
+            configuredColumnPositions = new int[order.Length];
+            for (var position = 0; position < order.Length; position++)
+                configuredColumnPositions[order[position]] = position;
+            return true;
         }
+
+        private int[] GetConfiguredColumnOrder(string table)
+        {
+            var columns = TableColumnOptions[table];
+            var byId = columns.Select((column, index) => (column.Id, index))
+                .ToDictionary(entry => entry.Id, entry => entry.index, StringComparer.Ordinal);
+            var saved = config.TableColumnOrder != null && config.TableColumnOrder.TryGetValue(table, out var order)
+                ? order : null;
+            return (saved ?? Enumerable.Empty<string>()).Where(id => id != null && byId.ContainsKey(id))
+                .Select(id => byId[id]).Concat(Enumerable.Range(0, columns.Length)).Distinct().ToArray();
+        }
+
+        private void MoveConfiguredColumn(string table, string sourceId, string targetId)
+        {
+            var columns = TableColumnOptions[table];
+            var order = GetConfiguredColumnOrder(table).Select(index => columns[index].Id).ToList();
+            var source = order.IndexOf(sourceId);
+            var target = order.IndexOf(targetId);
+            if (source < 0 || target < 0 || source == target)
+                return;
+            order.RemoveAt(source);
+            order.Insert(target, sourceId);
+            config.TableColumnOrder ??= new();
+            config.TableColumnOrder[table] = order;
+            config.Save();
+        }
+
+        private int ConfiguredSortColumn(int displayIndex) => configuredColumnOrder != null &&
+            displayIndex >= 0 && displayIndex < configuredColumnOrder.Length ? configuredColumnOrder[displayIndex] : displayIndex;
+
+        private bool SetConfiguredColumnIndex(int index) =>
+            ImGui.TableSetColumnIndex(configuredColumnPositions == null ? index : configuredColumnPositions[index]);
 
         private bool BeginStyledTable(string id, int columns, ImGuiTableFlags flags,
             Vector2 size = default, float innerWidth = 0)
@@ -106,9 +151,11 @@ namespace MentorRouletteTracker
             return false;
         }
 
-        private static void EndStyledTable()
+        private void EndStyledTable()
         {
             ImGui.EndTable();
+            configuredColumnOrder = null;
+            configuredColumnPositions = null;
             var min = ImGui.GetItemRectMin();
             var max = ImGui.GetItemRectMax();
             ImGui.GetWindowDrawList().AddRect(min, max, ImGui.GetColorU32(ImGuiCol.Border), 3f);
@@ -155,7 +202,7 @@ namespace MentorRouletteTracker
         {
             var columns = TableColumnOptions[table];
             var labels = new string[columns.Length];
-            for (var i = 0; i < columns.Length; i++)
+            foreach (var i in configuredColumnOrder ?? Enumerable.Range(0, columns.Length).ToArray())
             {
                 var visible = IsTableColumnVisible(table, i) &&
                     (!table.StartsWith("Statistics: ", StringComparison.Ordinal) || i != 1 || showDetail);
@@ -176,7 +223,7 @@ namespace MentorRouletteTracker
             ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
             for (var i = 0; i < columns.Length; i++)
             {
-                if (!ImGui.TableSetColumnIndex(i))
+                if (!SetConfiguredColumnIndex(i))
                     continue;
                 ImGui.TableHeader(TableHeaderLabel(labels[i], ImGui.GetContentRegionAvail().X));
                 if (ImGui.IsItemHovered())
@@ -184,9 +231,9 @@ namespace MentorRouletteTracker
             }
         }
 
-        private static void DrawTableCell(int index, string text)
+        private void DrawTableCell(int index, string text)
         {
-            if (ImGui.TableSetColumnIndex(index))
+            if (SetConfiguredColumnIndex(index))
             {
                 var width = ImGui.GetContentRegionAvail().X;
                 ImGui.TextUnformatted(text);
@@ -227,7 +274,7 @@ namespace MentorRouletteTracker
         {
             config.TableColumns ??= new();
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Choose which columns to show. Click a table header to sort.");
+            ImGui.TextDisabled("Check columns to show them. Drag a name to change its position.");
             ImGui.PopTextWrapPos();
             foreach (var (table, columns) in TableColumnOptions)
             {
@@ -239,30 +286,53 @@ namespace MentorRouletteTracker
                     if (ImGui.Button("Reset columns"))
                     {
                         config.TableColumns.Remove(table);
+                        config.TableColumnOrder?.Remove(table);
                         config.Save();
                     }
-                    foreach (var (column, index) in columns.Select((column, index) => (column, index)))
+                    foreach (var index in GetConfiguredColumnOrder(table))
                     {
+                        var column = columns[index];
                         if (column.Id == "detail" && table != "Statistics: Race and gender")
                             continue;
-                        if (column.Required)
-                        {
-                            ImGui.TextDisabled($"{column.Label} (always shown)");
-                            continue;
-                        }
+                        ImGui.PushID(column.Id);
                         var visible = IsTableColumnVisible(table, index);
-                        if (!ImGui.Checkbox(column.Label, ref visible))
-                            continue;
-                        if (!config.TableColumns.TryGetValue(table, out var selected) || selected == null)
+                        ImGui.BeginDisabled(column.Required);
+                        if (ImGui.Checkbox("##visible", ref visible))
                         {
-                            selected = columns.Where(option => option.DefaultVisible).Select(option => option.Id).ToHashSet();
-                            config.TableColumns[table] = selected;
+                            if (!config.TableColumns.TryGetValue(table, out var selected) || selected == null)
+                            {
+                                selected = columns.Where(option => option.DefaultVisible).Select(option => option.Id).ToHashSet();
+                                config.TableColumns[table] = selected;
+                            }
+                            if (visible)
+                                selected.Add(column.Id);
+                            else
+                                selected.Remove(column.Id);
+                            config.Save();
                         }
-                        if (visible)
-                            selected.Add(column.Id);
-                        else
-                            selected.Remove(column.Id);
-                        config.Save();
+                        ImGui.EndDisabled();
+                        ImGui.SameLine();
+                        ImGui.Selectable($"{column.Label}{(column.Required ? " (always shown)" : "")}###dragColumn");
+                        if (ImGui.BeginDragDropSource())
+                        {
+                            draggedColumnTable = table;
+                            draggedColumnId = column.Id;
+                            ImGui.SetDragDropPayload("DUTY_TRACKER_COLUMN", BitConverter.GetBytes(index), ImGuiCond.Once);
+                            ImGui.TextUnformatted(column.Label);
+                            ImGui.EndDragDropSource();
+                        }
+                        if (ImGui.BeginDragDropTarget())
+                        {
+                            var payload = ImGui.AcceptDragDropPayload("DUTY_TRACKER_COLUMN", ImGuiDragDropFlags.None);
+                            if (!payload.IsNull && payload.IsDelivery() && draggedColumnTable == table && draggedColumnId != null)
+                            {
+                                MoveConfiguredColumn(table, draggedColumnId, column.Id);
+                                draggedColumnTable = null;
+                                draggedColumnId = null;
+                            }
+                            ImGui.EndDragDropTarget();
+                        }
+                        ImGui.PopID();
                     }
                     ImGui.TreePop();
                 }

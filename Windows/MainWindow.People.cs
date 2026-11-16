@@ -134,9 +134,9 @@ namespace MentorRouletteTracker
                 SetupConfiguredColumns("People", scrollable: true);
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
-                var sortColumn = sortSpecs.SpecsCount > 0 && IsTableColumnVisible("People", sortSpecs.Specs.ColumnIndex)
-                    ? sortSpecs.Specs.ColumnIndex : 0;
-                var direction = sortSpecs.SpecsCount > 0 && sortColumn == sortSpecs.Specs.ColumnIndex
+                var sortColumn = sortSpecs.SpecsCount > 0 && IsTableColumnVisible("People", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex))
+                    ? ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) : 0;
+                var direction = sortSpecs.SpecsCount > 0 && sortColumn == ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)
                     ? sortSpecs.Specs.SortDirection : ImGuiSortDirection.Ascending;
                 if (sortSpecs.SpecsDirty || data.PeopleSort != (sortColumn, (int)direction))
                 {
@@ -173,7 +173,7 @@ namespace MentorRouletteTracker
                 {
                     var player = people[i];
                     ImGui.TableNextRow();
-                    ImGui.TableSetColumnIndex(0);
+                    SetConfiguredColumnIndex(0);
                     if (ImGui.Selectable($"{player.Name}###person{player.Name}@{player.World}"))
                     {
                         historyPlayerName = player.Name;

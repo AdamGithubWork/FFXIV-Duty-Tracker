@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using MentorRouletteTracker.DutyTracking;
 using System.Numerics;
@@ -155,18 +155,18 @@ namespace MentorRouletteTracker
             {
                 SetupConfiguredColumns(key, label, detail);
                 var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible(key, sortSpecs.Specs.ColumnIndex) &&
-                    (sortSpecs.Specs.ColumnIndex != 1 || detail))
+                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible(key, ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)) &&
+                    (ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) != 1 || detail))
                 {
                     var spec = sortSpecs.Specs;
-                    rows = SortTableRows(rows, row => spec.ColumnIndex switch
+                    rows = SortTableRows(rows, row => ConfiguredSortColumn(spec.ColumnIndex) switch
                     {
                         0 => row.Name,
                         1 => row.Detail,
                         2 or 5 => row.Seen,
                         3 => row.Deaths,
                         4 => row.AverageDeaths,
-                        >= 6 and <= 19 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 6, averages: true),
+                        >= 6 and <= 19 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 6, averages: true),
                         _ => row.Name
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Name + " " + row.Detail);
                     sortSpecs.SpecsDirty = false;

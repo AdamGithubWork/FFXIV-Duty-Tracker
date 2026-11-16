@@ -193,6 +193,7 @@ namespace MentorRouletteTracker
                 ImGui.EndTabBar();
             }
 
+            DrawResetSettingsConfirmation();
             DrawDetailWindow();
             DrawNoteWindow();
 

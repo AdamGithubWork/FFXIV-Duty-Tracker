@@ -105,10 +105,10 @@ namespace MentorRouletteTracker
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
 
-                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Records", sortSpecs.Specs.ColumnIndex))
+                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Records", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)))
                 {
                     var spec = sortSpecs.Specs;
-                    records = SortTableRows(records, record => spec.ColumnIndex switch
+                    records = SortTableRows(records, record => ConfiguredSortColumn(spec.ColumnIndex) switch
                     {
                         0 => record.DutyName,
                         1 => DutyClassification.DisplayType(record),
@@ -144,7 +144,7 @@ namespace MentorRouletteTracker
 
                     ImGui.TableNextRow();
 
-                    ImGui.TableSetColumnIndex(0);
+                    SetConfiguredColumnIndex(0);
 
                     if (ImGui.Selectable(
                             $"{r.DutyName}###record{id}",
@@ -181,16 +181,16 @@ namespace MentorRouletteTracker
                     DrawTableCell(4, FormatDuration(r.TimeInDuty));
                     DrawTableCell(5, r.JoinedInProgress ? "Yes" : "No");
                     DrawTableCell(6, r.WipeCount.ToString());
-                    if (ImGui.TableSetColumnIndex(7))
+                    if (SetConfiguredColumnIndex(7))
                         ImGui.TextUnformatted(Counts(r).Lalafell.ToString());
                     DrawTableCell(8, r.Completed ? "Yes" : "No");
-                    if (ImGui.TableSetColumnIndex(9))
+                    if (SetConfiguredColumnIndex(9))
                         ImGui.TextUnformatted(Counts(r).Sprouts.ToString());
-                    if (ImGui.TableSetColumnIndex(10))
+                    if (SetConfiguredColumnIndex(10))
                         ImGui.TextUnformatted(Counts(r).Mentors.ToString());
-                    if (ImGui.TableSetColumnIndex(11))
+                    if (SetConfiguredColumnIndex(11))
                         ImGui.TextUnformatted(Counts(r).Players.ToString());
-                    if (ImGui.TableSetColumnIndex(12))
+                    if (SetConfiguredColumnIndex(12))
                         ImGui.TextUnformatted(Counts(r).Deaths?.ToString() ?? "-");
                     DrawTableCell(13, r.DutyType == "PvP" ? PvpPlacementLabel(r.PvPPlacement) : "-");
                     DrawTableCell(14, RecorderPvpPlayer(r)?.PvPDamageDealt?.ToString("N0") ?? "-");
@@ -442,7 +442,7 @@ namespace MentorRouletteTracker
                             bool ascending =
                                 spec.SortDirection == ImGuiSortDirection.Ascending;
 
-                            sortedParty = spec.ColumnIndex switch
+                            sortedParty = ConfiguredSortColumn(spec.ColumnIndex) switch
                             {
                                 0 => ascending
                                     ? sortedParty.OrderBy(x => x.Name).ToList()

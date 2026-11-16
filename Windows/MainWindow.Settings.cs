@@ -7,6 +7,7 @@ namespace MentorRouletteTracker
     {
         private bool? settingsExpansion;
         private bool? milestoneExpansion;
+        private bool openResetSettingsConfirmation;
 
         private void DrawSettingsTab()
         {
@@ -32,20 +33,7 @@ namespace MentorRouletteTracker
             }
             ImGui.SameLine();
             if (ImGui.Button("Reset all settings"))
-                ImGui.OpenPopup("ResetAllSettings");
-            if (ImGui.BeginPopup("ResetAllSettings"))
-            {
-                ImGui.TextWrapped("Reset settings, colors, columns, and filters to their defaults? Duty records and notes stay saved.");
-                if (ImGui.Button("Reset settings"))
-                {
-                    ResetAllSettings();
-                    ImGui.CloseCurrentPopup();
-                }
-                ImGui.SameLine();
-                if (ImGui.Button("Cancel##ResetSettings"))
-                    ImGui.CloseCurrentPopup();
-                ImGui.EndPopup();
-            }
+                openResetSettingsConfirmation = true;
             ImGui.Spacing();
 
             var contentTypes = new (uint Id, string Name)[]
@@ -209,6 +197,40 @@ namespace MentorRouletteTracker
             }
 
             settingsExpansion = null;
+        }
+
+        private void DrawResetSettingsConfirmation()
+        {
+            const string title = "Reset all settings##ResetAllSettings";
+            if (openResetSettingsConfirmation)
+            {
+                ImGui.OpenPopup(title);
+                openResetSettingsConfirmation = false;
+            }
+            if (!ImGui.IsPopupOpen(title))
+                return;
+            const string message = "Reset settings, colors, columns, and filters to their defaults? Duty records and notes stay saved.";
+            var style = ImGui.GetStyle();
+            var width = ImGui.GetFontSize() * 28;
+            var textHeight = ImGui.CalcTextSize(message, false, width - style.WindowPadding.X * 2).Y;
+            var height = textHeight + style.WindowPadding.Y * 2 + style.ItemSpacing.Y * 3 +
+                ImGui.GetFrameHeight() + ImGui.GetFrameHeightWithSpacing();
+            ImGui.SetNextWindowSize(new Vector2(width, height), ImGuiCond.Always);
+            ImGui.SetNextWindowPos(ImGui.GetWindowPos() + ImGui.GetWindowSize() * 0.5f,
+                ImGuiCond.Always, new Vector2(0.5f));
+            if (!ImGui.BeginPopupModal(title, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
+                return;
+            ImGui.TextWrapped(message);
+            ImGui.Spacing();
+            if (ImGui.Button("Reset settings"))
+            {
+                ResetAllSettings();
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##ResetSettings"))
+                ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
         }
 
         private void ResetAllSettings()

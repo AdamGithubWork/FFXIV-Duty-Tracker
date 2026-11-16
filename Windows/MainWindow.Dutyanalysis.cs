@@ -386,10 +386,10 @@ namespace MentorRouletteTracker
             {
                 SetupConfiguredColumns("Duty Analysis", scrollable: true);
                 var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Duty Analysis", sortSpecs.Specs.ColumnIndex))
+                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Duty Analysis", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)))
                 {
                     var spec = sortSpecs.Specs;
-                    stats = SortTableRows(stats, row => spec.ColumnIndex switch
+                    stats = SortTableRows(stats, row => ConfiguredSortColumn(spec.ColumnIndex) switch
                     {
                         0 => row.Duty,
                         1 => row.Runs,
@@ -403,7 +403,7 @@ namespace MentorRouletteTracker
                         9 => row.Mentors,
                         10 => row.Players,
                         11 => row.Lalafell,
-                        >= 12 and <= 25 => PvpStatisticValue(row.Pvp, spec.ColumnIndex - 12),
+                        >= 12 and <= 25 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
                         _ => row.Duty
                     }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
                     sortSpecs.SpecsDirty = false;

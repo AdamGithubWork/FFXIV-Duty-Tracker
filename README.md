@@ -169,8 +169,10 @@ or table value to read its full text.
 
 Settings > Table columns controls the visible, sortable columns in Records, People,
 Stats by duty, and each grouped Statistics table. Existing columns start visible;
-new optional columns start hidden. Use Reset columns under a table to restore its
-defaults. The identifying duty, player, or group columns stay visible.
+new optional columns start hidden. Drag a column name onto another name in Settings
+to move it. Each table saves its own order, including hidden columns. Use Reset
+columns under a table to restore visibility and order. The identifying duty,
+player, or group columns stay visible and can also be moved.
 
 Records and Stats by duty can show sprouts, mentors, players, and known deaths.
 Player-based counts follow player filters and Include yourself; mentor counts

@@ -123,7 +123,7 @@ public partial class MainWindow
         _ => "-"
     };
 
-    private static void DrawPvpStatisticCells(int start, PvpStatistics stats, bool includeScores = true, bool averages = false)
+    private void DrawPvpStatisticCells(int start, PvpStatistics stats, bool includeScores = true, bool averages = false)
     {
         var first = includeScores ? 0 : 3;
         for (var index = first; index < 14; index++)

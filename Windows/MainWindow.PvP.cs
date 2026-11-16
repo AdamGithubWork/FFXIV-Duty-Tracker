@@ -45,8 +45,8 @@ public partial class MainWindow
             return;
         SetupConfiguredColumns("PvP players", scrollable: true);
         var specs = ImGui.TableGetSortSpecs();
-        var column = specs.SpecsCount > 0 && IsTableColumnVisible("PvP players", specs.Specs.ColumnIndex)
-            ? specs.Specs.ColumnIndex : 3;
+        var column = specs.SpecsCount > 0 && IsTableColumnVisible("PvP players", ConfiguredSortColumn(specs.Specs.ColumnIndex))
+            ? ConfiguredSortColumn(specs.Specs.ColumnIndex) : 3;
         var ascending = specs.SpecsCount == 0 || specs.Specs.SortDirection == ImGuiSortDirection.Ascending;
         var players = SortTableRows(record.Party, player => column switch
         {

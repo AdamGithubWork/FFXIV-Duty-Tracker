@@ -22,6 +22,7 @@ namespace MentorRouletteTracker
         public bool ShowDatacenterStatistics { get; set; } = true;
         public HashSet<string> HiddenMilestones { get; set; } = new();
         public Dictionary<string, HashSet<string>> TableColumns { get; set; } = new();
+        public Dictionary<string, List<string>> TableColumnOrder { get; set; } = new();
         public uint? WindowBackgroundColor { get; set; }
         public uint? PanelBackgroundColor { get; set; }
         public uint? TableHeaderBackgroundColor { get; set; }
