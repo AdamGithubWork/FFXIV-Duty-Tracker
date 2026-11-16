@@ -357,7 +357,7 @@ namespace MentorRouletteTracker
                     ref isOpen))
             {
                 ImGui.TextColored(
-                    new Vector4(1f, 0.85f, 0.4f, 1f),
+                    WindowAppearance.Accent,
                     r.DutyName);
 
                 ImGui.Separator();
@@ -386,7 +386,7 @@ namespace MentorRouletteTracker
                 ImGui.Separator();
                 ImGui.Spacing();
 
-                ImGui.Text(r.DutyType == "PvP" ? $"Players ({r.Party.Count})" : $"Party ({r.Party.Count})");
+                ImGui.Text(r.DutyType == "PvP" ? $"PvP records ({r.Party.Count})" : $"Party ({r.Party.Count})");
                 if (r.PvPRosterComplete.HasValue)
                 {
                     ImGui.PushTextWrapPos();
@@ -403,7 +403,7 @@ namespace MentorRouletteTracker
 
                 if (r.DutyType == "PvP")
                 {
-                    DrawPvpPlayers(r);
+                    DrawPvpRecords(r);
                 }
                 else if (r.Party.Count > 0)
                 {

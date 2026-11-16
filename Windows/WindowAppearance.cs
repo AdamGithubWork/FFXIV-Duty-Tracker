@@ -5,8 +5,10 @@ namespace MentorRouletteTracker
 {
     internal static class WindowAppearance
     {
-        internal static readonly Vector4 DefaultTableHeader = new(0.12f, 0.16f, 0.21f, 1f);
-        internal static readonly Vector4 DefaultAlternateRow = new(0.45f, 0.6f, 0.8f, 0.05f);
+        internal static Vector4 Accent => ImGui.GetStyle().Colors[(int)ImGuiCol.CheckMark];
+        internal static Vector4 DefaultTableHeader => ImGui.GetStyle().Colors[(int)ImGuiCol.TableHeaderBg];
+        internal static Vector4 DefaultAlternateRow => ImGui.GetStyle().Colors[(int)ImGuiCol.TableRowBgAlt];
+        internal static Vector4 FilterBackground => ImGui.GetStyle().Colors[(int)ImGuiCol.FrameBg];
 
         internal static int Push(Configuration config)
         {

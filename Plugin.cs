@@ -42,7 +42,8 @@ namespace MentorRouletteTracker
             config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history storage error."), createDatabase: savedConfig == null);
             var trackedTypes = config.TrackedContentTypeIds.Distinct().ToList();
             var timerTypes = config.TimerVisibleContentTypeIds.Distinct().ToList();
-            var settingsChanged = savedConfig == null ||
+            var columnSettingsChanged = config.UpgradePvpColumnSettings();
+            var settingsChanged = savedConfig == null || columnSettingsChanged ||
                 trackedTypes.Count != config.TrackedContentTypeIds.Count ||
                 timerTypes.Count != config.TimerVisibleContentTypeIds.Count;
             config.TrackedContentTypeIds = trackedTypes;

@@ -9,8 +9,8 @@ namespace MentorRouletteTracker
     {
         public int Version { get; set; } = 1;
         public List<uint> TrackedContentTypeIds { get; set; } = [2, 3, 4, 5, 6, 21, 28, 30, 37];
-        public List<uint> TimerVisibleContentTypeIds { get; set; } = [2, 3, 4, 5, 6, 21, 28, 30, 37];
-        public bool TrackAllianceMembers { get; set; }
+        public List<uint> TimerVisibleContentTypeIds { get; set; } = [2, 3, 4, 5, 6];
+        public bool TrackAllianceMembers { get; set; } = true;
         public bool TrackPvpEnemies { get; set; } = true;
         public bool IncludeSelfInStatistics { get; set; }
         public bool ShowStatisticsOverview { get; set; } = true;
@@ -76,6 +76,22 @@ namespace MentorRouletteTracker
                 if (property.CanRead && property.CanWrite)
                     property.SetValue(this, property.GetValue(defaults));
             Save();
+        }
+
+        internal bool UpgradePvpColumnSettings()
+        {
+            var changed = false;
+            if (TableColumns != null && TableColumns.Remove("PvP players", out var visibility))
+            {
+                TableColumns.TryAdd("PvP records", visibility);
+                changed = true;
+            }
+            if (TableColumnOrder != null && TableColumnOrder.Remove("PvP players", out var order))
+            {
+                TableColumnOrder.TryAdd("PvP records", order);
+                changed = true;
+            }
+            return changed;
         }
 
         public void DisposeHistory() => history?.Dispose();

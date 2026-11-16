@@ -66,7 +66,7 @@ whose side can't be confirmed are skipped while it's off. The choice is saved wi
 each duty, so delayed imports use that duty's setting. Existing history isn't deleted.
 PvPStats imports your whole team regardless of the alliance-tracking setting.
 
-Choose scoreboard columns under Settings > Table columns > PvP players. Records
+Choose scoreboard columns under Settings > Table columns > PvP records. Records
 also has optional columns for your PvP scores and placement. People has optional
 PvP damage, kills, assists, and teammate/enemy encounter totals. Those totals use
 the current filters and only include known scores; '-' means unknown.
@@ -151,6 +151,12 @@ Turn duty recording on or off, choose what to record and when to show the duty
 timer, and set player tracking preferences. Choose your visible statistics and
 milestones here. The heatmap metric selector is in Duty Analysis.
 
+New profiles record all supported duties, track alliance members and PvP opponents,
+and show the timer for Dungeons, Guildhests, Trials, Raids, and PvP. PvP controls
+are gray until PvPStats is enabled. Its status appears in green when enabled and
+red when unavailable. The default colors follow your Dalamud theme;
+custom background colors still apply.
+
 Reset all settings restores recording preferences, colors, columns, milestones,
 and filters after confirmation. Completed records, pending duties, and notes stay
 saved. PvP recording still requires PvPStats to be enabled after a reset.
@@ -161,8 +167,7 @@ larger lists.
 
 Settings > Appearance lets you change window and panel backgrounds, table headers,
 and row colors, with a separate Opacity slider and a live table preview. New custom
-colors start fully opaque. Make colors opaque keeps the selected colors and sets
-their opacity to 100%. Reset a single color or use Reset colors to restore the
+colors start fully opaque. Reset a single color or use Reset colors to restore the
 defaults. Appearance choices are saved. Headers stay on one line until
 columns are very narrow; you can also turn wrapping off. Hover a clipped header
 or table value to read its full text.
@@ -173,6 +178,13 @@ new optional columns start hidden. Drag a column name onto another name in Setti
 to move it. Each table saves its own order, including hidden columns. Use Reset
 columns under a table to restore visibility and order. The identifying duty,
 player, or group columns stay visible and can also be moved.
+
+PvP records uses the same detailed-view layout for every PvP mode: Name, World,
+Job, Side, Damage dealt, Kills, Deaths, Assists, Damage taken, Healing done, Result,
+Race, Gender, and Status. Status starts unchecked. Damage taken and Healing done
+follow Assists in the other tables' default orders too. Saved layouts are kept;
+Reset columns applies a table's new defaults, and Reset all settings applies all
+defaults.
 
 Records and Stats by duty can show sprouts, mentors, players, and known deaths.
 Player-based counts follow player filters and Include yourself; mentor counts

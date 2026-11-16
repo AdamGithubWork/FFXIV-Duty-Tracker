@@ -68,8 +68,7 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
                 foreach (var contentType in contentTypes)
                 {
-                    var missingPvpStats = contentType.Id == 6 && !tracker.PvpTrackingAvailable;
-                    ImGui.BeginDisabled(missingPvpStats);
+                    var pvpDisabled = BeginPvpControl(contentType.Id == 6);
                     var isTracked =
                         config.TrackedContentTypeIds.Contains(contentType.Id);
 
@@ -84,9 +83,7 @@ namespace MentorRouletteTracker
 
                         config.Save();
                     }
-                    ImGui.EndDisabled();
-                    if (missingPvpStats)
-                        ImGui.TextWrapped("Enable PvP Tracker (PvPStats) in /xlplugins to record PvP duties.");
+                    EndPvpControl(pvpDisabled);
                 }
                 EndSettingsSection();
             }
@@ -119,20 +116,16 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
             if (BeginSettingsSection("PvP", defaultOpen: true))
             {
-                ImGui.TextWrapped(tracker.PvpTrackingAvailable
-                    ? "PvPStats is enabled. PvP recording is available."
-                    : "PvP recording is disabled. Enable PvP Tracker (PvPStats) in /xlplugins first.");
+                DrawPvpStatsStatus();
+                var pvpDisabled = BeginPvpControl();
                 var trackEnemies = config.TrackPvpEnemies;
                 if (ImGui.Checkbox("Track opposing members in PvP matches", ref trackEnemies))
                 {
                     config.TrackPvpEnemies = trackEnemies;
                     config.Save();
                 }
-                ImGui.PushTextWrapPos();
-                ImGui.TextDisabled("Applies to new duties. Turn this off to record teammates only. Existing history stays saved.");
-                ImGui.TextDisabled("PvPStats adds teammate/enemy labels, damage dealt, kills, deaths, assists, and placement after a match. Teammates include your whole team, even when alliance tracking is off.");
-                ImGui.TextDisabled("Nearby players can have race, gender, and status recorded. Hidden identities and missing scores stay unknown.");
-                ImGui.PopTextWrapPos();
+                EndPvpControl(pvpDisabled);
+                ImGui.TextDisabled("New matches only.");
                 EndSettingsSection();
             }
 
@@ -143,6 +136,7 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
                 foreach (var contentType in contentTypes)
                 {
+                    var pvpDisabled = BeginPvpControl(contentType.Id == 6);
                     var showTimer =
                         config.TimerVisibleContentTypeIds.Contains(contentType.Id);
 
@@ -157,6 +151,7 @@ namespace MentorRouletteTracker
 
                         config.Save();
                     }
+                    EndPvpControl(pvpDisabled);
                 }
                 EndSettingsSection();
             }
@@ -197,6 +192,40 @@ namespace MentorRouletteTracker
             }
 
             settingsExpansion = null;
+        }
+
+        private bool BeginPvpControl(bool isPvp = true)
+        {
+            var disabled = isPvp && !tracker.PvpTrackingAvailable;
+            if (disabled)
+                ImGui.PushStyleColor(ImGuiCol.CheckMark, new Vector4(0.6f, 0.6f, 0.6f, 1f));
+            ImGui.BeginDisabled(disabled);
+            return disabled;
+        }
+
+        private static void EndPvpControl(bool disabled)
+        {
+            ImGui.EndDisabled();
+            if (disabled)
+                ImGui.PopStyleColor();
+        }
+
+        private void DrawPvpStatsStatus()
+        {
+            var enabled = tracker.PvpTrackingAvailable;
+            ImGui.PushStyleColor(ImGuiCol.ChildBg, enabled ? new Vector4(0.06f, 0.20f, 0.09f, 1f) : new Vector4(0.24f, 0.06f, 0.05f, 1f));
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
+            if (ImGui.BeginChild("PvpStatsStatus", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
+                ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+                ImGui.TextColored(enabled ? new Vector4(0.45f, 1f, 0.55f, 1f) : new Vector4(1f, 0.45f, 0.40f, 1f),
+                    enabled ? "PvPStats enabled" : "PvPStats unavailable");
+            ImGui.EndChild();
+            ImGui.PopStyleVar();
+            ImGui.PopStyleColor();
+            ImGui.TextWrapped(enabled
+                ? "PvPStats provides player rosters, match scores, and results."
+                : "Enable PvP Tracker (PvPStats) in /xlplugins to record PvP.");
+            ImGui.Spacing();
         }
 
         private void DrawResetSettingsConfirmation()
@@ -352,9 +381,6 @@ namespace MentorRouletteTracker
                 config.AlternateRowBackgroundColor = null;
                 config.Save();
             }
-            ImGui.SameLine();
-            if (ImGui.Button("Make colors opaque"))
-                MakeBackgroundColorsOpaque();
             ImGui.Spacing();
             ImGui.TextDisabled("Table preview");
             if (BeginStyledTable("AppearancePreview", 2,
@@ -422,17 +448,6 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
         }
 
-        private void MakeBackgroundColorsOpaque()
-        {
-            static uint? Opaque(uint? color) => color.HasValue ? color.Value | 0xFF000000u : null;
-            config.WindowBackgroundColor = Opaque(config.WindowBackgroundColor);
-            config.PanelBackgroundColor = Opaque(config.PanelBackgroundColor);
-            config.TableHeaderBackgroundColor = Opaque(config.TableHeaderBackgroundColor);
-            config.TableRowBackgroundColor = Opaque(config.TableRowBackgroundColor);
-            config.AlternateRowBackgroundColor = Opaque(config.AlternateRowBackgroundColor);
-            config.Save();
-        }
-
         private void DrawStatisticsCustomization()
         {
             var changed = false;
@@ -483,7 +498,10 @@ namespace MentorRouletteTracker
                     {
                         var key = MilestoneKey(section.Title, row.Label);
                         var visible = !config.HiddenMilestones.Contains(key);
-                        if (!ImGui.Checkbox(row.Label, ref visible))
+                        var pvpDisabled = BeginPvpControl(section.Title is "PvP player stats" or "Your PvP results" || row.Label.Contains("(PvP)", StringComparison.Ordinal));
+                        var toggled = ImGui.Checkbox(row.Label, ref visible);
+                        EndPvpControl(pvpDisabled);
+                        if (!toggled)
                             continue;
                         if (visible)
                             config.HiddenMilestones.Remove(key);

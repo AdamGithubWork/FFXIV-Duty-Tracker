@@ -84,7 +84,7 @@ namespace MentorRouletteTracker
         }
 
         private static void DrawSectionHeading(string title) =>
-            ImGui.TextColored(new Vector4(0.65f, 0.8f, 1f, 1f), title);
+            ImGui.TextColored(WindowAppearance.Accent, title);
 
         public override void PreDraw()
         {

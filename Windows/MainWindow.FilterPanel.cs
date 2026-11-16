@@ -73,8 +73,8 @@ namespace MentorRouletteTracker
             ImGui.EndChild();
             ImGui.PopStyleVar();
             ImGui.Spacing();
-            ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.10f, 0.18f, 0.27f, 1f));
-            ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.40f, 0.62f, 0.85f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.ChildBg, WindowAppearance.FilterBackground);
+            ImGui.PushStyleColor(ImGuiCol.Border, WindowAppearance.Accent);
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
             if (ImGui.BeginChild("FilterBoundary", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
@@ -171,6 +171,7 @@ namespace MentorRouletteTracker
                     DrawFilterOption(dutyType, selectedDutyTypes);
                     continue;
                 }
+                var pvpDisabled = BeginPvpControl();
                 var pvpSelected = selectedDutyTypes.Contains("PvP");
                 if (ImGui.Checkbox("PvP", ref pvpSelected))
                 {
@@ -188,6 +189,7 @@ namespace MentorRouletteTracker
                         TogglePvpMode(mode);
                 }
                 ImGui.Unindent();
+                EndPvpControl(pvpDisabled);
             }
             ImGui.EndCombo();
             ImGui.Spacing();

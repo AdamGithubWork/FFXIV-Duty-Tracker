@@ -24,7 +24,7 @@ public partial class MainWindow
         false => "Teammate", true => "Enemy", _ => "Unknown"
     };
 
-    private void DrawPvpPlayers(DutyRecord record)
+    private void DrawPvpRecords(DutyRecord record)
     {
         var teammates = record.Party.Count(player => player.PvPIsEnemy == false);
         var enemies = record.Party.Count(player => player.PvPIsEnemy == true);
@@ -41,11 +41,11 @@ public partial class MainWindow
         var rowHeight = ImGui.GetTextLineHeight() + TableCellVerticalPadding * 2;
         var desiredHeight = rowHeight * (Math.Min(record.Party.Count, 12) + 2) + ImGui.GetStyle().ScrollbarSize;
         var availableHeight = Math.Max(rowHeight * 3, ImGui.GetContentRegionAvail().Y - ImGui.GetTextLineHeightWithSpacing() * 5);
-        if (!BeginConfiguredTable("PvP players", "pvpPlayerDetailV2", height: Math.Min(desiredHeight, availableHeight), verticalScroll: true))
+        if (!BeginConfiguredTable("PvP records", "pvpPlayerDetailV2", height: Math.Min(desiredHeight, availableHeight), verticalScroll: true))
             return;
-        SetupConfiguredColumns("PvP players", scrollable: true);
+        SetupConfiguredColumns("PvP records", scrollable: true);
         var specs = ImGui.TableGetSortSpecs();
-        var column = specs.SpecsCount > 0 && IsTableColumnVisible("PvP players", ConfiguredSortColumn(specs.Specs.ColumnIndex))
+        var column = specs.SpecsCount > 0 && IsTableColumnVisible("PvP records", ConfiguredSortColumn(specs.Specs.ColumnIndex))
             ? ConfiguredSortColumn(specs.Specs.ColumnIndex) : 3;
         var ascending = specs.SpecsCount == 0 || specs.Specs.SortDirection == ImGuiSortDirection.Ascending;
         var players = SortTableRows(record.Party, player => column switch

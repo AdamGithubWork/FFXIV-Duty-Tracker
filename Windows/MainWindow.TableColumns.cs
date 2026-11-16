@@ -15,13 +15,13 @@ namespace MentorRouletteTracker
 
         private static readonly Dictionary<string, TableColumnOption[]> TableColumnOptions = new()
         {
-            ["PvP players"] =
+            ["PvP records"] =
             [
                 new("name", "Name", Required: true), new("world", "World"), new("job", "Job"),
                 new("side", "Side"), new("damage", "Damage dealt"),
                 new("kills", "Kills"), new("deaths", "Deaths"), new("assists", "Assists"),
-                new("race", "Race", false), new("gender", "Gender", false), new("status", "Status", false),
-                new("result", "Result"), new("taken", "Damage taken", false), new("healing", "Healing done", false)
+                new("race", "Race"), new("gender", "Gender"), new("status", "Status", false),
+                new("result", "Result"), new("taken", "Damage taken"), new("healing", "Healing done")
             ],
             ["Records"] =
             [
@@ -110,7 +110,25 @@ namespace MentorRouletteTracker
             var saved = config.TableColumnOrder != null && config.TableColumnOrder.TryGetValue(table, out var order)
                 ? order : null;
             return (saved ?? Enumerable.Empty<string>()).Where(id => id != null && byId.ContainsKey(id))
-                .Select(id => byId[id]).Concat(Enumerable.Range(0, columns.Length)).Distinct().ToArray();
+                .Select(id => byId[id]).Concat(GetDefaultColumnOrder(table)).Distinct().ToArray();
+        }
+
+        private static int[] GetDefaultColumnOrder(string table)
+        {
+            var columns = TableColumnOptions[table];
+            if (table == "PvP records")
+                return new[] { "name", "world", "job", "side", "damage", "kills", "deaths", "assists",
+                    "taken", "healing", "result", "race", "gender", "status" }
+                    .Select(id => Array.FindIndex(columns, column => column.Id == id)).ToArray();
+            var order = Enumerable.Range(0, columns.Length).ToList();
+            var assists = Array.FindIndex(columns, column => column.Id == "pvpAssists");
+            if (assists >= 0)
+            {
+                var support = order.Where(index => columns[index].Id is "pvpDamageTaken" or "pvpHealingDone").ToArray();
+                order.RemoveAll(index => support.Contains(index));
+                order.InsertRange(order.IndexOf(assists) + 1, support);
+            }
+            return order.ToArray();
         }
 
         private void MoveConfiguredColumn(string table, string sourceId, string targetId)
@@ -296,6 +314,7 @@ namespace MentorRouletteTracker
                             continue;
                         ImGui.PushID(column.Id);
                         var visible = IsTableColumnVisible(table, index);
+                        var pvpDisabled = BeginPvpControl(table == "PvP records" || column.Id.StartsWith("pvp", StringComparison.Ordinal));
                         ImGui.BeginDisabled(column.Required);
                         if (ImGui.Checkbox("##visible", ref visible))
                         {
@@ -311,6 +330,7 @@ namespace MentorRouletteTracker
                             config.Save();
                         }
                         ImGui.EndDisabled();
+                        EndPvpControl(pvpDisabled);
                         ImGui.SameLine();
                         ImGui.Selectable($"{column.Label}{(column.Required ? " (always shown)" : "")}###dragColumn");
                         if (ImGui.BeginDragDropSource())
