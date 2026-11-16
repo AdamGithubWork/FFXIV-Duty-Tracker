@@ -7,16 +7,16 @@
     "Punchline": "Keep track of your duties and the players you meet.",
     "Description": "See your past duties, who you ran into, deaths, wipes, and milestones. Filter your history, add notes, or export it to CSV. PvP rosters, teams, damage, kills, assists, deaths, and placement require PvP Tracker by SaMo.",
     "ApplicableVersion": "any",
-    "RepoUrl": "https://github.com/AdamGithubWork/FFXIV-Duty-Tracker",
+    "RepoUrl": "https://github.com/AdalithCode/FFXIV-Duty-Tracker",
     "Tags": [
       "utility",
       "tracking",
       "stats"
     ],
     "DalamudApiLevel": 15,
-    "DownloadLinkInstall": "https://github.com/AdamGithubWork/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/AdamGithubWork/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
-    "DownloadLinkTesting": "https://github.com/AdamGithubWork/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
+    "DownloadLinkInstall": "https://github.com/AdalithCode/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/AdalithCode/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
+    "DownloadLinkTesting": "https://github.com/AdalithCode/FFXIV-Duty-Tracker/releases/download/v1.0.0.1-beta.1/latest.zip",
     "IsHide": false,
     "IsTestingExclusive": false,
     "LastUpdate": 1794802383
