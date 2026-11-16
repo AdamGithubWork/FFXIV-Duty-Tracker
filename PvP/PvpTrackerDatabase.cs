@@ -12,7 +12,7 @@ public static class PvpTrackerDatabase
         ("rwmatch", PvpMode.RivalWings)
     ];
 
-    // PvPStats uses these enum ordinals when jobs are stored as numbers.
+    // PvP Tracker uses these enum ordinals when jobs are stored as numbers.
     private static readonly string[] Jobs =
         ["PLD", "WAR", "DRK", "GNB", "WHM", "SCH", "AST", "SGE", "MNK", "DRG", "NIN", "SAM", "RPR", "VPR", "BRD", "MCH", "DNC", "BLM", "SMN", "RDM", "PCT"];
 

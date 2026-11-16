@@ -218,13 +218,13 @@ namespace MentorRouletteTracker
             if (ImGui.BeginChild("PvpStatsStatus", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
                 ImGui.TextColored(enabled ? new Vector4(0.45f, 1f, 0.55f, 1f) : new Vector4(1f, 0.45f, 0.40f, 1f),
-                    enabled ? "PvPStats enabled" : "PvPStats unavailable");
+                    enabled ? "PvP Tracker enabled" : "PvP Tracker unavailable");
             ImGui.EndChild();
             ImGui.PopStyleVar();
             ImGui.PopStyleColor();
             ImGui.TextWrapped(enabled
-                ? "PvPStats provides player rosters, match scores, and results."
-                : "Enable PvP Tracker (PvPStats) in /xlplugins to record PvP.");
+                ? "PvP Tracker by SaMo provides player rosters, match scores, and results."
+                : "Enable PvP Tracker by SaMo in /xlplugins to record PvP.");
             ImGui.Spacing();
         }
 
@@ -267,6 +267,7 @@ namespace MentorRouletteTracker
             config.ResetPreferences();
             tracker.Armed = config.StorageAvailable;
             ClearFilters();
+            filtersExpanded = false;
             selectedHeatmapMetric = 0;
             settingsExpansion = false;
             milestoneExpansion = false;

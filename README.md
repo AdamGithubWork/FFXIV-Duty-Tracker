@@ -10,7 +10,7 @@ The plugin started as Mentor Roulette Tracker. It now tracks other duty types to
 ## Requirements
 
 - FFXIV with XIVLauncher and Dalamud, using API 15.
-- PvP Tracker (PvPStats) for full PvP rosters and scoreboard deaths. Other tracking works without it.
+- [PvP Tracker by SaMo](https://github.com/wrath16/PvpStats) for full PvP rosters and scoreboard deaths. Other tracking works without it.
 
 ## Installation
 
@@ -30,12 +30,12 @@ Keep the dependency DLLs and the `runtimes` folder alongside the plugin. Load
 - Party members: name, home world, job, race, gender, status, and recorded deaths
 
 You can choose which duty types to record and whether to track alliance members.
-PvP recording requires PvP Tracker (PvPStats) to be enabled in Dalamud. Having an
-old PvPStats database isn't enough. Settings shows whether PvP recording is available;
-PvE recording works without PvPStats. If PvPStats unloads during a recorded duty,
+PvP recording requires PvP Tracker by SaMo to be enabled in Dalamud. Having an
+old PvP Tracker database isn't enough. Settings shows whether PvP recording is available;
+PvE recording works without PvP Tracker. If PvP Tracker unloads during a recorded duty,
 player capture pauses and the duty already in progress is kept.
 
-PvPStats results add the full scoreboard roster: up to 72 players in Frontline,
+PvP Tracker results add the full scoreboard roster: up to 72 players in Frontline,
 10 in Crystalline Conflict, and 48 in Rival Wings. Names, home worlds, jobs,
 damage dealt, kills, deaths, assists, and teams are imported after the match.
 Duty details show whether each player was a teammate or enemy, with your team's
@@ -50,21 +50,21 @@ matches, which can't have appearance details filled in afterward.
 Observed players absent from a final result
 are kept, so replacements or leavers can make a recorded roster larger.
 
-Duty Tracker checks for saved results when a PvP duty finishes, including PvPStats
+Duty Tracker checks for saved results when a PvP duty finishes, including PvP Tracker
 versions without the match-saved callback. First checks are after about one minute
 for CC and five minutes for Frontline/Rival Wings, then every 30 seconds if needed.
 Recent matches keep their 30-minute retry window; older unfinished imports get one
 check after reload. Partial results add available players without marking the
 roster complete. Fully imported scoreboards aren't imported again after reload.
 Previously imported full rosters get another lookup to add missing combat scores,
-teams, and player results when PvPStats still has them.
+teams, and player results when PvP Tracker still has them.
 Older records with known deaths aren't bulk-backfilled automatically.
 
 Settings > PvP has **Track opposing members in PvP matches**, enabled by default.
 Turn it off before entering a duty to capture and import teammates only. Players
 whose side can't be confirmed are skipped while it's off. The choice is saved with
 each duty, so delayed imports use that duty's setting. Existing history isn't deleted.
-PvPStats imports your whole team regardless of the alliance-tracking setting.
+PvP Tracker imports your whole team regardless of the alliance-tracking setting.
 
 Choose scoreboard columns under Settings > Table columns > PvP records. Records
 also has optional columns for your PvP scores and placement. People has optional
@@ -100,9 +100,9 @@ count once per duty.
 
 Damage taken and Healing done are optional columns alongside damage dealt in
 Records, PvP details, People, Duty Analysis, and grouped Statistics. Statistics
-uses averages; the other tables use totals. Healing uses PvPStats' HP restored
+uses averages; the other tables use totals. Healing uses PvP Tracker' HP restored
 score. Missing scores stay unknown and don't count as zero. Older imported matches
-get another lookup for these scores when PvPStats still has them.
+get another lookup for these scores when PvP Tracker still has them.
 
 Interrupted duties stay pending while login and loading states settle. A pending
 duty resumes only for the same character name and home world. If its recorder
@@ -118,6 +118,10 @@ or edit the wipe count and joined-in-progress flag. You can delete individual
 records here. Export CSV and Clear all records are in Settings > History & exports.
 Both actions cover all saved records regardless of filters. Clearing records still
 requires confirmation.
+
+Duty details, player history, and note windows stay open when the main window is
+closed or you switch tabs. Close each window with its own close button. Deleting
+a duty also closes its details and note window.
 
 ### Statistics
 
@@ -153,13 +157,13 @@ milestones here. The heatmap metric selector is in Duty Analysis.
 
 New profiles record all supported duties, track alliance members and PvP opponents,
 and show the timer for Dungeons, Guildhests, Trials, Raids, and PvP. PvP controls
-are gray until PvPStats is enabled. Its status appears in green when enabled and
+are gray until PvP Tracker is enabled. Its status appears in green when enabled and
 red when unavailable. The default colors follow your Dalamud theme;
 custom background colors still apply.
 
 Reset all settings restores recording preferences, colors, columns, milestones,
 and filters after confirmation. Completed records, pending duties, and notes stay
-saved. PvP recording still requires PvPStats to be enabled after a reset.
+saved. PvP recording still requires PvP Tracker to be enabled after a reset.
 
 PvP duty details show teammate/enemy labels and results without team names such as
 Astra or Umbra. Duty tables size themselves to their rows, with scrolling for

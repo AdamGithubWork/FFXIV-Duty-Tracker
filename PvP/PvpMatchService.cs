@@ -145,7 +145,7 @@ namespace MentorRouletteTracker.PvP
                 log.Information($"Resumed PvP scoreboard lookup for {record.DutyName}.");
             }
 
-            // PvPStats may still be writing the match when the plugin reloads.
+            // PvP Tracker may still be writing the match when the plugin reloads.
             restoreTimes = (restoreTimes ?? Array.Empty<DateTime>()).Where(time =>
             {
                 if (matches.Any(match => Math.Abs(

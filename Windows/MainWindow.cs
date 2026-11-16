@@ -1,4 +1,4 @@
-﻿
+
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -100,6 +100,11 @@ namespace MentorRouletteTracker
 
         public void Dispose()
         {
+            showDetailWindow = false;
+            showNoteWindow = false;
+            showPlayerHistory = false;
+            selectedRecord = null;
+            noteRecord = null;
         }
 
         public void OpenDutyHistory(string dutyName, bool fullRunsOnly = false)
@@ -125,6 +130,41 @@ namespace MentorRouletteTracker
             minimumEncounters = 1;
 
             IsOpen = true;
+        }
+
+        public void DrawIndependentWindows()
+        {
+            if (!config.StorageAvailable)
+                return;
+            if (selectedRecord != null && !config.History.Records.Contains(selectedRecord))
+            {
+                selectedRecord = null;
+                showDetailWindow = false;
+            }
+            if (noteRecord != null && !config.History.Records.Contains(noteRecord))
+            {
+                noteRecord = null;
+                showNoteWindow = false;
+            }
+            if (!showPlayerHistory && !showDetailWindow && !showNoteWindow)
+                return;
+            var colorCount = WindowAppearance.Push(config);
+            try
+            {
+                if (showPlayerHistory)
+                {
+                    var selected = GetPeopleRows(GetPlayerViewData()).FirstOrDefault(player =>
+                        player.Name == historyPlayerName && player.World == historyPlayerWorld);
+                    DrawPlayerHistory(selected);
+                }
+                DrawDetailWindow();
+                DrawNoteWindow();
+            }
+            finally
+            {
+                if (colorCount > 0)
+                    ImGui.PopStyleColor(colorCount);
+            }
         }
 
         public override void Draw()
@@ -194,23 +234,17 @@ namespace MentorRouletteTracker
             }
 
             DrawResetSettingsConfirmation();
-            DrawDetailWindow();
-            DrawNoteWindow();
-
             if (openEditRecord)
             {
                 ImGui.OpenPopup("EditDutyRecord");
                 openEditRecord = false;
             }
-
             DrawEditRecordWindow();
-
             if (openDeleteConfirmation)
             {
                 ImGui.OpenPopup("ConfirmDeleteRecord");
                 openDeleteConfirmation = false;
             }
-
             DrawDeleteConfirmation();
         }
     }

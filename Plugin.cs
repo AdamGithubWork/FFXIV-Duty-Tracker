@@ -95,8 +95,14 @@ namespace MentorRouletteTracker
                         "Open Duty Tracker. Use '/dt arm' to record duties or '/dt disarm' to stop recording.",
                 });
 
-            pluginInterface.UiBuilder.Draw += windowSystem.Draw;
+            pluginInterface.UiBuilder.Draw += DrawUi;
             pluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
+        }
+
+        private void DrawUi()
+        {
+            windowSystem.Draw();
+            mainWindow.DrawIndependentWindows();
         }
 
         private void OnOpenMainUi()
@@ -134,7 +140,7 @@ namespace MentorRouletteTracker
 
         public void Dispose()
         {
-            pluginInterface.UiBuilder.Draw -= windowSystem.Draw;
+            pluginInterface.UiBuilder.Draw -= DrawUi;
             pluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi;
             commandManager.RemoveHandler(CommandName);
             windowSystem.RemoveAllWindows();

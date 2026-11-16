@@ -31,7 +31,7 @@ public partial class MainWindow
         var unknown = record.Party.Count - teammates - enemies;
         ImGui.Text($"Teammates: {teammates}    Enemies: {enemies}    Side unknown: {unknown}");
         ImGui.PushTextWrapPos();
-        ImGui.TextDisabled("Scores come from PvPStats. '-' means unknown.");
+        ImGui.TextDisabled("Scores come from PvP Tracker. '-' means unknown.");
         ImGui.PopTextWrapPos();
         if (record.Party.Count == 0)
         {

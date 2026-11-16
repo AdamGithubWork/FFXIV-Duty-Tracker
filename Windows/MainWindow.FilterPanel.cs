@@ -7,6 +7,8 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
+        private bool filtersExpanded;
+
         private void ClearFilters()
         {
             globalPlayerSearchText = string.Empty;
@@ -40,7 +42,9 @@ namespace MentorRouletteTracker
             }
 
             var countText = activeCount == 0 ? "No filters" : $"{activeCount} active";
-            if (!ImGui.CollapsingHeader($"Filters — {tab} ({countText})###GlobalFilters"))
+            ImGui.SetNextItemOpen(filtersExpanded, ImGuiCond.Always);
+            filtersExpanded = ImGui.CollapsingHeader($"Filters — {tab} ({countText})###GlobalFilters");
+            if (!filtersExpanded)
                 return;
 
             var height = Math.Min(ImGui.GetFontSize() * 16f,

@@ -203,12 +203,6 @@ namespace MentorRouletteTracker
                 EndStyledTable();
             }
 
-            if (showPlayerHistory)
-            {
-                var selected = people.FirstOrDefault(x =>
-                    x.Name == historyPlayerName && x.World == historyPlayerWorld);
-                DrawPlayerHistory(selected);
-            }
         }
 
         private void DrawPlayerHistory(PeopleTableRow? selected)
@@ -257,7 +251,6 @@ namespace MentorRouletteTracker
                             {
                                 selectedRecord = entry.Record;
                                 showDetailWindow = true;
-                                isOpen = false;
                             }
                             ImGui.TableSetColumnIndex(1);
                             ImGui.TextUnformatted(DutyClassification.DisplayType(entry.Record));

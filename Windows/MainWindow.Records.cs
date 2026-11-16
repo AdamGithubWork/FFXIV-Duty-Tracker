@@ -391,13 +391,13 @@ namespace MentorRouletteTracker
                 {
                     ImGui.PushTextWrapPos();
                     ImGui.TextDisabled(r.PvPRosterComplete.Value
-                        ? r.TrackPvpEnemies ? "PvPStats roster imported. Some character details may be unknown."
-                            : "PvPStats teammate roster imported. Opposing members weren't tracked for this duty."
-                        : "Waiting for the full PvPStats scoreboard.");
+                        ? r.TrackPvpEnemies ? "PvP Tracker roster imported. Some character details may be unknown."
+                            : "PvP Tracker teammate roster imported. Opposing members weren't tracked for this duty."
+                        : "Waiting for the full PvP Tracker scoreboard.");
                     ImGui.PopTextWrapPos();
                 }
                 if (r.PvPRosterComplete == true && (!r.PvPCombatStatsComplete || !r.PvPResultsComplete || !r.PvPExtendedStatsComplete))
-                    ImGui.TextDisabled("Checking PvPStats for missing scores, teams, and results.");
+                    ImGui.TextDisabled("Checking PvP Tracker for missing scores, teams, and results.");
 
                 ImGui.Spacing();
 
