@@ -50,8 +50,6 @@ namespace MentorRouletteTracker
         private bool showNoteWindow = false;
         private string noteDraft = string.Empty;
 
-        private string lastExportMessage = string.Empty;
-
         private int selectedHeatmapMetric = 0;
         private int appearanceColorCount;
 

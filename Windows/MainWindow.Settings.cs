@@ -126,6 +126,8 @@ namespace MentorRouletteTracker
                         config.IncludeSelfInStatistics = includeSelf;
                         config.Save();
                     }
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Your data is still recorded when this is off. It just won't be included in statistics.");
 
                     bool trackAlliance = config.TrackAllianceMembers;
 
@@ -383,18 +385,18 @@ namespace MentorRouletteTracker
 
         private void DrawHistorySettings()
         {
+            UpdateCsvExport();
             ImGui.TextWrapped("Export all saved records to CSV, or clear saved duty history. Filters don't limit these actions.");
             ImGui.Spacing();
-            if (ImGui.Button("Export CSV"))
+            ImGui.BeginDisabled(csvExportTask != null);
+            try
             {
-                var path = Path.Combine(
-                    exportDirectory,
-                    $"mentor_roulette_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-                CsvExporter.Export(config.History.Records, path);
-
-                lastExportMessage =
-                    $"Exported {config.History.Records.Count} records to {path}";
+                if (ImGui.Button("Export CSV"))
+                    StartCsvExport();
+            }
+            finally
+            {
+                ImGui.EndDisabled();
             }
 
             ImGui.SameLine();
@@ -442,7 +444,7 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
 
                 ImGui.TextColored(
-                    new Vector4(0.4f, 1f, 0.4f, 1f),
+                    exportFailed ? new Vector4(1f, 0.4f, 0.4f, 1f) : new Vector4(0.4f, 1f, 0.4f, 1f),
                     lastExportMessage);
             }
 
