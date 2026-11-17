@@ -32,6 +32,7 @@ namespace MentorRouletteTracker
             this.config = config;
 
             IsOpen = true;
+            RespectCloseHotkey = false;
         }
 
         public override void PreDraw()

@@ -22,6 +22,7 @@ namespace MentorRouletteTracker
         private bool commandRegistered;
         private bool drawSubscribed;
         private bool mainUiSubscribed;
+        private bool configUiSubscribed;
         private bool disposed;
 
         public Plugin(
@@ -105,6 +106,8 @@ namespace MentorRouletteTracker
                 drawSubscribed = true;
                 pluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
                 mainUiSubscribed = true;
+                pluginInterface.UiBuilder.OpenConfigUi += OnOpenConfigUi;
+                configUiSubscribed = true;
             }
             catch
             {
@@ -123,6 +126,8 @@ namespace MentorRouletteTracker
         {
             mainWindow.IsOpen = true;
         }
+
+        private void OnOpenConfigUi() => mainWindow.OpenSettings();
 
         private void OnCommand(string command, string args)
         {
@@ -162,6 +167,8 @@ namespace MentorRouletteTracker
                 Cleanup(() => pluginInterface.UiBuilder.Draw -= DrawUi, "drawing callback");
             if (mainUiSubscribed)
                 Cleanup(() => pluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi, "main window callback");
+            if (configUiSubscribed)
+                Cleanup(() => pluginInterface.UiBuilder.OpenConfigUi -= OnOpenConfigUi, "settings callback");
             if (commandRegistered)
                 Cleanup(() => commandManager.RemoveHandler(CommandName), "command handler");
             Cleanup(windowSystem.RemoveAllWindows, "windows");

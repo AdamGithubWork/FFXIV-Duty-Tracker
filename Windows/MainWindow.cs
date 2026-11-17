@@ -36,6 +36,7 @@ namespace MentorRouletteTracker
         private string? dutyHistoryFilter;
         private bool dutyHistoryFullRunsOnly;
         private bool openDutyHistory;
+        private bool openSettings;
 
         private DutyRecord? recordPendingDeletion;
         private bool openDeleteConfirmation;
@@ -108,8 +109,16 @@ namespace MentorRouletteTracker
 
         public override void OnClose() => SaveAppearanceChanges();
 
+        public void OpenSettings()
+        {
+            openSettings = true;
+            openDutyHistory = false;
+            IsOpen = true;
+        }
+
         public void OpenDutyHistory(string dutyName, bool fullRunsOnly = false)
         {
+            openSettings = false;
             if (string.IsNullOrWhiteSpace(dutyName))
                 return;
 
@@ -257,10 +266,12 @@ namespace MentorRouletteTracker
                         }
                     }
 
-                    if (ImGui.BeginTabItem("Settings"))
+                    var settingsTabFlags = openSettings ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+                    if (ImGui.BeginTabItem("Settings", settingsTabFlags))
                     {
                         try
                         {
+                            openSettings = false;
                             DrawSettingsTab();
                         }
                         finally
