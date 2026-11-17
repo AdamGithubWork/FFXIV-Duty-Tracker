@@ -8,6 +8,15 @@ namespace MentorRouletteTracker
         private bool? settingsExpansion;
         private bool? milestoneExpansion;
         private bool openResetSettingsConfirmation;
+        private bool appearanceSettingsDirty;
+
+        private void SaveAppearanceChanges()
+        {
+            if (!appearanceSettingsDirty)
+                return;
+            config.Save();
+            appearanceSettingsDirty = false;
+        }
 
         private void DrawSettingsTab()
         {
@@ -500,7 +509,8 @@ namespace MentorRouletteTracker
                 config.TableHeaderBackgroundColor = null;
                 config.TableRowBackgroundColor = null;
                 config.AlternateRowBackgroundColor = null;
-                config.Save();
+                appearanceSettingsDirty = true;
+                SaveAppearanceChanges();
             }
             ImGui.Spacing();
             ImGui.TextDisabled("Table preview");
@@ -548,16 +558,19 @@ namespace MentorRouletteTracker
                     if (!customized)
                         color.W = 1f;
                     update(ImGui.ColorConvertFloat4ToU32(color));
-                    config.Save();
+                    appearanceSettingsDirty = true;
                     customized = true;
                 }
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                    SaveAppearanceChanges();
                 ImGui.SameLine();
                 if (customized)
                 {
                     if (ImGui.SmallButton("Reset"))
                     {
                         update(null);
-                        config.Save();
+                        appearanceSettingsDirty = true;
+                        SaveAppearanceChanges();
                     }
                 }
                 else
@@ -571,8 +584,10 @@ namespace MentorRouletteTracker
                 {
                     color.W = opacity / 100f;
                     update(ImGui.ColorConvertFloat4ToU32(color));
-                    config.Save();
+                    appearanceSettingsDirty = true;
                 }
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                    SaveAppearanceChanges();
             }
             finally
             {

@@ -8,9 +8,27 @@ namespace MentorRouletteTracker
     public partial class MainWindow
     {
         private bool filtersExpanded;
+        private readonly Dictionary<string, DateFields> dateInputs = new();
+
+        private sealed class DateFields
+        {
+            public int Year;
+            public int Month;
+            public int Day;
+            public DateTime AppliedDate;
+
+            public DateFields(DateTime date)
+            {
+                Year = date.Year;
+                Month = date.Month;
+                Day = date.Day;
+                AppliedDate = date.Date;
+            }
+        }
 
         private void ClearFilters()
         {
+            dateInputs.Clear();
             globalPlayerSearchText = string.Empty;
             globalDutySearchText = string.Empty;
             selectedDutyTypes.Clear();
@@ -330,11 +348,10 @@ namespace MentorRouletteTracker
             ImGui.Spacing();
         }
 
-        private static void DrawFilterDate(string label, ref DateTime date)
+        private void DrawFilterDate(string label, ref DateTime date)
         {
-            var year = date.Year;
-            var month = date.Month;
-            var day = date.Day;
+            if (!dateInputs.TryGetValue(label, out var input) || input.AppliedDate != date.Date)
+                dateInputs[label] = input = new DateFields(date);
             ImGui.PushID(label);
             try
             {
@@ -346,15 +363,15 @@ namespace MentorRouletteTracker
                         ImGui.TableNextColumn();
                         ImGui.TextDisabled("Year");
                         ImGui.SetNextItemWidth(-1);
-                        ImGui.InputInt("##Year", ref year, 0, 0);
+                        ImGui.InputInt("##Year", ref input.Year, 0, 0);
                         ImGui.TableNextColumn();
                         ImGui.TextDisabled("Month");
                         ImGui.SetNextItemWidth(-1);
-                        ImGui.InputInt("##Month", ref month, 0, 0);
+                        ImGui.InputInt("##Month", ref input.Month, 0, 0);
                         ImGui.TableNextColumn();
                         ImGui.TextDisabled("Day");
                         ImGui.SetNextItemWidth(-1);
-                        ImGui.InputInt("##Day", ref day, 0, 0);
+                        ImGui.InputInt("##Day", ref input.Day, 0, 0);
                     }
                     finally
                     {
@@ -366,8 +383,13 @@ namespace MentorRouletteTracker
             {
                 ImGui.PopID();
             }
-            if (IsValidDate(year, month, day))
-                date = new DateTime(year, month, day);
+            if (IsValidDate(input.Year, input.Month, input.Day))
+            {
+                date = new DateTime(input.Year, input.Month, input.Day);
+                input.AppliedDate = date;
+            }
+            else
+                ImGui.TextDisabled("Enter a valid date to apply this filter.");
         }
     }
 }

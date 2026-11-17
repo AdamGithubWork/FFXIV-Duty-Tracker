@@ -103,7 +103,10 @@ namespace MentorRouletteTracker
             showPlayerHistory = false;
             selectedRecord = null;
             noteRecord = null;
+            SaveAppearanceChanges();
         }
+
+        public override void OnClose() => SaveAppearanceChanges();
 
         public void OpenDutyHistory(string dutyName, bool fullRunsOnly = false)
         {
@@ -285,6 +288,8 @@ namespace MentorRouletteTracker
                 openDeleteConfirmation = false;
             }
             DrawDeleteConfirmation();
+            if (appearanceSettingsDirty && !ImGui.IsAnyItemActive())
+                SaveAppearanceChanges();
         }
     }
 }
