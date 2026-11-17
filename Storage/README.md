@@ -62,6 +62,11 @@ controls stay hidden until the database can load. Restore a missing database whi
 the plugin is unloaded, then reload it. Only a new profile can create an empty
 database automatically.
 
+Only one loaded Duty Tracker instance can use a history database at a time. A second
+game client shows a message asking you to unload it in the first client and reload
+it in the second. The `history.sqlite.lock` file stays on disk, but ownership is
+released when the session finishes or its process exits; the file does not need deleting.
+
 Startup saves settings only for a new profile or when duplicate content-type IDs
 were removed, and only after history loaded successfully.
 

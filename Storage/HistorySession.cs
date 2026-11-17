@@ -8,6 +8,7 @@ public sealed class HistorySession : IDisposable
 {
     private readonly HistoryData data;
     private readonly SqliteHistoryStore store;
+    private readonly FileStream writerLock;
     private readonly Action<Exception>? reportError;
     private readonly object gate = new();
     private readonly CancellationTokenSource writeCancellation = new();
@@ -35,9 +36,26 @@ public sealed class HistorySession : IDisposable
         var directory = Path.GetDirectoryName(store.DatabasePath)!;
         var prefix = Path.GetFileNameWithoutExtension(store.DatabasePath) + "-recovery-";
         recoveryPath = Path.Combine(directory, prefix + Guid.NewGuid().ToString("N") + ".json");
-        data = store.LoadHistory();
-        RecoverHistory(Directory.EnumerateFiles(directory, prefix + "*.json").ToArray());
-        recoverySnapshot = SqliteHistoryStore.Capture(data);
+        try
+        {
+            writerLock = new FileStream(store.DatabasePath + ".lock", FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
+        {
+            throw new IOException("Duty Tracker history is already open in another game client. Unload Duty Tracker in that client, then reload it here.", ex);
+        }
+        try
+        {
+            data = store.LoadHistory();
+            RecoverHistory(Directory.EnumerateFiles(directory, prefix + "*.json").ToArray());
+            recoverySnapshot = SqliteHistoryStore.Capture(data);
+        }
+        catch
+        {
+            writerLock.Dispose();
+            throw;
+        }
     }
 
     private void RecoverHistory(string[] paths)
@@ -341,6 +359,22 @@ public sealed class HistorySession : IDisposable
     {
         lock (gate) if (disposed) return;
         try { Flush(ShutdownSaveTimeout); }
-        finally { lock (gate) disposed = true; }
+        finally
+        {
+            Task finishing;
+            lock (gate)
+            {
+                disposed = true;
+                finishing = worker;
+            }
+            if (finishing.IsCompleted)
+                writerLock.Dispose();
+            else
+            {
+                // A timed-out writer still owns history until its final recovery copy is written.
+                _ = finishing.ContinueWith(_ => writerLock.Dispose(), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
+        }
     }
 }
