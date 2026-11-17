@@ -265,7 +265,6 @@ namespace MentorRouletteTracker
         private void ResetAllSettings()
         {
             config.ResetPreferences();
-            tracker.Armed = config.StorageAvailable;
             ClearFilters();
             filtersExpanded = false;
             selectedHeatmapMetric = 0;

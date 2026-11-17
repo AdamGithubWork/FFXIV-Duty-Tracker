@@ -36,7 +36,17 @@ namespace MentorRouletteTracker.DutyTracking
         public DutyRecord? ActiveDuty => current;
         public uint? ActiveContentTypeId { get; private set; }
         private readonly Dictionary<string, bool> previousDeathStates = new();
-        public bool Armed { get; set; } = true;
+        public bool Armed
+        {
+            get => config.StorageAvailable && config.RecordDuties;
+            set
+            {
+                if (config.RecordDuties == value)
+                    return;
+                config.RecordDuties = value;
+                config.Save();
+            }
+        }
         public bool PvpTrackingAvailable => pvpStatsEnabled();
 
         public DutyTrackerService(
@@ -67,7 +77,6 @@ namespace MentorRouletteTracker.DutyTracking
             this.dutyState.DutyWiped += OnDutyWiped;
             this.dutyState.DutyCompleted += OnDutyCompleted;
             this.framework.Update += OnFrameworkUpdate;
-            Armed = config.StorageAvailable;
             pendingRestoreNeeded = config.StorageAvailable && config.History.PendingDuty != null;
             territoryCheckNeeded = pendingRestoreNeeded;
         }

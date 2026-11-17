@@ -8,7 +8,10 @@ namespace MentorRouletteTracker
     public class Configuration : IPluginConfiguration
     {
         public int Version { get; set; } = 1;
+        public bool RecordDuties { get; set; } = true;
+        [Newtonsoft.Json.JsonProperty(ObjectCreationHandling = Newtonsoft.Json.ObjectCreationHandling.Replace)]
         public List<uint> TrackedContentTypeIds { get; set; } = [2, 3, 4, 5, 6, 21, 28, 30, 37];
+        [Newtonsoft.Json.JsonProperty(ObjectCreationHandling = Newtonsoft.Json.ObjectCreationHandling.Replace)]
         public List<uint> TimerVisibleContentTypeIds { get; set; } = [2, 3, 4, 5, 6];
         public bool TrackAllianceMembers { get; set; } = true;
         public bool TrackPvpEnemies { get; set; } = true;
