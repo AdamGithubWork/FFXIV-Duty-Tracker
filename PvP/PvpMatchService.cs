@@ -116,8 +116,17 @@ namespace MentorRouletteTracker.PvP
             if (!restoreTask.IsCompleted)
                 return;
 
-            var matches = restoreTask.GetAwaiter().GetResult();
+            var completedRestore = restoreTask;
             restoreTask = null;
+            List<PvpMatchReference>? matches = null;
+            try
+            {
+                matches = completedRestore.GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Could not resume PvP scoreboard lookups. A later attempt may retry.");
+            }
             if (matches == null)
             {
                 restoreTimes = (restoreTimes ?? Array.Empty<DateTime>()).Where(time => CanKeepLooking(time, now)).ToArray();
@@ -425,7 +434,7 @@ namespace MentorRouletteTracker.PvP
                 {
                     pendingPvpMatches.Remove(matchId);
                     RememberProcessedMatch(matchId);
-                    log.Warning($"PvP scoreboard {matchId}: stopped retrying after 30 minutes without applying results.");
+                    log.Warning($"PvP scoreboard {matchId}: stopped retrying after 30 minutes; results are still incomplete.");
                     continue;
                 }
 
