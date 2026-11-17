@@ -292,71 +292,119 @@ namespace MentorRouletteTracker
         {
             config.TableColumns ??= new();
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Check columns to show them. Drag a name to change its position.");
-            ImGui.PopTextWrapPos();
+            try
+            {
+                ImGui.TextDisabled("Check columns to show them. Drag a name to change its position.");
+            }
+            finally
+            {
+                ImGui.PopTextWrapPos();
+            }
             foreach (var (table, columns) in TableColumnOptions)
             {
                 ImGui.PushID(table);
-                if (tableColumnsExpansion.HasValue)
-                    ImGui.SetNextItemOpen(tableColumnsExpansion.Value, ImGuiCond.Always);
-                if (ImGui.TreeNodeEx(table, ImGuiTreeNodeFlags.SpanAvailWidth))
+                try
                 {
-                    if (ImGui.Button("Reset columns"))
+                    if (tableColumnsExpansion.HasValue)
+                        ImGui.SetNextItemOpen(tableColumnsExpansion.Value, ImGuiCond.Always);
+                    if (ImGui.TreeNodeEx(table, ImGuiTreeNodeFlags.SpanAvailWidth))
                     {
-                        config.TableColumns.Remove(table);
-                        config.TableColumnOrder?.Remove(table);
-                        config.Save();
-                    }
-                    foreach (var index in GetConfiguredColumnOrder(table))
-                    {
-                        var column = columns[index];
-                        if (column.Id == "detail" && table != "Statistics: Race and gender")
-                            continue;
-                        ImGui.PushID(column.Id);
-                        var visible = IsTableColumnVisible(table, index);
-                        var pvpDisabled = BeginPvpControl(table == "PvP records" || column.Id.StartsWith("pvp", StringComparison.Ordinal));
-                        ImGui.BeginDisabled(column.Required);
-                        if (ImGui.Checkbox("##visible", ref visible))
+                        try
                         {
-                            if (!config.TableColumns.TryGetValue(table, out var selected) || selected == null)
+                            if (ImGui.Button("Reset columns"))
                             {
-                                selected = columns.Where(option => option.DefaultVisible).Select(option => option.Id).ToHashSet();
-                                config.TableColumns[table] = selected;
+                                config.TableColumns.Remove(table);
+                                config.TableColumnOrder?.Remove(table);
+                                config.Save();
                             }
-                            if (visible)
-                                selected.Add(column.Id);
-                            else
-                                selected.Remove(column.Id);
-                            config.Save();
-                        }
-                        ImGui.EndDisabled();
-                        EndPvpControl(pvpDisabled);
-                        ImGui.SameLine();
-                        ImGui.Selectable($"{column.Label}{(column.Required ? " (always shown)" : "")}###dragColumn");
-                        if (ImGui.BeginDragDropSource())
-                        {
-                            draggedColumnTable = table;
-                            draggedColumnId = column.Id;
-                            ImGui.SetDragDropPayload("DUTY_TRACKER_COLUMN", BitConverter.GetBytes(index), ImGuiCond.Once);
-                            ImGui.TextUnformatted(column.Label);
-                            ImGui.EndDragDropSource();
-                        }
-                        if (ImGui.BeginDragDropTarget())
-                        {
-                            var payload = ImGui.AcceptDragDropPayload("DUTY_TRACKER_COLUMN", ImGuiDragDropFlags.None);
-                            if (!payload.IsNull && payload.IsDelivery() && draggedColumnTable == table && draggedColumnId != null)
+                            foreach (var index in GetConfiguredColumnOrder(table))
                             {
-                                MoveConfiguredColumn(table, draggedColumnId, column.Id);
-                                draggedColumnTable = null;
-                                draggedColumnId = null;
+                                var column = columns[index];
+                                if (column.Id == "detail" && table != "Statistics: Race and gender")
+                                    continue;
+                                ImGui.PushID(column.Id);
+                                try
+                                {
+                                    var visible = IsTableColumnVisible(table, index);
+                                    var pvpDisabled = BeginPvpControl(table == "PvP records" || column.Id.StartsWith("pvp", StringComparison.Ordinal));
+                                    try
+                                    {
+                                        ImGui.BeginDisabled(column.Required);
+                                        try
+                                        {
+                                            if (ImGui.Checkbox("##visible", ref visible))
+                                            {
+                                                if (!config.TableColumns.TryGetValue(table, out var selected) || selected == null)
+                                                {
+                                                    selected = columns.Where(option => option.DefaultVisible).Select(option => option.Id).ToHashSet();
+                                                    config.TableColumns[table] = selected;
+                                                }
+                                                if (visible)
+                                                    selected.Add(column.Id);
+                                                else
+                                                    selected.Remove(column.Id);
+                                                config.Save();
+                                            }
+                                        }
+                                        finally
+                                        {
+                                            ImGui.EndDisabled();
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        EndPvpControl(pvpDisabled);
+                                    }
+                                    ImGui.SameLine();
+                                    ImGui.Selectable($"{column.Label}{(column.Required ? " (always shown)" : "")}###dragColumn");
+                                    if (ImGui.BeginDragDropSource())
+                                    {
+                                        try
+                                        {
+                                            draggedColumnTable = table;
+                                            draggedColumnId = column.Id;
+                                            ImGui.SetDragDropPayload("DUTY_TRACKER_COLUMN", BitConverter.GetBytes(index), ImGuiCond.Once);
+                                            ImGui.TextUnformatted(column.Label);
+                                        }
+                                        finally
+                                        {
+                                            ImGui.EndDragDropSource();
+                                        }
+                                    }
+                                    if (ImGui.BeginDragDropTarget())
+                                    {
+                                        try
+                                        {
+                                            var payload = ImGui.AcceptDragDropPayload("DUTY_TRACKER_COLUMN", ImGuiDragDropFlags.None);
+                                            if (!payload.IsNull && payload.IsDelivery() && draggedColumnTable == table && draggedColumnId != null)
+                                            {
+                                                MoveConfiguredColumn(table, draggedColumnId, column.Id);
+                                                draggedColumnTable = null;
+                                                draggedColumnId = null;
+                                            }
+                                        }
+                                        finally
+                                        {
+                                            ImGui.EndDragDropTarget();
+                                        }
+                                    }
+                                }
+                                finally
+                                {
+                                    ImGui.PopID();
+                                }
                             }
-                            ImGui.EndDragDropTarget();
                         }
-                        ImGui.PopID();
+                        finally
+                        {
+                            ImGui.TreePop();
+                        }
                     }
-                    ImGui.TreePop();
                 }
-                ImGui.PopID();
+                finally
+                {
+                    ImGui.PopID();
+                }
             }
             tableColumnsExpansion = null;
         }

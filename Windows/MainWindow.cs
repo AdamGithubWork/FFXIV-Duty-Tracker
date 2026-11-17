@@ -183,54 +183,95 @@ namespace MentorRouletteTracker
 
             if (ImGui.BeginTabBar("MainTabs"))
             {
-                var recordsTabFlags = openDutyHistory
-                    ? ImGuiTabItemFlags.SetSelected
-                    : ImGuiTabItemFlags.None;
-
-                if (ImGui.BeginTabItem("Records", recordsTabFlags))
+                try
                 {
-                    DrawFilterPanel("Records");
-                    DrawRecordsTab();
-                    ImGui.EndTabItem();
+                    var recordsTabFlags = openDutyHistory
+                        ? ImGuiTabItemFlags.SetSelected
+                        : ImGuiTabItemFlags.None;
+
+                    if (ImGui.BeginTabItem("Records", recordsTabFlags))
+                    {
+                        try
+                        {
+                            DrawFilterPanel("Records");
+                            DrawRecordsTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
+
+                    openDutyHistory = false;
+
+                    if (ImGui.BeginTabItem("Statistics"))
+                    {
+                        try
+                        {
+                            DrawFilterPanel("Statistics", encounterFilter: true);
+                            DrawStatisticsTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
+
+                    if (ImGui.BeginTabItem("Duty Analysis"))
+                    {
+                        try
+                        {
+                            DrawFilterPanel("Duty Analysis");
+                            DrawDutyAnalysisTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
+
+                    if (ImGui.BeginTabItem("Summary"))
+                    {
+                        try
+                        {
+                            DrawFilterPanel("Summary", playerFilters: false);
+                            DrawSummaryTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
+
+                    if (ImGui.BeginTabItem("People"))
+                    {
+                        try
+                        {
+                            DrawFilterPanel("People", encounterFilter: true);
+                            DrawPeopleTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
+
+                    if (ImGui.BeginTabItem("Settings"))
+                    {
+                        try
+                        {
+                            DrawSettingsTab();
+                        }
+                        finally
+                        {
+                            ImGui.EndTabItem();
+                        }
+                    }
                 }
-
-                openDutyHistory = false;
-
-                if (ImGui.BeginTabItem("Statistics"))
+                finally
                 {
-                    DrawFilterPanel("Statistics", encounterFilter: true);
-                    DrawStatisticsTab();
-                    ImGui.EndTabItem();
+                    ImGui.EndTabBar();
                 }
-
-                if (ImGui.BeginTabItem("Duty Analysis"))
-                {
-                    DrawFilterPanel("Duty Analysis");
-                    DrawDutyAnalysisTab();
-                    ImGui.EndTabItem();
-                }
-
-                if (ImGui.BeginTabItem("Summary"))
-                {
-                    DrawFilterPanel("Summary", playerFilters: false);
-                    DrawSummaryTab();
-                    ImGui.EndTabItem();
-                }
-
-                if (ImGui.BeginTabItem("People"))
-                {
-                    DrawFilterPanel("People", encounterFilter: true);
-                    DrawPeopleTab();
-                    ImGui.EndTabItem();
-                }
-
-                if (ImGui.BeginTabItem("Settings"))
-                {
-                    DrawSettingsTab();
-                    ImGui.EndTabItem();
-                }
-
-                ImGui.EndTabBar();
             }
 
             DrawResetSettingsConfirmation();

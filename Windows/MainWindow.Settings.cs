@@ -11,9 +11,15 @@ namespace MentorRouletteTracker
 
         private void DrawSettingsTab()
         {
-            if (ImGui.BeginChild("SettingsContent", Vector2.Zero, false))
-                DrawSettingsContent();
-            ImGui.EndChild();
+            try
+            {
+                if (ImGui.BeginChild("SettingsContent", Vector2.Zero, false))
+                    DrawSettingsContent();
+            }
+            finally
+            {
+                ImGui.EndChild();
+            }
         }
 
         private void DrawSettingsContent()
@@ -51,144 +57,222 @@ namespace MentorRouletteTracker
 
             if (BeginSettingsSection("Duty recording", defaultOpen: true))
             {
-                var armed = tracker.Armed;
-
-                if (ImGui.Checkbox("Record duties", ref armed))
+                try
                 {
-                    tracker.Armed = armed;
-                }
+                    var armed = tracker.Armed;
 
-                ImGui.PushTextWrapPos();
-                ImGui.TextDisabled(
-                    "Turn this off before duties you don't want recorded.");
-                ImGui.PopTextWrapPos();
-
-                ImGui.Spacing();
-                ImGui.TextDisabled("Choose which duties to record.");
-                ImGui.Spacing();
-                foreach (var contentType in contentTypes)
-                {
-                    var pvpDisabled = BeginPvpControl(contentType.Id == 6);
-                    var isTracked =
-                        config.TrackedContentTypeIds.Contains(contentType.Id);
-
-                    if (ImGui.Checkbox(
-                        $"{contentType.Name}##DutyTracking",
-                        ref isTracked))
+                    if (ImGui.Checkbox("Record duties", ref armed))
                     {
-                        if (isTracked)
-                            config.TrackedContentTypeIds.Add(contentType.Id);
-                        else
-                            config.TrackedContentTypeIds.Remove(contentType.Id);
-
-                        config.Save();
+                        tracker.Armed = armed;
                     }
-                    EndPvpControl(pvpDisabled);
+
+                    ImGui.PushTextWrapPos();
+                    try
+                    {
+                        ImGui.TextDisabled(
+                            "Turn this off before duties you don't want recorded.");
+                    }
+                    finally
+                    {
+                        ImGui.PopTextWrapPos();
+                    }
+
+                    ImGui.Spacing();
+                    ImGui.TextDisabled("Choose which duties to record.");
+                    ImGui.Spacing();
+                    foreach (var contentType in contentTypes)
+                    {
+                        var pvpDisabled = BeginPvpControl(contentType.Id == 6);
+                        try
+                        {
+                            var isTracked =
+                                config.TrackedContentTypeIds.Contains(contentType.Id);
+
+                            if (ImGui.Checkbox(
+                                $"{contentType.Name}##DutyTracking",
+                                ref isTracked))
+                            {
+                                if (isTracked)
+                                    config.TrackedContentTypeIds.Add(contentType.Id);
+                                else
+                                    config.TrackedContentTypeIds.Remove(contentType.Id);
+
+                                config.Save();
+                            }
+                        }
+                        finally
+                        {
+                            EndPvpControl(pvpDisabled);
+                        }
+                    }
                 }
-                EndSettingsSection();
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Player tracking", defaultOpen: true))
             {
-                bool includeSelf = config.IncludeSelfInStatistics;
-
-                if (ImGui.Checkbox(
-                    "Include yourself in statistics",
-                    ref includeSelf))
+                try
                 {
-                    config.IncludeSelfInStatistics = includeSelf;
-                    config.Save();
+                    bool includeSelf = config.IncludeSelfInStatistics;
+
+                    if (ImGui.Checkbox(
+                        "Include yourself in statistics",
+                        ref includeSelf))
+                    {
+                        config.IncludeSelfInStatistics = includeSelf;
+                        config.Save();
+                    }
+
+                    bool trackAlliance = config.TrackAllianceMembers;
+
+                    if (ImGui.Checkbox(
+                        "Track alliance members",
+                        ref trackAlliance))
+                    {
+                        config.TrackAllianceMembers = trackAlliance;
+                        config.Save();
+                    }
                 }
-
-                bool trackAlliance = config.TrackAllianceMembers;
-
-                if (ImGui.Checkbox(
-                    "Track alliance members",
-                    ref trackAlliance))
+                finally
                 {
-                    config.TrackAllianceMembers = trackAlliance;
-                    config.Save();
+                    EndSettingsSection();
                 }
-                EndSettingsSection();
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("PvP", defaultOpen: true))
             {
-                DrawPvpStatsStatus();
-                var pvpDisabled = BeginPvpControl();
-                var trackEnemies = config.TrackPvpEnemies;
-                if (ImGui.Checkbox("Track opposing members in PvP matches", ref trackEnemies))
+                try
                 {
-                    config.TrackPvpEnemies = trackEnemies;
-                    config.Save();
+                    DrawPvpStatsStatus();
+                    var pvpDisabled = BeginPvpControl();
+                    try
+                    {
+                        var trackEnemies = config.TrackPvpEnemies;
+                        if (ImGui.Checkbox("Track opposing members in PvP matches", ref trackEnemies))
+                        {
+                            config.TrackPvpEnemies = trackEnemies;
+                            config.Save();
+                        }
+                    }
+                    finally
+                    {
+                        EndPvpControl(pvpDisabled);
+                    }
+                    ImGui.TextDisabled("New matches only.");
                 }
-                EndPvpControl(pvpDisabled);
-                ImGui.TextDisabled("New matches only.");
-                EndSettingsSection();
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Duty timer"))
             {
-                ImGui.TextDisabled("Choose which duties show the timer.");
-                ImGui.Spacing();
-                foreach (var contentType in contentTypes)
+                try
                 {
-                    var pvpDisabled = BeginPvpControl(contentType.Id == 6);
-                    var showTimer =
-                        config.TimerVisibleContentTypeIds.Contains(contentType.Id);
-
-                    if (ImGui.Checkbox(
-                        $"{contentType.Name}##TimerVisibility",
-                        ref showTimer))
+                    ImGui.TextDisabled("Choose which duties show the timer.");
+                    ImGui.Spacing();
+                    foreach (var contentType in contentTypes)
                     {
-                        if (showTimer)
-                            config.TimerVisibleContentTypeIds.Add(contentType.Id);
-                        else
-                            config.TimerVisibleContentTypeIds.Remove(contentType.Id);
+                        var pvpDisabled = BeginPvpControl(contentType.Id == 6);
+                        try
+                        {
+                            var showTimer =
+                                config.TimerVisibleContentTypeIds.Contains(contentType.Id);
 
-                        config.Save();
+                            if (ImGui.Checkbox(
+                                $"{contentType.Name}##TimerVisibility",
+                                ref showTimer))
+                            {
+                                if (showTimer)
+                                    config.TimerVisibleContentTypeIds.Add(contentType.Id);
+                                else
+                                    config.TimerVisibleContentTypeIds.Remove(contentType.Id);
+
+                                config.Save();
+                            }
+                        }
+                        finally
+                        {
+                            EndPvpControl(pvpDisabled);
+                        }
                     }
-                    EndPvpControl(pvpDisabled);
                 }
-                EndSettingsSection();
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Appearance"))
             {
-                DrawAppearanceSettings();
-                EndSettingsSection();
+                try
+                {
+                    DrawAppearanceSettings();
+                }
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Statistics sections"))
             {
-                DrawStatisticsCustomization();
-                EndSettingsSection();
+                try
+                {
+                    DrawStatisticsCustomization();
+                }
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Table columns"))
             {
-                DrawTableColumnSettings();
-                EndSettingsSection();
+                try
+                {
+                    DrawTableColumnSettings();
+                }
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("Milestones"))
             {
-                DrawMilestoneCustomization();
-                EndSettingsSection();
+                try
+                {
+                    DrawMilestoneCustomization();
+                }
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             ImGui.Spacing();
             if (BeginSettingsSection("History & exports"))
             {
-                DrawHistorySettings();
-                EndSettingsSection();
+                try
+                {
+                    DrawHistorySettings();
+                }
+                finally
+                {
+                    EndSettingsSection();
+                }
             }
 
             settingsExpansion = null;
@@ -214,14 +298,32 @@ namespace MentorRouletteTracker
         {
             var enabled = tracker.PvpTrackingAvailable;
             ImGui.PushStyleColor(ImGuiCol.ChildBg, enabled ? new Vector4(0.06f, 0.20f, 0.09f, 1f) : new Vector4(0.24f, 0.06f, 0.05f, 1f));
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
-            if (ImGui.BeginChild("PvpStatsStatus", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
-                ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
-                ImGui.TextColored(enabled ? new Vector4(0.45f, 1f, 0.55f, 1f) : new Vector4(1f, 0.45f, 0.40f, 1f),
-                    enabled ? "PvP Tracker enabled" : "PvP Tracker unavailable");
-            ImGui.EndChild();
-            ImGui.PopStyleVar();
-            ImGui.PopStyleColor();
+            try
+            {
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
+                try
+                {
+                    try
+                    {
+                        if (ImGui.BeginChild("PvpStatsStatus", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
+                            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+                            ImGui.TextColored(enabled ? new Vector4(0.45f, 1f, 0.55f, 1f) : new Vector4(1f, 0.45f, 0.40f, 1f),
+                                enabled ? "PvP Tracker enabled" : "PvP Tracker unavailable");
+                    }
+                    finally
+                    {
+                        ImGui.EndChild();
+                    }
+                }
+                finally
+                {
+                    ImGui.PopStyleVar();
+                }
+            }
+            finally
+            {
+                ImGui.PopStyleColor();
+            }
             ImGui.TextWrapped(enabled
                 ? "PvP Tracker by SaMo provides player rosters, match scores, and results."
                 : "Enable PvP Tracker by SaMo in /xlplugins to record PvP.");
@@ -249,17 +351,23 @@ namespace MentorRouletteTracker
                 ImGuiCond.Always, new Vector2(0.5f));
             if (!ImGui.BeginPopupModal(title, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
                 return;
-            ImGui.TextWrapped(message);
-            ImGui.Spacing();
-            if (ImGui.Button("Reset settings"))
+            try
             {
-                ResetAllSettings();
-                ImGui.CloseCurrentPopup();
+                ImGui.TextWrapped(message);
+                ImGui.Spacing();
+                if (ImGui.Button("Reset settings"))
+                {
+                    ResetAllSettings();
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Cancel##ResetSettings"))
+                    ImGui.CloseCurrentPopup();
             }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel##ResetSettings"))
-                ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
+            finally
+            {
+                ImGui.EndPopup();
+            }
         }
 
         private void ResetAllSettings()
@@ -298,30 +406,35 @@ namespace MentorRouletteTracker
 
             if (ImGui.BeginPopup("ConfirmClear"))
             {
-                ImGui.Text(
-                    "Clear all duty records? You can't undo this.");
-
-                ImGui.Spacing();
-
-                if (ImGui.Button("Yes, clear"))
+                try
                 {
-                    config.History.Records.Clear();
-                    config.History.Save();
+                    ImGui.Text(
+                        "Clear all duty records? You can't undo this.");
 
-                    selectedRecord = null;
-                    showDetailWindow = false;
+                    ImGui.Spacing();
 
-                    ImGui.CloseCurrentPopup();
+                    if (ImGui.Button("Yes, clear"))
+                    {
+                        config.History.Records.Clear();
+                        config.History.Save();
+
+                        selectedRecord = null;
+                        showDetailWindow = false;
+
+                        ImGui.CloseCurrentPopup();
+                    }
+
+                    ImGui.SameLine();
+
+                    if (ImGui.Button("Cancel"))
+                    {
+                        ImGui.CloseCurrentPopup();
+                    }
                 }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel"))
+                finally
                 {
-                    ImGui.CloseCurrentPopup();
+                    ImGui.EndPopup();
                 }
-
-                ImGui.EndPopup();
             }
 
             if (!string.IsNullOrEmpty(lastExportMessage))
@@ -357,8 +470,14 @@ namespace MentorRouletteTracker
         private void DrawAppearanceSettings()
         {
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Choose background colors below. Use Opacity to control transparency. Reset restores the default color.");
-            ImGui.PopTextWrapPos();
+            try
+            {
+                ImGui.TextDisabled("Choose background colors below. Use Opacity to control transparency. Reset restores the default color.");
+            }
+            finally
+            {
+                ImGui.PopTextWrapPos();
+            }
             ImGui.Spacing();
 
             DrawBackgroundColor("Window background", config.WindowBackgroundColor,
@@ -386,16 +505,22 @@ namespace MentorRouletteTracker
             if (BeginStyledTable("AppearancePreview", 2,
                 ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Row");
-                ImGui.TableSetupColumn("Example");
-                ImGui.TableHeadersRow();
-                for (var i = 0; i < 3; i++)
+                try
                 {
-                    ImGui.TableNextRow();
-                    DrawTableCell(0, $"Row {i + 1}");
-                    DrawTableCell(1, i % 2 == 0 ? "Table row color" : "Alternate row color");
+                    ImGui.TableSetupColumn("Row");
+                    ImGui.TableSetupColumn("Example");
+                    ImGui.TableHeadersRow();
+                    for (var i = 0; i < 3; i++)
+                    {
+                        ImGui.TableNextRow();
+                        DrawTableCell(0, $"Row {i + 1}");
+                        DrawTableCell(1, i % 2 == 0 ? "Table row color" : "Alternate row color");
+                    }
                 }
-                EndStyledTable();
+                finally
+                {
+                    EndStyledTable();
+                }
             }
             ImGui.Spacing();
             var wrap = config.WrapTableHeaders;
@@ -409,42 +534,48 @@ namespace MentorRouletteTracker
         private void DrawBackgroundColor(string label, uint? saved, Vector4 fallback, Action<uint?> update)
         {
             ImGui.PushID(label);
-            ImGui.TextUnformatted(label);
-            var color = saved.HasValue ? ImGui.ColorConvertU32ToFloat4(saved.Value) : fallback;
-            var customized = saved.HasValue;
-            var resetWidth = ImGui.CalcTextSize("Default").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-            ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - resetWidth)));
-            if (ImGui.ColorEdit4("##Color", ref color, ImGuiColorEditFlags.NoAlpha))
+            try
             {
-                if (!customized)
-                    color.W = 1f;
-                update(ImGui.ColorConvertFloat4ToU32(color));
-                config.Save();
-                customized = true;
-            }
-            ImGui.SameLine();
-            if (customized)
-            {
-                if (ImGui.SmallButton("Reset"))
+                ImGui.TextUnformatted(label);
+                var color = saved.HasValue ? ImGui.ColorConvertU32ToFloat4(saved.Value) : fallback;
+                var customized = saved.HasValue;
+                var resetWidth = ImGui.CalcTextSize("Default").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - resetWidth)));
+                if (ImGui.ColorEdit4("##Color", ref color, ImGuiColorEditFlags.NoAlpha))
                 {
-                    update(null);
+                    if (!customized)
+                        color.W = 1f;
+                    update(ImGui.ColorConvertFloat4ToU32(color));
+                    config.Save();
+                    customized = true;
+                }
+                ImGui.SameLine();
+                if (customized)
+                {
+                    if (ImGui.SmallButton("Reset"))
+                    {
+                        update(null);
+                        config.Save();
+                    }
+                }
+                else
+                {
+                    ImGui.TextDisabled("Default");
+                }
+                var opacity = color.W * 100f;
+                var opacityLabelWidth = ImGui.CalcTextSize("Opacity").X + ImGui.GetStyle().ItemSpacing.X;
+                ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - opacityLabelWidth)));
+                if (ImGui.SliderFloat("Opacity", ref opacity, 0, 100, "%.0f%%"))
+                {
+                    color.W = opacity / 100f;
+                    update(ImGui.ColorConvertFloat4ToU32(color));
                     config.Save();
                 }
             }
-            else
+            finally
             {
-                ImGui.TextDisabled("Default");
+                ImGui.PopID();
             }
-            var opacity = color.W * 100f;
-            var opacityLabelWidth = ImGui.CalcTextSize("Opacity").X + ImGui.GetStyle().ItemSpacing.X;
-            ImGui.SetNextItemWidth(Math.Max(1, Math.Min(280, ImGui.GetContentRegionAvail().X - opacityLabelWidth)));
-            if (ImGui.SliderFloat("Opacity", ref opacity, 0, 100, "%.0f%%"))
-            {
-                color.W = opacity / 100f;
-                update(ImGui.ColorConvertFloat4ToU32(color));
-                config.Save();
-            }
-            ImGui.PopID();
             ImGui.Spacing();
         }
 
@@ -490,28 +621,47 @@ namespace MentorRouletteTracker
             foreach (var section in milestoneSections)
             {
                 ImGui.PushID(section.Title);
-                if (milestoneExpansion.HasValue)
-                    ImGui.SetNextItemOpen(milestoneExpansion.Value, ImGuiCond.Always);
-                if (ImGui.TreeNodeEx(MilestoneTitle(section.Title), ImGuiTreeNodeFlags.SpanAvailWidth))
+                try
                 {
-                    foreach (var row in section.Rows)
+                    if (milestoneExpansion.HasValue)
+                        ImGui.SetNextItemOpen(milestoneExpansion.Value, ImGuiCond.Always);
+                    if (ImGui.TreeNodeEx(MilestoneTitle(section.Title), ImGuiTreeNodeFlags.SpanAvailWidth))
                     {
-                        var key = MilestoneKey(section.Title, row.Label);
-                        var visible = !config.HiddenMilestones.Contains(key);
-                        var pvpDisabled = BeginPvpControl(section.Title is "PvP player stats" or "Your PvP results" || row.Label.Contains("(PvP)", StringComparison.Ordinal));
-                        var toggled = ImGui.Checkbox(row.Label, ref visible);
-                        EndPvpControl(pvpDisabled);
-                        if (!toggled)
-                            continue;
-                        if (visible)
-                            config.HiddenMilestones.Remove(key);
-                        else
-                            config.HiddenMilestones.Add(key);
-                        changed = true;
+                        try
+                        {
+                            foreach (var row in section.Rows)
+                            {
+                                var key = MilestoneKey(section.Title, row.Label);
+                                var visible = !config.HiddenMilestones.Contains(key);
+                                var toggled = false;
+                                var pvpDisabled = BeginPvpControl(section.Title is "PvP player stats" or "Your PvP results" || row.Label.Contains("(PvP)", StringComparison.Ordinal));
+                                try
+                                {
+                                    toggled = ImGui.Checkbox(row.Label, ref visible);
+                                }
+                                finally
+                                {
+                                    EndPvpControl(pvpDisabled);
+                                }
+                                if (!toggled)
+                                    continue;
+                                if (visible)
+                                    config.HiddenMilestones.Remove(key);
+                                else
+                                    config.HiddenMilestones.Add(key);
+                                changed = true;
+                            }
+                        }
+                        finally
+                        {
+                            ImGui.TreePop();
+                        }
                     }
-                    ImGui.TreePop();
                 }
-                ImGui.PopID();
+                finally
+                {
+                    ImGui.PopID();
+                }
             }
             milestoneExpansion = null;
 

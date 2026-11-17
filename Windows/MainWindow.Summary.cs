@@ -57,72 +57,88 @@ namespace MentorRouletteTracker
             config.HiddenMilestones ??= new();
             RefreshMilestonesIfNeeded(objectTable.LocalPlayer?.Name.TextValue);
 
-            if (ImGui.BeginChild("SummaryContent", Vector2.Zero, false,
-                    ImGuiWindowFlags.HorizontalScrollbar))
+            try
             {
-                DrawSectionHeading("Milestones");
-                ImGui.TextDisabled("Your PvP stats cover all dates. Duty filters still apply.");
-                ImGui.Separator();
-
-                if (milestoneSections.Count == 0)
-                    ImGui.TextDisabled("No completed duties with these filters.");
-                else
+                if (ImGui.BeginChild("SummaryContent", Vector2.Zero, false,
+                        ImGuiWindowFlags.HorizontalScrollbar))
                 {
-                    var anyVisible = false;
-                    foreach (var section in milestoneSections)
+                    DrawSectionHeading("Milestones");
+                    ImGui.TextDisabled("Your PvP stats cover all dates. Duty filters still apply.");
+                    ImGui.Separator();
+
+                    if (milestoneSections.Count == 0)
+                        ImGui.TextDisabled("No completed duties with these filters.");
+                    else
                     {
-                        var visibleRows = section.Rows.Where(row =>
-                            !config.HiddenMilestones.Contains(MilestoneKey(section.Title, row.Label))).ToList();
-                        if (visibleRows.Count == 0)
-                            continue;
-                        anyVisible = true;
-                        ImGui.Spacing();
-                        if (ImGui.CollapsingHeader($"{MilestoneTitle(section.Title)}##Lifetime{section.Title}",
-                                ImGuiTreeNodeFlags.DefaultOpen))
+                        var anyVisible = false;
+                        foreach (var section in milestoneSections)
                         {
-                            if (BeginStyledTable($"LifetimeTable##{section.Title}", 2,
-                                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
-                                ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Resizable))
+                            var visibleRows = section.Rows.Where(row =>
+                                !config.HiddenMilestones.Contains(MilestoneKey(section.Title, row.Label))).ToList();
+                            if (visibleRows.Count == 0)
+                                continue;
+                            anyVisible = true;
+                            ImGui.Spacing();
+                            if (ImGui.CollapsingHeader($"{MilestoneTitle(section.Title)}##Lifetime{section.Title}",
+                                    ImGuiTreeNodeFlags.DefaultOpen))
                             {
-                                ImGui.TableSetupColumn("Record");
-                                ImGui.TableSetupColumn("Result");
-                                ImGui.TableHeadersRow();
-
-                                foreach (var row in visibleRows)
+                                if (BeginStyledTable($"LifetimeTable##{section.Title}", 2,
+                                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
+                                    ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Resizable))
                                 {
-                                    ImGui.TableNextRow();
-                                    ImGui.TableSetColumnIndex(0);
-                                    ImGui.TextUnformatted(row.Label);
-                                    ImGui.TableSetColumnIndex(1);
+                                    try
+                                    {
+                                        ImGui.TableSetupColumn("Record");
+                                        ImGui.TableSetupColumn("Result");
+                                        ImGui.TableHeadersRow();
 
-                                    if (row.Value.Record is DutyRecord record)
-                                    {
-                                        ImGui.PushID(row.Label);
-                                        if (ImGui.Selectable(row.Value.Text + "###ViewDuty"))
+                                        foreach (var row in visibleRows)
                                         {
-                                            selectedRecord = record;
-                                            showDetailWindow = true;
+                                            ImGui.TableNextRow();
+                                            ImGui.TableSetColumnIndex(0);
+                                            ImGui.TextUnformatted(row.Label);
+                                            ImGui.TableSetColumnIndex(1);
+
+                                            if (row.Value.Record is DutyRecord record)
+                                            {
+                                                ImGui.PushID(row.Label);
+                                                try
+                                                {
+                                                    if (ImGui.Selectable(row.Value.Text + "###ViewDuty"))
+                                                    {
+                                                        selectedRecord = record;
+                                                        showDetailWindow = true;
+                                                    }
+                                                    if (ImGui.IsItemHovered())
+                                                        ImGui.SetTooltip("View duty details");
+                                                }
+                                                finally
+                                                {
+                                                    ImGui.PopID();
+                                                }
+                                            }
+                                            else
+                                            {
+                                                ImGui.TextUnformatted(row.Value.Text);
+                                            }
                                         }
-                                        if (ImGui.IsItemHovered())
-                                            ImGui.SetTooltip("View duty details");
-                                        ImGui.PopID();
                                     }
-                                    else
+                                    finally
                                     {
-                                        ImGui.TextUnformatted(row.Value.Text);
+                                        EndStyledTable();
                                     }
                                 }
-
-                                EndStyledTable();
                             }
                         }
+                        if (!anyVisible)
+                            ImGui.TextDisabled("No milestones selected. Choose which ones to show in Settings.");
                     }
-                    if (!anyVisible)
-                        ImGui.TextDisabled("No milestones selected. Choose which ones to show in Settings.");
                 }
             }
-
-            ImGui.EndChild();
+            finally
+            {
+                ImGui.EndChild();
+            }
         }
 
         private static string MilestoneTitle(string title) => title == "PvP player stats" ? "Your lifetime PvP stats" : title;

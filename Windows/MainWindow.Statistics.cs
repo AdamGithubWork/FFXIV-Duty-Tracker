@@ -12,54 +12,64 @@ namespace MentorRouletteTracker
             var data = GetPlayerViewData();
             var records = data.Records;
 
-            if (ImGui.BeginChild(
-                "StatisticsContent",
-                Vector2.Zero,
-                false,
-                ImGuiWindowFlags.HorizontalScrollbar))
+            try
             {
-                ImGui.Text("Player stats");
-                ImGui.PushTextWrapPos();
-                ImGui.TextDisabled("Completed duties matching the filters. '-' means unknown.");
-                ImGui.PopTextWrapPos();
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                if (records.Count == 0)
+                if (ImGui.BeginChild(
+                    "StatisticsContent",
+                    Vector2.Zero,
+                    false,
+                    ImGuiWindowFlags.HorizontalScrollbar))
                 {
-                    ImGui.TextDisabled("No completed duties with these filters.");
-                    ImGui.EndChild();
-                    return;
-                }
-
-                var anyVisible = false;
-                void Section(bool visible, Action draw)
-                {
-                    if (!visible)
-                        return;
-                    if (anyVisible)
+                    ImGui.Text("Player stats");
+                    ImGui.PushTextWrapPos();
+                    try
                     {
-                        ImGui.Spacing();
-                        ImGui.Separator();
-                        ImGui.Spacing();
+                        ImGui.TextDisabled("Completed duties matching the filters. '-' means unknown.");
                     }
-                    draw();
-                    anyVisible = true;
+                    finally
+                    {
+                        ImGui.PopTextWrapPos();
+                    }
+                    ImGui.Separator();
+                    ImGui.Spacing();
+
+                    if (records.Count == 0)
+                    {
+                        ImGui.TextDisabled("No completed duties with these filters.");
+                        return;
+                    }
+
+                    var anyVisible = false;
+                    void Section(bool visible, Action draw)
+                    {
+                        if (!visible)
+                            return;
+                        if (anyVisible)
+                        {
+                            ImGui.Spacing();
+                            ImGui.Separator();
+                            ImGui.Spacing();
+                        }
+                        draw();
+                        anyVisible = true;
+                    }
+
+                    Section(config.ShowStatisticsOverview, () => DrawSelectedPlayerStatistics(data));
+                    Section(config.ShowRaceStatistics, () => DrawRaceStatistics(data));
+                    Section(config.ShowGenderStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Gender));
+                    Section(config.ShowJobStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Job));
+                    Section(config.ShowStatusStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Status));
+                    Section(config.ShowWorldStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.World));
+                    Section(config.ShowDatacenterStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Datacenter));
+
+                    if (!anyVisible)
+                        ImGui.TextDisabled("No stats selected. Choose which sections to show in Settings.");
                 }
-
-                Section(config.ShowStatisticsOverview, () => DrawSelectedPlayerStatistics(data));
-                Section(config.ShowRaceStatistics, () => DrawRaceStatistics(data));
-                Section(config.ShowGenderStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Gender));
-                Section(config.ShowJobStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Job));
-                Section(config.ShowStatusStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Status));
-                Section(config.ShowWorldStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.World));
-                Section(config.ShowDatacenterStatistics, () => DrawPlayerStatisticTable(data, PlayerStatistic.Datacenter));
-
-                if (!anyVisible)
-                    ImGui.TextDisabled("No stats selected. Choose which sections to show in Settings.");
             }
-
-            ImGui.EndChild();
+            finally
+            {
+                ImGui.EndChild();
+            }
         }
 
         private void DrawSelectedPlayerStatistics(PlayerViewData data)
@@ -75,30 +85,35 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.RowBg |
                 ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Statistic");
-                ImGui.TableSetupColumn("Value");
+                try
+                {
+                    ImGui.TableSetupColumn("Statistic");
+                    ImGui.TableSetupColumn("Value");
 
-                DrawStatisticRow(
-                    "Unique Players Seen",
-                    overview.UniquePlayers.ToString());
+                    DrawStatisticRow(
+                        "Unique Players Seen",
+                        overview.UniquePlayers.ToString());
 
-                DrawStatisticRow(
-                    "Total Encounters",
-                    overview.TotalEncounters.ToString());
+                    DrawStatisticRow(
+                        "Total Encounters",
+                        overview.TotalEncounters.ToString());
 
-                DrawStatisticRow(
-                    "Duties With Matching Players",
-                    overview.DutiesWithPlayers.ToString());
+                    DrawStatisticRow(
+                        "Duties With Matching Players",
+                        overview.DutiesWithPlayers.ToString());
 
-                DrawStatisticRow(
-                    "Duties Since Last Encounter",
-                    overview.CurrentDrought.ToString());
+                    DrawStatisticRow(
+                        "Duties Since Last Encounter",
+                        overview.CurrentDrought.ToString());
 
-                DrawStatisticRow(
-                    "Longest Encounter Drought",
-                    $"{overview.LongestDrought} duties");
-
-                EndStyledTable();
+                    DrawStatisticRow(
+                        "Longest Encounter Drought",
+                        $"{overview.LongestDrought} duties");
+                }
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
 
@@ -153,37 +168,43 @@ namespace MentorRouletteTracker
             var total = rows.Sum(row => row.Seen);
             if (BeginConfiguredTable(key, tableId, showDetail: detail))
             {
-                SetupConfiguredColumns(key, label, detail);
-                var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible(key, ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)) &&
-                    (ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) != 1 || detail))
+                try
                 {
-                    var spec = sortSpecs.Specs;
-                    rows = SortTableRows(rows, row => ConfiguredSortColumn(spec.ColumnIndex) switch
+                    SetupConfiguredColumns(key, label, detail);
+                    var sortSpecs = ImGui.TableGetSortSpecs();
+                    if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible(key, ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)) &&
+                        (ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) != 1 || detail))
                     {
-                        0 => row.Name,
-                        1 => row.Detail,
-                        2 or 5 => row.Seen,
-                        3 => row.Deaths,
-                        4 => row.AverageDeaths,
-                        >= 6 and <= 19 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 6, averages: true),
-                        _ => row.Name
-                    }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Name + " " + row.Detail);
-                    sortSpecs.SpecsDirty = false;
-                }
+                        var spec = sortSpecs.Specs;
+                        rows = SortTableRows(rows, row => ConfiguredSortColumn(spec.ColumnIndex) switch
+                        {
+                            0 => row.Name,
+                            1 => row.Detail,
+                            2 or 5 => row.Seen,
+                            3 => row.Deaths,
+                            4 => row.AverageDeaths,
+                            >= 6 and <= 19 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 6, averages: true),
+                            _ => row.Name
+                        }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Name + " " + row.Detail);
+                        sortSpecs.SpecsDirty = false;
+                    }
 
-                foreach (var row in rows)
-                {
-                    ImGui.TableNextRow();
-                    DrawTableCell(0, row.Name);
-                    DrawTableCell(1, row.Detail);
-                    DrawTableCell(2, row.Seen.ToString());
-                    DrawTableCell(3, row.Deaths?.ToString() ?? "-");
-                    DrawTableCell(4, row.AverageDeaths?.ToString("F2") ?? "-");
-                    DrawTableCell(5, $"{(double)row.Seen / total * 100:F1}%");
-                    DrawPvpStatisticCells(6, row.Pvp, averages: true);
+                    foreach (var row in rows)
+                    {
+                        ImGui.TableNextRow();
+                        DrawTableCell(0, row.Name);
+                        DrawTableCell(1, row.Detail);
+                        DrawTableCell(2, row.Seen.ToString());
+                        DrawTableCell(3, row.Deaths?.ToString() ?? "-");
+                        DrawTableCell(4, row.AverageDeaths?.ToString("F2") ?? "-");
+                        DrawTableCell(5, $"{(double)row.Seen / total * 100:F1}%");
+                        DrawPvpStatisticCells(6, row.Pvp, averages: true);
+                    }
                 }
-                EndStyledTable();
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
     }

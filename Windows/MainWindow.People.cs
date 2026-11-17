@@ -121,9 +121,15 @@ namespace MentorRouletteTracker
             ImGui.TextDisabled($"({uniqueLalafell} Lalafell)");
             ImGui.Spacing();
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Click a player to view recorded duties with them. Click a header to sort.");
-            ImGui.TextDisabled("'-' means unknown.");
-            ImGui.PopTextWrapPos();
+            try
+            {
+                ImGui.TextDisabled("Click a player to view recorded duties with them. Click a header to sort.");
+                ImGui.TextDisabled("'-' means unknown.");
+            }
+            finally
+            {
+                ImGui.PopTextWrapPos();
+            }
             ImGui.Spacing();
 
             if (people.Count == 0)
@@ -209,63 +215,75 @@ namespace MentorRouletteTracker
         {
             ImGui.SetNextWindowSize(new Vector2(760, 440), ImGuiCond.FirstUseEver);
             bool isOpen = showPlayerHistory;
-            if (ImGui.Begin("Player Duty History###DutyTrackerPlayerHistory", ref isOpen))
+            try
             {
-                ImGui.TextUnformatted($"{historyPlayerName}@{historyPlayerWorld}");
-                ImGui.TextDisabled("Duties recorded with this player. Filters still apply.");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                if (selected == null || selected.Encounters.Count == 0)
+                if (ImGui.Begin("Player Duty History###DutyTrackerPlayerHistory", ref isOpen))
                 {
-                    ImGui.TextDisabled("No duties with this player match these filters.");
-                }
-                else
-                {
-                    ImGui.Text($"Encounters: {selected.TimesSeen}    Known death counts: {selected.KnownDeathEncounters}    Total deaths: {selected.TotalDeaths?.ToString() ?? "-"}    Average: {selected.AverageDeaths?.ToString("F2") ?? "-"}");
+                    ImGui.TextUnformatted($"{historyPlayerName}@{historyPlayerWorld}");
+                    ImGui.TextDisabled("Duties recorded with this player. Filters still apply.");
+                    ImGui.Separator();
                     ImGui.Spacing();
 
-                    if (BeginStyledTable(
-                        "playerHistoryTable", 5,
-                        ImGuiTableFlags.Borders |
-                        ImGuiTableFlags.RowBg |
-                        ImGuiTableFlags.ScrollY |
-                        ImGuiTableFlags.Resizable |
-                        ImGuiTableFlags.SizingStretchProp))
+                    if (selected == null || selected.Encounters.Count == 0)
                     {
-                        ImGui.TableSetupColumn("Duty");
-                        ImGui.TableSetupColumn("Type");
-                        ImGui.TableSetupColumn("Started");
-                        ImGui.TableSetupColumn("Job");
-                        ImGui.TableSetupColumn("Deaths");
-                        ImGui.TableHeadersRow();
+                        ImGui.TextDisabled("No duties with this player match these filters.");
+                    }
+                    else
+                    {
+                        ImGui.Text($"Encounters: {selected.TimesSeen}    Known death counts: {selected.KnownDeathEncounters}    Total deaths: {selected.TotalDeaths?.ToString() ?? "-"}    Average: {selected.AverageDeaths?.ToString("F2") ?? "-"}");
+                        ImGui.Spacing();
 
-                        var history = selected.Encounters;
-
-                        for (int i = 0; i < history.Count; i++)
+                        if (BeginStyledTable(
+                            "playerHistoryTable", 5,
+                            ImGuiTableFlags.Borders |
+                            ImGuiTableFlags.RowBg |
+                            ImGuiTableFlags.ScrollY |
+                            ImGuiTableFlags.Resizable |
+                            ImGuiTableFlags.SizingStretchProp))
                         {
-                            var entry = history[i];
-                            ImGui.TableNextRow();
-                            ImGui.TableSetColumnIndex(0);
-                            if (ImGui.Selectable($"{entry.Record.DutyName}###history{GetRecordUiId(entry.Record)}"))
+                            try
                             {
-                                selectedRecord = entry.Record;
-                                showDetailWindow = true;
+                                ImGui.TableSetupColumn("Duty");
+                                ImGui.TableSetupColumn("Type");
+                                ImGui.TableSetupColumn("Started");
+                                ImGui.TableSetupColumn("Job");
+                                ImGui.TableSetupColumn("Deaths");
+                                ImGui.TableHeadersRow();
+
+                                var history = selected.Encounters;
+
+                                for (int i = 0; i < history.Count; i++)
+                                {
+                                    var entry = history[i];
+                                    ImGui.TableNextRow();
+                                    ImGui.TableSetColumnIndex(0);
+                                    if (ImGui.Selectable($"{entry.Record.DutyName}###history{GetRecordUiId(entry.Record)}"))
+                                    {
+                                        selectedRecord = entry.Record;
+                                        showDetailWindow = true;
+                                    }
+                                    ImGui.TableSetColumnIndex(1);
+                                    ImGui.TextUnformatted(DutyClassification.DisplayType(entry.Record));
+                                    ImGui.TableSetColumnIndex(2);
+                                    ImGui.TextUnformatted(entry.Record.Timestamp.ToString("yyyy-MM-dd HH:mm"));
+                                    ImGui.TableSetColumnIndex(3);
+                                    ImGui.TextUnformatted(entry.Player.Job);
+                                    ImGui.TableSetColumnIndex(4);
+                                    ImGui.TextUnformatted(EffectiveDeaths(entry.Record, entry.Player)?.ToString() ?? "-");
+                                }
                             }
-                            ImGui.TableSetColumnIndex(1);
-                            ImGui.TextUnformatted(DutyClassification.DisplayType(entry.Record));
-                            ImGui.TableSetColumnIndex(2);
-                            ImGui.TextUnformatted(entry.Record.Timestamp.ToString("yyyy-MM-dd HH:mm"));
-                            ImGui.TableSetColumnIndex(3);
-                            ImGui.TextUnformatted(entry.Player.Job);
-                            ImGui.TableSetColumnIndex(4);
-                            ImGui.TextUnformatted(EffectiveDeaths(entry.Record, entry.Player)?.ToString() ?? "-");
+                            finally
+                            {
+                                EndStyledTable();
+                            }
                         }
-                        EndStyledTable();
                     }
                 }
             }
-            ImGui.End();
+            finally
+            {
+                ImGui.End();
+            }
             showPlayerHistory = isOpen;
         }
     }

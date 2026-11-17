@@ -23,17 +23,23 @@ public partial class MainWindow
         var columns = ImGui.GetContentRegionAvail().X >= ImGui.GetFontSize() * 19f ? 2 : 1;
         if (ImGui.BeginTable("JobAndWorldFilters", columns, ImGuiTableFlags.SizingStretchSame))
         {
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted("Job");
-            ImGui.SetNextItemWidth(-1);
-            DrawGroupedFilter("Jobs", "All Jobs", "Roles", selectedPlayerJobs, JobFilterGroups,
-                players.Select(player => player.Job));
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted("Home world");
-            ImGui.SetNextItemWidth(-1);
-            DrawGroupedFilter("Worlds", "All Worlds", "Datacenters", selectedPlayerWorlds, worlds,
-                players.Select(player => player.World));
-            ImGui.EndTable();
+            try
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted("Job");
+                ImGui.SetNextItemWidth(-1);
+                DrawGroupedFilter("Jobs", "All Jobs", "Roles", selectedPlayerJobs, JobFilterGroups,
+                    players.Select(player => player.Job));
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted("Home world");
+                ImGui.SetNextItemWidth(-1);
+                DrawGroupedFilter("Worlds", "All Worlds", "Datacenters", selectedPlayerWorlds, worlds,
+                    players.Select(player => player.World));
+            }
+            finally
+            {
+                ImGui.EndTable();
+            }
         }
     }
 
@@ -51,45 +57,63 @@ public partial class MainWindow
         if (!ImGui.BeginCombo($"##{id}Filter", preview, ImGuiComboFlags.HeightLarge))
             return;
 
-        ImGui.PushID(id);
-        if (ImGui.Selectable(allLabel, selected.Count == 0))
-            selected.Clear();
-
-        ImGui.Separator();
-        ImGui.TextDisabled(groupLabel);
-        foreach (var group in groups)
+        try
         {
-            var wholeGroup = group.Options.All(selected.Contains);
-            var groupCount = group.Options.Count(selected.Contains);
-            var label = groupCount > 0 && !wholeGroup
-                ? $"{group.Name} ({groupCount}/{group.Options.Length})" : group.Name;
-            if (ImGui.Checkbox(label + $"###Group{group.Name}", ref wholeGroup))
-                SelectFilterGroup(selected, group.Options, wholeGroup);
-        }
+            ImGui.PushID(id);
+            try
+            {
+                if (ImGui.Selectable(allLabel, selected.Count == 0))
+                    selected.Clear();
 
-        foreach (var group in groups)
-        {
-            ImGui.Separator();
-            ImGui.TextDisabled(group.Name);
-            ImGui.Indent();
-            foreach (var option in group.Options)
-                DrawFilterOption(option, selected);
-            ImGui.Unindent();
-        }
+                ImGui.Separator();
+                ImGui.TextDisabled(groupLabel);
+                foreach (var group in groups)
+                {
+                    var wholeGroup = group.Options.All(selected.Contains);
+                    var groupCount = group.Options.Count(selected.Contains);
+                    var label = groupCount > 0 && !wholeGroup
+                        ? $"{group.Name} ({groupCount}/{group.Options.Length})" : group.Name;
+                    if (ImGui.Checkbox(label + $"###Group{group.Name}", ref wholeGroup))
+                        SelectFilterGroup(selected, group.Options, wholeGroup);
+                }
 
-        var groupedOptions = groups.SelectMany(group => group.Options).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var otherOptions = recordedOptions.Concat(selected)
-            .Where(option => !string.IsNullOrWhiteSpace(option) && !groupedOptions.Contains(option))
-            .Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
-        if (otherOptions.Count > 0)
-        {
-            ImGui.Separator();
-            ImGui.TextDisabled("Other");
-            foreach (var option in otherOptions)
-                DrawFilterOption(option, selected);
+                foreach (var group in groups)
+                {
+                    ImGui.Separator();
+                    ImGui.TextDisabled(group.Name);
+                    ImGui.Indent();
+                    try
+                    {
+                        foreach (var option in group.Options)
+                            DrawFilterOption(option, selected);
+                    }
+                    finally
+                    {
+                        ImGui.Unindent();
+                    }
+                }
+
+                var groupedOptions = groups.SelectMany(group => group.Options).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var otherOptions = recordedOptions.Concat(selected)
+                    .Where(option => !string.IsNullOrWhiteSpace(option) && !groupedOptions.Contains(option))
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
+                if (otherOptions.Count > 0)
+                {
+                    ImGui.Separator();
+                    ImGui.TextDisabled("Other");
+                    foreach (var option in otherOptions)
+                        DrawFilterOption(option, selected);
+                }
+            }
+            finally
+            {
+                ImGui.PopID();
+            }
         }
-        ImGui.PopID();
-        ImGui.EndCombo();
+        finally
+        {
+            ImGui.EndCombo();
+        }
     }
 
     private static void SelectFilterGroup(HashSet<string> selected, IEnumerable<string> options, bool select)

@@ -13,48 +13,53 @@ namespace MentorRouletteTracker
                 .OrderBy(x => x.Timestamp)
                 .ToList();
 
-            if (ImGui.BeginChild(
-                "DutyAnalysisContent",
-                Vector2.Zero,
-                false,
-                ImGuiWindowFlags.HorizontalScrollbar))
+            try
             {
-                ImGui.Text("Duty Analysis");
-                ImGui.TextDisabled("Completed duties matching the filters above.");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                if (records.Count == 0)
+                if (ImGui.BeginChild(
+                    "DutyAnalysisContent",
+                    Vector2.Zero,
+                    false,
+                    ImGuiWindowFlags.HorizontalScrollbar))
                 {
-                    ImGui.TextDisabled("No completed duties with these filters.");
-                }
-                else
-                {
-                    DrawDutyOverview(records);
-                    ImGui.Spacing();
+                    ImGui.Text("Duty Analysis");
+                    ImGui.TextDisabled("Completed duties matching the filters above.");
                     ImGui.Separator();
                     ImGui.Spacing();
 
-                    DrawDutyTypeStatistics(records);
-                    ImGui.Spacing();
-                    ImGui.Separator();
-                    ImGui.Spacing();
+                    if (records.Count == 0)
+                    {
+                        ImGui.TextDisabled("No completed duties with these filters.");
+                    }
+                    else
+                    {
+                        DrawDutyOverview(records);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Spacing();
 
-                    DrawMostCommonDuty(records);
-                    ImGui.Spacing();
-                    ImGui.Separator();
-                    ImGui.Spacing();
+                        DrawDutyTypeStatistics(records);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Spacing();
 
-                    DrawDutiesHeatmap(records);
-                    ImGui.Spacing();
-                    ImGui.Separator();
-                    ImGui.Spacing();
+                        DrawMostCommonDuty(records);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Spacing();
 
-                    DrawDutySpecificDetails(records);
+                        DrawDutiesHeatmap(records);
+                        ImGui.Spacing();
+                        ImGui.Separator();
+                        ImGui.Spacing();
+
+                        DrawDutySpecificDetails(records);
+                    }
                 }
             }
-
-            ImGui.EndChild();
+            finally
+            {
+                ImGui.EndChild();
+            }
         }
 
         private void DrawDutyOverview(List<DutyRecord> records)
@@ -69,22 +74,27 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.RowBg |
                 ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Statistic");
-                ImGui.TableSetupColumn("Value");
+                try
+                {
+                    ImGui.TableSetupColumn("Statistic");
+                    ImGui.TableSetupColumn("Value");
 
-                DrawStatisticRow("Completed Duties", records.Count.ToString());
-                var fullRuns = records.Where(record => !record.JoinedInProgress).ToList();
-                DrawStatisticRow("Average Duty Length (full runs)",
-                    fullRuns.Count == 0
-                        ? "N/A"
-                        : FormatDuration(TimeSpan.FromSeconds(
-                            fullRuns.Average(record => record.TimeInDuty.TotalSeconds))));
-                DrawStatisticRow("Average Wipes / Duty",
-                    records.Average(x => x.WipeCount).ToString("F2"));
-                DrawStatisticRow("Joined In Progress",
-                    records.Count(x => x.JoinedInProgress).ToString());
-
-                EndStyledTable();
+                    DrawStatisticRow("Completed Duties", records.Count.ToString());
+                    var fullRuns = records.Where(record => !record.JoinedInProgress).ToList();
+                    DrawStatisticRow("Average Duty Length (full runs)",
+                        fullRuns.Count == 0
+                            ? "N/A"
+                            : FormatDuration(TimeSpan.FromSeconds(
+                                fullRuns.Average(record => record.TimeInDuty.TotalSeconds))));
+                    DrawStatisticRow("Average Wipes / Duty",
+                        records.Average(x => x.WipeCount).ToString("F2"));
+                    DrawStatisticRow("Joined In Progress",
+                        records.Count(x => x.JoinedInProgress).ToString());
+                }
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
 
@@ -107,24 +117,29 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.RowBg |
                 ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Duty Type");
-                ImGui.TableSetupColumn("Count");
-
-                ImGui.TableHeadersRow();
-
-                foreach (var group in typeCounts)
+                try
                 {
-                    ImGui.TableNextRow();
+                    ImGui.TableSetupColumn("Duty Type");
+                    ImGui.TableSetupColumn("Count");
 
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(group.Key);
+                    ImGui.TableHeadersRow();
 
-                    ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(
-                        group.Count().ToString());
+                    foreach (var group in typeCounts)
+                    {
+                        ImGui.TableNextRow();
+
+                        ImGui.TableSetColumnIndex(0);
+                        ImGui.TextUnformatted(group.Key);
+
+                        ImGui.TableSetColumnIndex(1);
+                        ImGui.TextUnformatted(
+                            group.Count().ToString());
+                    }
                 }
-
-                EndStyledTable();
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
 
@@ -147,19 +162,24 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.RowBg |
                 ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Duty");
-                ImGui.TableSetupColumn("Times Completed");
+                try
+                {
+                    ImGui.TableSetupColumn("Duty");
+                    ImGui.TableSetupColumn("Times Completed");
 
-                ImGui.TableNextRow();
+                    ImGui.TableNextRow();
 
-                ImGui.TableSetColumnIndex(0);
-                ImGui.TextUnformatted(mostCommon.Key);
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.TextUnformatted(mostCommon.Key);
 
-                ImGui.TableSetColumnIndex(1);
-                ImGui.TextUnformatted(
-                    mostCommon.Count().ToString());
-
-                EndStyledTable();
+                    ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(
+                        mostCommon.Count().ToString());
+                }
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
 
@@ -225,99 +245,109 @@ namespace MentorRouletteTracker
                 ImGuiTableFlags.RowBg |
                 ImGuiTableFlags.SizingStretchProp))
             {
-                ImGui.TableSetupColumn("Day");
-
-                foreach (var period in timePeriods)
+                try
                 {
-                    ImGui.TableSetupColumn(period);
-                }
+                    ImGui.TableSetupColumn("Day");
 
-                ImGui.TableHeadersRow();
-
-                var maxValue = Math.Max(
-                    1.0,
-                    dutiesByDayAndTime.Max(x =>
-                        selectedHeatmapMetric == 0
-                            ? x.Count
-                            : x.AverageDuration));
-
-                foreach (var day in days)
-                {
-                    ImGui.TableNextRow();
-
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(day.ToString());
-
-                    for (int i = 0; i < timePeriods.Length; i++)
+                    foreach (var period in timePeriods)
                     {
-                        var period = timePeriods[i];
+                        ImGui.TableSetupColumn(period);
+                    }
 
-                        var group = dutiesByDayAndTime
-                            .FirstOrDefault(x => x.Day == day && x.TimePeriod == period);
+                    ImGui.TableHeadersRow();
 
-                        var count = group?.Count ?? 0;
-
-                        var value = selectedHeatmapMetric == 0
-                            ? count
-                            : group?.AverageDuration ?? 0;
-
-                        ImGui.TableSetColumnIndex(i + 1);
-
-                        var intensity = (float)(value / maxValue);
-
-                        Vector4 cellColor;
-
-                        if (selectedHeatmapMetric == 0)
-                        {
-                            cellColor = new Vector4(
-                                0.08f,
-                                0.25f + intensity * 0.45f,
-                                0.12f + intensity * 0.20f,
-                                1.0f);
-                        }
-                        else
-                        {
-                            cellColor = new Vector4(
-                                0.15f + intensity * 0.65f,
-                                0.65f - intensity * 0.45f,
-                                0.12f,
-                                1.0f);
-                        }
-
-                        if (count > 0)
-                        {
-                            ImGui.TableSetBgColor(
-                                ImGuiTableBgTarget.CellBg,
-                                ImGui.ColorConvertFloat4ToU32(cellColor));
-                        }
-
-                        ImGui.TextUnformatted(
+                    var maxValue = Math.Max(
+                        1.0,
+                        dutiesByDayAndTime.Max(x =>
                             selectedHeatmapMetric == 0
-                                ? count.ToString()
-                                : count > 0
-                                    ? $"{value:F1}m"
-                                    : "—");
+                                ? x.Count
+                                : x.AverageDuration));
 
-                        if (ImGui.IsItemHovered() && count > 0)
+                    foreach (var day in days)
+                    {
+                        ImGui.TableNextRow();
+
+                        ImGui.TableSetColumnIndex(0);
+                        ImGui.TextUnformatted(day.ToString());
+
+                        for (int i = 0; i < timePeriods.Length; i++)
                         {
-                            ImGui.BeginTooltip();
+                            var period = timePeriods[i];
 
-                            ImGui.TextUnformatted($"{day} - {period}");
-                            ImGui.Separator();
-                            ImGui.TextUnformatted($"Duties: {count}");
+                            var group = dutiesByDayAndTime
+                                .FirstOrDefault(x => x.Day == day && x.TimePeriod == period);
 
-                            if (selectedHeatmapMetric == 1)
+                            var count = group?.Count ?? 0;
+
+                            var value = selectedHeatmapMetric == 0
+                                ? count
+                                : group?.AverageDuration ?? 0;
+
+                            ImGui.TableSetColumnIndex(i + 1);
+
+                            var intensity = (float)(value / maxValue);
+
+                            Vector4 cellColor;
+
+                            if (selectedHeatmapMetric == 0)
                             {
-                                ImGui.TextUnformatted(
-                                    $"Average Duration: {value:F1} minutes");
+                                cellColor = new Vector4(
+                                    0.08f,
+                                    0.25f + intensity * 0.45f,
+                                    0.12f + intensity * 0.20f,
+                                    1.0f);
+                            }
+                            else
+                            {
+                                cellColor = new Vector4(
+                                    0.15f + intensity * 0.65f,
+                                    0.65f - intensity * 0.45f,
+                                    0.12f,
+                                    1.0f);
                             }
 
-                            ImGui.EndTooltip();
+                            if (count > 0)
+                            {
+                                ImGui.TableSetBgColor(
+                                    ImGuiTableBgTarget.CellBg,
+                                    ImGui.ColorConvertFloat4ToU32(cellColor));
+                            }
+
+                            ImGui.TextUnformatted(
+                                selectedHeatmapMetric == 0
+                                    ? count.ToString()
+                                    : count > 0
+                                        ? $"{value:F1}m"
+                                        : "—");
+
+                            if (ImGui.IsItemHovered() && count > 0)
+                            {
+                                ImGui.BeginTooltip();
+
+                                try
+                                {
+                                    ImGui.TextUnformatted($"{day} - {period}");
+                                    ImGui.Separator();
+                                    ImGui.TextUnformatted($"Duties: {count}");
+
+                                    if (selectedHeatmapMetric == 1)
+                                    {
+                                        ImGui.TextUnformatted(
+                                            $"Average Duration: {value:F1} minutes");
+                                    }
+                                }
+                                finally
+                                {
+                                    ImGui.EndTooltip();
+                                }
+                            }
                         }
                     }
                 }
-
-                EndStyledTable();
+                finally
+                {
+                    EndStyledTable();
+                }
             }
         }
 
@@ -370,8 +400,14 @@ namespace MentorRouletteTracker
         {
             DrawSectionHeading("Stats by duty");
             ImGui.PushTextWrapPos();
-            ImGui.TextDisabled("Choose columns in Settings. '-' means unknown.");
-            ImGui.PopTextWrapPos();
+            try
+            {
+                ImGui.TextDisabled("Choose columns in Settings. '-' means unknown.");
+            }
+            finally
+            {
+                ImGui.PopTextWrapPos();
+            }
             ImGui.Spacing();
             var stats = BuildDutyAnalysisRows(records);
             if (stats.Count == 0)
@@ -384,48 +420,54 @@ namespace MentorRouletteTracker
             var height = rowHeight * (Math.Min(stats.Count, 12) + 2) + ImGui.GetStyle().ScrollbarSize;
             if (BeginConfiguredTable("Duty Analysis", "dutySpecificDetails", verticalScroll: true, height: height))
             {
-                SetupConfiguredColumns("Duty Analysis", scrollable: true);
-                var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Duty Analysis", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)))
+                try
                 {
-                    var spec = sortSpecs.Specs;
-                    stats = SortTableRows(stats, row => ConfiguredSortColumn(spec.ColumnIndex) switch
+                    SetupConfiguredColumns("Duty Analysis", scrollable: true);
+                    var sortSpecs = ImGui.TableGetSortSpecs();
+                    if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Duty Analysis", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)))
                     {
-                        0 => row.Duty,
-                        1 => row.Runs,
-                        2 => row.Deaths,
-                        3 => row.AverageDeaths,
-                        4 => row.TotalWipes,
-                        5 => row.WipesPerRun,
-                        6 => row.AverageTime,
-                        7 => row.InProgress,
-                        8 => row.Sprouts,
-                        9 => row.Mentors,
-                        10 => row.Players,
-                        11 => row.Lalafell,
-                        >= 12 and <= 25 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
-                        _ => row.Duty
-                    }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
-                    sortSpecs.SpecsDirty = false;
+                        var spec = sortSpecs.Specs;
+                        stats = SortTableRows(stats, row => ConfiguredSortColumn(spec.ColumnIndex) switch
+                        {
+                            0 => row.Duty,
+                            1 => row.Runs,
+                            2 => row.Deaths,
+                            3 => row.AverageDeaths,
+                            4 => row.TotalWipes,
+                            5 => row.WipesPerRun,
+                            6 => row.AverageTime,
+                            7 => row.InProgress,
+                            8 => row.Sprouts,
+                            9 => row.Mentors,
+                            10 => row.Players,
+                            11 => row.Lalafell,
+                            >= 12 and <= 25 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
+                            _ => row.Duty
+                        }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
+                        sortSpecs.SpecsDirty = false;
+                    }
+                    foreach (var row in stats)
+                    {
+                        ImGui.TableNextRow();
+                        DrawTableCell(0, row.Duty);
+                        DrawTableCell(1, row.Runs.ToString());
+                        DrawTableCell(2, row.Deaths?.ToString() ?? "-");
+                        DrawTableCell(3, row.AverageDeaths?.ToString("F2") ?? "-");
+                        DrawTableCell(4, row.TotalWipes.ToString());
+                        DrawTableCell(5, row.WipesPerRun.ToString("F2"));
+                        DrawTableCell(6, FormatDuration(row.AverageTime));
+                        DrawTableCell(7, row.InProgress.ToString());
+                        DrawTableCell(8, row.Sprouts.ToString());
+                        DrawTableCell(9, row.Mentors.ToString());
+                        DrawTableCell(10, row.Players.ToString());
+                        DrawTableCell(11, row.Lalafell.ToString());
+                        DrawPvpStatisticCells(12, row.Pvp);
+                    }
                 }
-                foreach (var row in stats)
+                finally
                 {
-                    ImGui.TableNextRow();
-                    DrawTableCell(0, row.Duty);
-                    DrawTableCell(1, row.Runs.ToString());
-                    DrawTableCell(2, row.Deaths?.ToString() ?? "-");
-                    DrawTableCell(3, row.AverageDeaths?.ToString("F2") ?? "-");
-                    DrawTableCell(4, row.TotalWipes.ToString());
-                    DrawTableCell(5, row.WipesPerRun.ToString("F2"));
-                    DrawTableCell(6, FormatDuration(row.AverageTime));
-                    DrawTableCell(7, row.InProgress.ToString());
-                    DrawTableCell(8, row.Sprouts.ToString());
-                    DrawTableCell(9, row.Mentors.ToString());
-                    DrawTableCell(10, row.Players.ToString());
-                    DrawTableCell(11, row.Lalafell.ToString());
-                    DrawPvpStatisticCells(12, row.Pvp);
+                    EndStyledTable();
                 }
-                EndStyledTable();
             }
         }
 

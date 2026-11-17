@@ -50,42 +50,84 @@ namespace MentorRouletteTracker
             var height = Math.Min(ImGui.GetFontSize() * 16f,
                 Math.Max(ImGui.GetFrameHeight() * 4f, ImGui.GetContentRegionAvail().Y * 0.5f));
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 10));
-            if (ImGui.BeginChild("FilterPanel", new Vector2(0, height), true))
+            try
             {
-                if (ImGui.Button("Clear filters"))
-                    ClearFilters();
-                ImGui.PushTextWrapPos();
-                ImGui.TextDisabled(playerFilters
-                    ? "Filters apply across data tabs. Select multiple options in a dropdown to include any of them."
-                    : "Only duty and date filters apply to Summary.");
-                ImGui.PopTextWrapPos();
-                ImGui.Spacing();
-
-                var columns = playerFilters && ImGui.GetContentRegionAvail().X >= ImGui.GetFontSize() * 38f ? 2 : 1;
-                if (ImGui.BeginTable("FilterGroups", columns, ImGuiTableFlags.SizingStretchSame))
+                try
                 {
-                    ImGui.TableNextColumn();
-                    DrawDutyFilters();
-                    if (playerFilters)
+                    if (ImGui.BeginChild("FilterPanel", new Vector2(0, height), true))
                     {
-                        ImGui.TableNextColumn();
-                        DrawPlayerFilters(encounterFilter);
+                        if (ImGui.Button("Clear filters"))
+                            ClearFilters();
+                        ImGui.PushTextWrapPos();
+                        try
+                        {
+                            ImGui.TextDisabled(playerFilters
+                                ? "Filters apply across data tabs. Select multiple options in a dropdown to include any of them."
+                                : "Only duty and date filters apply to Summary.");
+                        }
+                        finally
+                        {
+                            ImGui.PopTextWrapPos();
+                        }
+                        ImGui.Spacing();
+
+                        var columns = playerFilters && ImGui.GetContentRegionAvail().X >= ImGui.GetFontSize() * 38f ? 2 : 1;
+                        if (ImGui.BeginTable("FilterGroups", columns, ImGuiTableFlags.SizingStretchSame))
+                        {
+                            try
+                            {
+                                ImGui.TableNextColumn();
+                                DrawDutyFilters();
+                                if (playerFilters)
+                                {
+                                    ImGui.TableNextColumn();
+                                    DrawPlayerFilters(encounterFilter);
+                                }
+                            }
+                            finally
+                            {
+                                ImGui.EndTable();
+                            }
+                        }
                     }
-                    ImGui.EndTable();
+                }
+                finally
+                {
+                    ImGui.EndChild();
                 }
             }
-            ImGui.EndChild();
-            ImGui.PopStyleVar();
+            finally
+            {
+                ImGui.PopStyleVar();
+            }
             ImGui.Spacing();
             ImGui.PushStyleColor(ImGuiCol.ChildBg, WindowAppearance.FilterBackground);
-            ImGui.PushStyleColor(ImGuiCol.Border, WindowAppearance.Accent);
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
-            if (ImGui.BeginChild("FilterBoundary", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
-                ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
-                ImGui.TextUnformatted($"End of filters — {tab} below");
-            ImGui.EndChild();
-            ImGui.PopStyleVar();
-            ImGui.PopStyleColor(2);
+            try
+            {
+                ImGui.PushStyleColor(ImGuiCol.Border, WindowAppearance.Accent);
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 4));
+                try
+                {
+                    try
+                    {
+                        if (ImGui.BeginChild("FilterBoundary", new Vector2(0, ImGui.GetTextLineHeight() + 10), true,
+                            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+                            ImGui.TextUnformatted($"End of filters — {tab} below");
+                    }
+                    finally
+                    {
+                        ImGui.EndChild();
+                    }
+                }
+                finally
+                {
+                    ImGui.PopStyleVar();
+                }
+            }
+            finally
+            {
+                ImGui.PopStyleColor(2);
+            }
             ImGui.Spacing();
         }
 
@@ -158,44 +200,62 @@ namespace MentorRouletteTracker
                 ImGui.Spacing();
                 return;
             }
-            var allTypes = selectedDutyTypes.Count == 0;
-            if (ImGui.Checkbox("All duty types", ref allTypes))
+            try
             {
-                selectedDutyTypes.Clear();
-                selectedPvpModes.Clear();
-            }
-            ImGui.Separator();
-            ImGui.TextDisabled("Duty types");
-            var additional = dutyTypes.Concat(selectedDutyTypes).Except(OrderedDutyTypes, StringComparer.Ordinal)
-                .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase);
-            foreach (var dutyType in OrderedDutyTypes.Concat(additional).ToList())
-            {
-                if (dutyType != "PvP")
+                var allTypes = selectedDutyTypes.Count == 0;
+                if (ImGui.Checkbox("All duty types", ref allTypes))
                 {
-                    DrawFilterOption(dutyType, selectedDutyTypes);
-                    continue;
-                }
-                var pvpDisabled = BeginPvpControl();
-                var pvpSelected = selectedDutyTypes.Contains("PvP");
-                if (ImGui.Checkbox("PvP", ref pvpSelected))
-                {
-                    if (!selectedDutyTypes.Remove("PvP"))
-                        selectedDutyTypes.Add("PvP");
+                    selectedDutyTypes.Clear();
                     selectedPvpModes.Clear();
                 }
-                ImGui.Indent();
-                ImGui.TextDisabled("PvP modes");
-                foreach (var (mode, label) in PvpModeOptions)
+                ImGui.Separator();
+                ImGui.TextDisabled("Duty types");
+                var additional = dutyTypes.Concat(selectedDutyTypes).Except(OrderedDutyTypes, StringComparer.Ordinal)
+                    .Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase);
+                foreach (var dutyType in OrderedDutyTypes.Concat(additional).ToList())
                 {
-                    var selected = selectedDutyTypes.Contains("PvP") &&
-                        (selectedPvpModes.Count == 0 || selectedPvpModes.Contains(mode));
-                    if (ImGui.Checkbox(label, ref selected))
-                        TogglePvpMode(mode);
+                    if (dutyType != "PvP")
+                    {
+                        DrawFilterOption(dutyType, selectedDutyTypes);
+                        continue;
+                    }
+                    var pvpDisabled = BeginPvpControl();
+                    try
+                    {
+                        var pvpSelected = selectedDutyTypes.Contains("PvP");
+                        if (ImGui.Checkbox("PvP", ref pvpSelected))
+                        {
+                            if (!selectedDutyTypes.Remove("PvP"))
+                                selectedDutyTypes.Add("PvP");
+                            selectedPvpModes.Clear();
+                        }
+                        ImGui.Indent();
+                        try
+                        {
+                            ImGui.TextDisabled("PvP modes");
+                            foreach (var (mode, label) in PvpModeOptions)
+                            {
+                                var selected = selectedDutyTypes.Contains("PvP") &&
+                                    (selectedPvpModes.Count == 0 || selectedPvpModes.Contains(mode));
+                                if (ImGui.Checkbox(label, ref selected))
+                                    TogglePvpMode(mode);
+                            }
+                        }
+                        finally
+                        {
+                            ImGui.Unindent();
+                        }
+                    }
+                    finally
+                    {
+                        EndPvpControl(pvpDisabled);
+                    }
                 }
-                ImGui.Unindent();
-                EndPvpControl(pvpDisabled);
             }
-            ImGui.EndCombo();
+            finally
+            {
+                ImGui.EndCombo();
+            }
             ImGui.Spacing();
         }
 
@@ -222,8 +282,14 @@ namespace MentorRouletteTracker
                 ImGui.SetNextItemWidth(-1);
                 ImGui.SliderInt("##MinimumEncounters", ref minimumEncounters, 1, 100, "%d", ImGuiSliderFlags.AlwaysClamp);
                 ImGui.PushTextWrapPos();
-                ImGui.TextDisabled("Set how many matching completed duties a player needs to appear in. Missing death counts still count toward encounters.");
-                ImGui.PopTextWrapPos();
+                try
+                {
+                    ImGui.TextDisabled("Set how many matching completed duties a player needs to appear in. Missing death counts still count toward encounters.");
+                }
+                finally
+                {
+                    ImGui.PopTextWrapPos();
+                }
             }
         }
 
@@ -240,14 +306,26 @@ namespace MentorRouletteTracker
             };
             if (ImGui.BeginCombo($"##{label}Filter", preview, ImGuiComboFlags.HeightLarge))
             {
-                ImGui.PushID(label);
-                if (ImGui.Selectable(allLabel, selected.Count == 0, ImGuiSelectableFlags.DontClosePopups))
-                    selected.Clear();
-                ImGui.Separator();
-                foreach (var option in options.Concat(selected).Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase).ToList())
-                    DrawFilterOption(option, selected);
-                ImGui.PopID();
-                ImGui.EndCombo();
+                try
+                {
+                    ImGui.PushID(label);
+                    try
+                    {
+                        if (ImGui.Selectable(allLabel, selected.Count == 0, ImGuiSelectableFlags.DontClosePopups))
+                            selected.Clear();
+                        ImGui.Separator();
+                        foreach (var option in options.Concat(selected).Distinct(StringComparer.Ordinal).Order(StringComparer.OrdinalIgnoreCase).ToList())
+                            DrawFilterOption(option, selected);
+                    }
+                    finally
+                    {
+                        ImGui.PopID();
+                    }
+                }
+                finally
+                {
+                    ImGui.EndCombo();
+                }
             }
             ImGui.Spacing();
         }
@@ -258,24 +336,36 @@ namespace MentorRouletteTracker
             var month = date.Month;
             var day = date.Day;
             ImGui.PushID(label);
-            ImGui.TextUnformatted(label);
-            if (ImGui.BeginTable("DateFields", 3, ImGuiTableFlags.SizingStretchSame))
+            try
             {
-                ImGui.TableNextColumn();
-                ImGui.TextDisabled("Year");
-                ImGui.SetNextItemWidth(-1);
-                ImGui.InputInt("##Year", ref year, 0, 0);
-                ImGui.TableNextColumn();
-                ImGui.TextDisabled("Month");
-                ImGui.SetNextItemWidth(-1);
-                ImGui.InputInt("##Month", ref month, 0, 0);
-                ImGui.TableNextColumn();
-                ImGui.TextDisabled("Day");
-                ImGui.SetNextItemWidth(-1);
-                ImGui.InputInt("##Day", ref day, 0, 0);
-                ImGui.EndTable();
+                ImGui.TextUnformatted(label);
+                if (ImGui.BeginTable("DateFields", 3, ImGuiTableFlags.SizingStretchSame))
+                {
+                    try
+                    {
+                        ImGui.TableNextColumn();
+                        ImGui.TextDisabled("Year");
+                        ImGui.SetNextItemWidth(-1);
+                        ImGui.InputInt("##Year", ref year, 0, 0);
+                        ImGui.TableNextColumn();
+                        ImGui.TextDisabled("Month");
+                        ImGui.SetNextItemWidth(-1);
+                        ImGui.InputInt("##Month", ref month, 0, 0);
+                        ImGui.TableNextColumn();
+                        ImGui.TextDisabled("Day");
+                        ImGui.SetNextItemWidth(-1);
+                        ImGui.InputInt("##Day", ref day, 0, 0);
+                    }
+                    finally
+                    {
+                        ImGui.EndTable();
+                    }
+                }
             }
-            ImGui.PopID();
+            finally
+            {
+                ImGui.PopID();
+            }
             if (IsValidDate(year, month, day))
                 date = new DateTime(year, month, day);
         }
