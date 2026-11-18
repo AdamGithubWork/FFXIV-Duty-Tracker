@@ -60,25 +60,18 @@ inheriting the recorder's result. `pvp_results_complete` tracks finished player
 results separately from combat scores. Older complete scoreboards get another
 lookup for missing results; absent results stay null.
 
-## Development database transition
+## Database upgrades
 
-The owner's schema-6 through schema-11 databases upgrade to schema 12.
-Before changing it, the plugin writes a complete SQLite backup to the `backups`
-subfolder. If that backup fails, the transition stops.
+Schemas 6 through 11 upgrade to schema 12. Before upgrading, the plugin saves a
+complete backup under `backups/history-before-v12-*.sqlite`. If the backup fails,
+the upgrade stops.
 
-For schemas 6 and 7, the transition removes the embedded JSON archive, import-origin columns, and any
-unused upload queue. It keeps duty/player values, IDs, row order, and the write
-revision. The backup retains the original database, including the old JSON archive.
-Older development schemas and JSON history imports aren't supported by this build.
-Schemas 6 through 8 also gain the nullable roster-import flag. All supported schemas
-gain the PvP fields. Existing duty/player values and revisions stay unchanged.
-Schema 10 also gains the mode, results-complete flag, and per-player placement.
-Schema 11 gains nullable damage taken and healing done per player, plus
-`pvp_extended_stats_complete` on each duty. The flag lets older completed imports
-receive those scores without repeatedly importing completed scoreboards. Missing
-scores stay null. Backups are named `history-before-v12-*.sqlite`.
+Upgrades keep existing records, IDs, player order, and the write revision. They add
+missing PvP fields and remove unused development-era import tables and columns.
+The backup keeps the original database. Older schemas and JSON history imports
+aren't supported.
 
-Backups are separate files. Clearing records leaves those backup files in place.
+Clearing records leaves upgrade backups in place.
 
 ## Loading and settings
 
@@ -119,8 +112,3 @@ database revision is applied at startup and removed after a successful save. Old
 copies are kept as `.json.stale` files. Conflicting or unreadable recoveries need
 review. A copy without a revision is removed if it matches the database; changed
 contents need review until its revision is known.
-
-## Development checks
-
-`StorageDiagnostics` is compiled only in debug builds. There is no public storage
-check command.
