@@ -8,7 +8,7 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>MentorRouletteTracker</AssemblyName>
-    <Version>1.0.0.2</Version>
+    <Version>1.0.0.3</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	  <Description>Tracks your duties, the players you meet, deaths, wipes, and milestones.</Description>
 	  <Company>Adalith</Company>
