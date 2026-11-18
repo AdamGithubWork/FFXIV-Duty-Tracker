@@ -441,7 +441,7 @@ namespace MentorRouletteTracker
                             9 => row.Mentors,
                             10 => row.Players,
                             11 => row.Lalafell,
-                            >= 12 and <= 25 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
+                            >= 12 and <= 28 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
                             _ => row.Duty
                         }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
                         sortSpecs.SpecsDirty = false;

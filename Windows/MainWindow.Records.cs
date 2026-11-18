@@ -148,6 +148,9 @@ namespace MentorRouletteTracker
                             16 => RecorderPvpPlayer(record)?.PvPAssists,
                             17 => RecorderPvpPlayer(record)?.PvPDamageTaken,
                             18 => RecorderPvpPlayer(record)?.PvPHealingDone,
+                            19 => PvpDamagePerMinute(record, RecorderPvpPlayer(record)),
+                            20 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPDamageTaken),
+                            21 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPHealingDone),
                             _ => record.DutyName
                         }, spec.SortDirection == ImGuiSortDirection.Ascending, record => record.DutyName);
                         sortSpecs.SpecsDirty = false;
@@ -222,6 +225,9 @@ namespace MentorRouletteTracker
                         DrawTableCell(16, RecorderPvpPlayer(r)?.PvPAssists?.ToString() ?? "-");
                         DrawTableCell(17, RecorderPvpPlayer(r)?.PvPDamageTaken?.ToString("N0") ?? "-");
                         DrawTableCell(18, RecorderPvpPlayer(r)?.PvPHealingDone?.ToString("N0") ?? "-");
+                        DrawTableCell(19, PvpDamagePerMinute(r, RecorderPvpPlayer(r))?.ToString("N0") ?? "-");
+                        DrawTableCell(20, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPDamageTaken)?.ToString("N0") ?? "-");
+                        DrawTableCell(21, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPHealingDone)?.ToString("N0") ?? "-");
                     }
                 }
                 finally

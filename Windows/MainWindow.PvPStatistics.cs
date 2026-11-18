@@ -8,6 +8,9 @@ public partial class MainWindow
     private sealed class PvpStatistics
     {
         public long? Damage { get; init; }
+        public double? DamagePerMinute { get; init; }
+        public double? DamageTakenPerMinute { get; init; }
+        public double? HealingPerMinute { get; init; }
         public long? DamageTaken { get; init; }
         public long? HealingDone { get; init; }
         public long? Deaths { get; init; }
@@ -48,6 +51,9 @@ public partial class MainWindow
         return new PvpStatistics
         {
             Damage = SumPvpScores(pvp.Select(encounter => encounter.Player.PvPDamageDealt)),
+            DamagePerMinute = CombinedPvpRatePerMinute(pvp, player => player.PvPDamageDealt),
+            DamageTakenPerMinute = CombinedPvpRatePerMinute(pvp, player => player.PvPDamageTaken),
+            HealingPerMinute = CombinedPvpRatePerMinute(pvp, player => player.PvPHealingDone),
             DamageTaken = SumPvpScores(pvp.Select(encounter => encounter.Player.PvPDamageTaken)),
             HealingDone = SumPvpScores(pvp.Select(encounter => encounter.Player.PvPHealingDone)),
             Deaths = SumPvpScores(pvp.Select(encounter => (long?)encounter.Player.PvPScoreboardDeaths)),
@@ -68,6 +74,21 @@ public partial class MainWindow
         };
     }
 
+    private static double? CombinedPvpRatePerMinute(IEnumerable<PlayerEncounter> encounters, Func<PartyMemberSnapshot, long?> score)
+    {
+        double total = 0;
+        double minutes = 0;
+        foreach (var encounter in encounters)
+        {
+            var value = score(encounter.Player);
+            if (!PvpRatePerMinute(encounter.Record, value).HasValue)
+                continue;
+            total += value!.Value;
+            minutes += encounter.Record.TimeInDuty.TotalMinutes;
+        }
+        return minutes > 0 ? total / minutes : null;
+    }
+
     private static TableColumnOption[] PvpResultColumns() =>
     [
         new("pvpWins", "Wins (PvP)", false), new("pvpLosses", "Losses (PvP)", false),
@@ -81,7 +102,18 @@ public partial class MainWindow
     [
         new("pvpDamage", averages ? "Average damage (PvP)" : "Damage dealt (PvP)", false),
         new("pvpKills", averages ? "Average kills (PvP)" : "Kills (PvP)", false),
-        new("pvpAssists", averages ? "Average assists (PvP)" : "Assists (PvP)", false), ..PvpResultColumns(), ..PvpSupportColumns(averages)
+        new("pvpAssists", averages ? "Average assists (PvP)" : "Assists (PvP)", false), ..PvpResultColumns(), ..PvpSupportColumns(averages),
+        PvpDamagePerMinuteColumn(), ..PvpSupportRateColumns()
+    ];
+
+    private static TableColumnOption PvpDamagePerMinuteColumn(string label = "Damage / min (PvP)") =>
+        new("pvpDamagePerMinute", label, false);
+
+    private static TableColumnOption[] PvpSupportRateColumns(
+        string takenLabel = "Damage taken / min (PvP)", string healingLabel = "Healing / min (PvP)") =>
+    [
+        new("pvpDamageTakenPerMinute", takenLabel, false),
+        new("pvpHealingPerMinute", healingLabel, false)
     ];
 
     private static TableColumnOption[] PvpSupportColumns(bool averages = false) =>
@@ -110,6 +142,9 @@ public partial class MainWindow
             11 => stats.ThirdRate,
             12 => stats.DamageTaken,
             13 => stats.HealingDone,
+            14 => stats.DamagePerMinute,
+            15 => stats.DamageTakenPerMinute,
+            16 => stats.HealingPerMinute,
             _ => null
         };
     }
@@ -117,7 +152,7 @@ public partial class MainWindow
     private static string PvpStatisticText(PvpStatistics stats, int column, bool averages = false) => PvpStatisticValue(stats, column, averages) switch
     {
         double rate when column is 5 or 7 or 9 or 11 => $"{rate:F1}%",
-        double average => average.ToString(column is 0 or 12 or 13 ? "N0" : "N2"),
+        double average => average.ToString(column is 0 or >= 12 and <= 16 ? "N0" : "N2"),
         long total => total.ToString("N0"),
         int count => count.ToString(),
         _ => "-"
@@ -126,7 +161,7 @@ public partial class MainWindow
     private void DrawPvpStatisticCells(int start, PvpStatistics stats, bool includeScores = true, bool averages = false)
     {
         var first = includeScores ? 0 : 3;
-        for (var index = first; index < 14; index++)
+        for (var index = first; index < 17; index++)
             DrawTableCell(start + index - first, PvpStatisticText(stats, index, averages));
     }
 

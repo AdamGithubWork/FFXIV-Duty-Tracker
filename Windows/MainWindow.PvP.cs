@@ -8,6 +8,13 @@ public partial class MainWindow
     private static PartyMemberSnapshot? RecorderPvpPlayer(DutyRecord record) => record.DutyType == "PvP"
         ? record.Party.FirstOrDefault(player => player.Name == record.RecorderName && player.World == record.RecorderWorld) : null;
 
+    private static double? PvpDamagePerMinute(DutyRecord record, PartyMemberSnapshot? player) =>
+        PvpRatePerMinute(record, player?.PvPDamageDealt);
+
+    private static double? PvpRatePerMinute(DutyRecord record, long? score) =>
+        record.DutyType == "PvP" && record.TimeInDuty > TimeSpan.Zero && score is >= 0
+            ? score.Value / record.TimeInDuty.TotalMinutes : null;
+
     private static long? SumPvpScores(IEnumerable<long?> scores)
     {
         var known = scores.Where(score => score.HasValue).ToArray();
@@ -65,6 +72,9 @@ public partial class MainWindow
                 11 => player.PvPPlacement,
                 12 => player.PvPDamageTaken,
                 13 => player.PvPHealingDone,
+                14 => PvpDamagePerMinute(record, player),
+                15 => PvpRatePerMinute(record, player.PvPDamageTaken),
+                16 => PvpRatePerMinute(record, player.PvPHealingDone),
                 _ => player.Name
             }, ascending, player => player.Name);
             specs.SpecsDirty = false;
@@ -86,6 +96,9 @@ public partial class MainWindow
                 DrawTableCell(11, PvpPlayerResultLabel(record, player));
                 DrawTableCell(12, player.PvPDamageTaken?.ToString("N0") ?? "-");
                 DrawTableCell(13, player.PvPHealingDone?.ToString("N0") ?? "-");
+                DrawTableCell(14, PvpDamagePerMinute(record, player)?.ToString("N0") ?? "-");
+                DrawTableCell(15, PvpRatePerMinute(record, player.PvPDamageTaken)?.ToString("N0") ?? "-");
+                DrawTableCell(16, PvpRatePerMinute(record, player.PvPHealingDone)?.ToString("N0") ?? "-");
             }
         }
         finally

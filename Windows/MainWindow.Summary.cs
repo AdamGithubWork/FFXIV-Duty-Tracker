@@ -165,19 +165,32 @@ namespace MentorRouletteTracker
                 return best == null ? new MilestoneResult("N/A") : new MilestoneResult(
                     $"{score(best.Player):N0} {unit} — {best.Player.Name}@{best.Player.World} — {best.Record.DutyName} — {best.Record.Timestamp:yyyy-MM-dd HH:mm}", best.Record);
             }
+            MilestoneResult PersonalRateBest(Func<PartyMemberSnapshot, long?> score, string unit)
+            {
+                var best = personalPvp.Where(entry => PvpRatePerMinute(entry.Record, score(entry.Player)).HasValue)
+                    .MaxBy(entry => PvpRatePerMinute(entry.Record, score(entry.Player)));
+                return best == null ? new MilestoneResult("N/A") : new MilestoneResult(
+                    $"{PvpRatePerMinute(best.Record, score(best.Player)):N0} {unit} / min — {best.Player.Name}@{best.Player.World} — {best.Record.DutyName} — {best.Record.Timestamp:yyyy-MM-dd HH:mm}", best.Record);
+            }
             var lifetimePvpRows = new List<(string Label, MilestoneResult Value)>
             {
                 ("Damage dealt (PvP)", PvpStatisticText(lifetimePvpTotals, 0)),
+                ("Damage / min (PvP)", PvpStatisticText(lifetimePvpTotals, 14)),
                 ("Kills (PvP)", PvpStatisticText(lifetimePvpTotals, 1)),
                 ("Assists (PvP)", PvpStatisticText(lifetimePvpTotals, 2)),
                 ("Deaths (PvP)", lifetimePvpTotals.Deaths?.ToString("N0") ?? "-"),
                 ("Damage taken (PvP)", PvpStatisticText(lifetimePvpTotals, 12)),
+                ("Damage taken / min (PvP)", PvpStatisticText(lifetimePvpTotals, 15)),
                 ("Healing done (PvP)", PvpStatisticText(lifetimePvpTotals, 13)),
+                ("Healing / min (PvP)", PvpStatisticText(lifetimePvpTotals, 16)),
                 ("Highest damage dealt in one match (PvP)", PersonalBest(player => player.PvPDamageDealt, "damage")),
+                ("Highest damage / min in one match (PvP)", PersonalRateBest(player => player.PvPDamageDealt, "damage")),
                 ("Most kills in one match (PvP)", PersonalBest(player => player.PvPKills, "kills")),
                 ("Most assists in one match (PvP)", PersonalBest(player => player.PvPAssists, "assists")),
                 ("Highest damage taken in one match (PvP)", PersonalBest(player => player.PvPDamageTaken, "damage taken")),
-                ("Most healing in one match (PvP)", PersonalBest(player => player.PvPHealingDone, "healing"))
+                ("Highest damage taken / min in one match (PvP)", PersonalRateBest(player => player.PvPDamageTaken, "damage taken")),
+                ("Most healing in one match (PvP)", PersonalBest(player => player.PvPHealingDone, "healing")),
+                ("Highest healing / min in one match (PvP)", PersonalRateBest(player => player.PvPHealingDone, "healing"))
             };
             if (records.Count == 0)
             {

@@ -21,7 +21,8 @@ namespace MentorRouletteTracker
                 new("side", "Side"), new("damage", "Damage dealt"),
                 new("kills", "Kills"), new("deaths", "Deaths"), new("assists", "Assists"),
                 new("race", "Race"), new("gender", "Gender"), new("status", "Status", false),
-                new("result", "Result"), new("taken", "Damage taken"), new("healing", "Healing done")
+                new("result", "Result"), new("taken", "Damage taken"), new("healing", "Healing done"),
+                PvpDamagePerMinuteColumn("Damage / min"), ..PvpSupportRateColumns("Damage taken / min", "Healing / min")
             ],
             ["Records"] =
             [
@@ -31,7 +32,8 @@ namespace MentorRouletteTracker
                 new("sprouts", "Sprouts seen", false), new("mentors", "Mentors seen", false),
                 new("players", "Players seen", false), new("deaths", "Known deaths", false),
                 new("pvpPlacement", "PvP placement", false), new("pvpDamage", "Your PvP damage", false),
-                new("pvpKills", "Your PvP kills", false), new("pvpAssists", "Your PvP assists", false), ..PvpSupportColumns()
+                new("pvpKills", "Your PvP kills", false), new("pvpAssists", "Your PvP assists", false), ..PvpSupportColumns(),
+                PvpDamagePerMinuteColumn("Your PvP damage / min"), ..PvpSupportRateColumns("Your PvP damage taken / min", "Your PvP healing / min")
             ],
             ["People"] =
             [
@@ -43,7 +45,8 @@ namespace MentorRouletteTracker
                 new("sprouts", "Sprout encounters", false), new("mentors", "Mentor encounters", false),
                 new("pvpDamage", "Damage dealt (PvP)", false), new("pvpKills", "Kills (PvP)", false),
                 new("pvpAssists", "Assists (PvP)", false), new("teammates", "Teammate encounters", false),
-                new("enemies", "Enemy encounters", false), ..PvpResultColumns(), ..PvpSupportColumns()
+                new("enemies", "Enemy encounters", false), ..PvpResultColumns(), ..PvpSupportColumns(),
+                PvpDamagePerMinuteColumn(), ..PvpSupportRateColumns()
             ],
             ["Duty Analysis"] =
             [
@@ -117,8 +120,8 @@ namespace MentorRouletteTracker
         {
             var columns = TableColumnOptions[table];
             if (table == "PvP records")
-                return new[] { "name", "world", "job", "side", "damage", "kills", "deaths", "assists",
-                    "taken", "healing", "result", "race", "gender", "status" }
+                return new[] { "name", "world", "job", "side", "damage", "pvpDamagePerMinute", "kills", "deaths", "assists",
+                    "taken", "pvpDamageTakenPerMinute", "healing", "pvpHealingPerMinute", "result", "race", "gender", "status" }
                     .Select(id => Array.FindIndex(columns, column => column.Id == id)).ToArray();
             var order = Enumerable.Range(0, columns.Length).ToList();
             var assists = Array.FindIndex(columns, column => column.Id == "pvpAssists");
@@ -127,6 +130,16 @@ namespace MentorRouletteTracker
                 var support = order.Where(index => columns[index].Id is "pvpDamageTaken" or "pvpHealingDone").ToArray();
                 order.RemoveAll(index => support.Contains(index));
                 order.InsertRange(order.IndexOf(assists) + 1, support);
+            }
+            foreach (var (scoreId, rateId) in new[]
+                { ("pvpDamage", "pvpDamagePerMinute"), ("pvpDamageTaken", "pvpDamageTakenPerMinute"), ("pvpHealingDone", "pvpHealingPerMinute") })
+            {
+                var score = Array.FindIndex(columns, column => column.Id == scoreId);
+                var rate = Array.FindIndex(columns, column => column.Id == rateId);
+                if (score < 0 || rate < 0)
+                    continue;
+                order.Remove(rate);
+                order.Insert(order.IndexOf(score) + 1, rate);
             }
             return order.ToArray();
         }
@@ -245,7 +258,9 @@ namespace MentorRouletteTracker
                     continue;
                 ImGui.TableHeader(TableHeaderLabel(labels[i], ImGui.GetContentRegionAvail().X));
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip(labels[i] + " — click to sort");
+                    ImGui.SetTooltip(columns[i].Id.EndsWith("PerMinute", StringComparison.Ordinal)
+                        ? "Score divided by recorded duty minutes, including waiting time. Groups combine each player's score and time. Click to sort."
+                        : labels[i] + " — click to sort");
             }
         }
 

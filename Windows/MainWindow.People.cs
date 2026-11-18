@@ -167,7 +167,7 @@ namespace MentorRouletteTracker
                         16 => player.PvpAssists,
                         17 => player.TeammateEncounters,
                         18 => player.EnemyEncounters,
-                        >= 19 and <= 29 => PvpStatisticValue(player.Pvp, sortColumn - 16),
+                        >= 19 and <= 32 => PvpStatisticValue(player.Pvp, sortColumn - 16),
                         _ => player.Name
                     }, direction == ImGuiSortDirection.Ascending, player => player.Name);
                     data.People = people;
