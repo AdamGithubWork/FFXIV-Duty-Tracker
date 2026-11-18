@@ -59,7 +59,7 @@ namespace MentorRouletteTracker
             DutyTrackerService tracker,
             string exportDirectory,
             IObjectTable objectTable)
-            : base("Duty Tracker###MentorRouletteTrackerMain")
+            : base("Noumenon###MentorRouletteTrackerMain")
         {
             this.config = config;
             this.tracker = tracker;
@@ -185,7 +185,7 @@ namespace MentorRouletteTracker
                 ImGui.TextWrapped(config.StorageError ?? "History storage is unavailable.");
                 ImGui.TextUnformatted("Recording is paused.");
                 ImGui.Spacing();
-                ImGui.TextWrapped("If the database is missing, unload Duty Tracker and restore it from a backup. Then reload the plugin.");
+                ImGui.TextWrapped("If the database is missing, unload Noumenon and restore it from a backup. Then reload the plugin.");
                 ImGui.TextWrapped($"Database: {Path.Combine(exportDirectory, "history.sqlite")}");
                 ImGui.TextWrapped("For other storage errors, check the Dalamud log before restoring files.");
                 return;

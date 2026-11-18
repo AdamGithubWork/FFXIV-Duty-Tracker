@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-## PvP Tracker by SaMo
+## [PvP Tracker](https://github.com/wrath16/PvpStats)
 
 The PvP integration references the `PvpStats` IPC channel and stored scoreboard formats.
 

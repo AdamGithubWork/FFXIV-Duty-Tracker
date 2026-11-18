@@ -79,7 +79,7 @@ namespace MentorRouletteTracker
                     try
                     {
                         ImGui.TextDisabled(
-                            "Turn this off before duties you don't want recorded.");
+                            "On by default and stays on until you turn it off. Your choice is saved when you reload or restart.");
                     }
                     finally
                     {
@@ -336,8 +336,10 @@ namespace MentorRouletteTracker
                 ImGui.PopStyleColor();
             }
             ImGui.TextWrapped(enabled
-                ? "PvP Tracker by SaMo provides player rosters, match scores, and results."
-                : "Enable PvP Tracker by SaMo in /xlplugins to record PvP.");
+                ? "PvP Tracker provides player rosters, match scores, and results."
+                : "Enable PvP Tracker in /xlplugins to record PvP.");
+            if (ImGui.SmallButton("PvP Tracker repository"))
+                Dalamud.Utility.Util.OpenLink("https://github.com/wrath16/PvpStats");
             ImGui.Spacing();
         }
 
@@ -414,13 +416,25 @@ namespace MentorRouletteTracker
             {
                 ImGui.OpenPopup("ConfirmClear");
             }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Clears saved history, even records hidden by filters. Your current duty, settings, exports, and backups stay.");
 
             if (ImGui.BeginPopup("ConfirmClear"))
             {
                 try
                 {
-                    ImGui.Text(
-                        "Clear all duty records? You can't undo this.");
+                    ImGui.PushTextWrapPos(ImGui.GetFontSize() * 26);
+                    try
+                    {
+                        ImGui.TextUnformatted("Clear all saved duty records?");
+                        ImGui.TextWrapped("This removes saved duties, player details, and notes from your history. You can't undo it here.");
+                        ImGui.Spacing();
+                        ImGui.TextWrapped("Your current duty and settings stay. CSV exports, backups, and older recovery copies aren't deleted.");
+                    }
+                    finally
+                    {
+                        ImGui.PopTextWrapPos();
+                    }
 
                     ImGui.Spacing();
 

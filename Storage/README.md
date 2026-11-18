@@ -7,6 +7,32 @@ in the JSON config. New installs create SQLite history automatically.
 and PvP updates. `SqliteHistoryStore` loads and saves them. There is one storage
 backend; JSON is used for settings and recovery files.
 
+## Clearing history and keeping copies
+
+**Clear all records** clears saved duties, both completed and incomplete, along with
+their player details and notes. It applies to the whole saved history, regardless
+of the current filters. It keeps the duty currently being recorded and your
+settings. That current duty can still be added to history when it ends.
+
+Clearing history doesn't delete CSV exports, upgrade backups, archived recovery
+copies, or abandoned temporary files. These copies can still contain the old
+duties, player names, and notes. An export already running also keeps the snapshot
+it started with.
+
+| File | When it's kept or removed |
+| --- | --- |
+| `history.sqlite` | The database stays in place. Clearing records removes saved duty/player rows but keeps the current duty. |
+| `backups/history-before-v*.sqlite` | Created before supported database upgrades. Kept until removed manually; there is no age limit or scheduled cleanup. These aren't regular, per-duty backups. |
+| `history-recovery-*.json` | Written after a failed or timed-out save. Compatible recovery data is loaded at startup. The current session's copy is removed after a successful save; a successfully handled startup recovery is removed too. |
+| `history-recovery-*.json.stale` | An older recovery copy, kept for review rather than restored over newer history. Not deleted by clearing records or on a schedule. |
+| `history-recovery-*.json.tmp` | A recovery write that didn't finish. Not loaded as history or removed by clearing records. |
+| `*.csv` | Separate exports. Clearing history doesn't change them. |
+| `*.csv.*.tmp` | Temporary export output, normally removed when the export finishes or fails. A process interruption can leave one behind; clearing history doesn't remove it. |
+
+The clear action can't be undone in the plugin. Keep recovery files if a save failed
+or history won't load; they may contain edits that never reached the database.
+Unload Noumenon before replacing the history database with a backup.
+
 ## Schema
 
 New databases create schema 12 directly:
@@ -62,7 +88,7 @@ controls stay hidden until the database can load. Restore a missing database whi
 the plugin is unloaded, then reload it. Only a new profile can create an empty
 database automatically.
 
-Only one loaded Duty Tracker instance can use a history database at a time. A second
+Only one loaded Noumenon instance can use a history database at a time. A second
 game client shows a message asking you to unload it in the first client and reload
 it in the second. The `history.sqlite.lock` file stays on disk, but ownership is
 released when the session finishes or its process exits; the file does not need deleting.

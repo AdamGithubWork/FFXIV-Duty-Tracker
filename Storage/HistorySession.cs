@@ -43,7 +43,7 @@ public sealed class HistorySession : IDisposable
         }
         catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
         {
-            throw new IOException("Duty Tracker history is already open in another game client. Unload Duty Tracker in that client, then reload it here.", ex);
+            throw new IOException("Noumenon history is already open in another game client. Unload Noumenon in that client, then reload it here.", ex);
         }
         try
         {

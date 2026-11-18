@@ -8,8 +8,8 @@ namespace MentorRouletteTracker
 {
     public sealed class Plugin : IDalamudPlugin
     {
-        public string Name => "Duty Tracker";
-        private const string CommandName = "/dt";
+        public string Name => "Noumenon";
+        private static readonly string[] CommandNames = ["/noumenon", "/nom"];
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
@@ -19,7 +19,7 @@ namespace MentorRouletteTracker
         private readonly MainWindow mainWindow;
         private readonly DutyTimerWindow dutyTimerWindow;
         private readonly PvpMatchService pvpMatchService;
-        private bool commandRegistered;
+        private readonly List<string> registeredCommands = new();
         private bool drawSubscribed;
         private bool mainUiSubscribed;
         private bool configUiSubscribed;
@@ -46,7 +46,7 @@ namespace MentorRouletteTracker
 
             try
             {
-                config.Initialize(pluginInterface, ex => log.Error(ex, "Duty Tracker history storage error."), createDatabase: savedConfig == null);
+                config.Initialize(pluginInterface, ex => log.Error(ex, "Noumenon history storage error."), createDatabase: savedConfig == null);
                 var trackedTypes = config.TrackedContentTypeIds.Distinct().ToList();
                 var timerTypes = config.TimerVisibleContentTypeIds.Distinct().ToList();
                 var columnSettingsChanged = config.UpgradePvpColumnSettings();
@@ -94,13 +94,16 @@ namespace MentorRouletteTracker
                     config);
                 windowSystem.AddWindow(dutyTimerWindow);
 
-                commandRegistered = commandManager.AddHandler(
-                    CommandName,
-                    new Dalamud.Game.Command.CommandInfo(OnCommand)
-                    {
-                        HelpMessage =
-                            "Open Duty Tracker. Use '/dt arm' to record duties or '/dt disarm' to stop recording.",
-                    });
+                foreach (var command in CommandNames)
+                {
+                    if (commandManager.AddHandler(command, new Dalamud.Game.Command.CommandInfo(OnCommand)
+                        {
+                            HelpMessage = $"Open Noumenon. Recording is on by default. Use '{command} disarm' to turn it off or '{command} arm' to turn it back on. Your choice is saved.",
+                        }))
+                        registeredCommands.Add(command);
+                    else
+                        log.Warning($"Could not register {command}; another plugin is using it.");
+                }
 
                 pluginInterface.UiBuilder.Draw += DrawUi;
                 drawSubscribed = true;
@@ -143,12 +146,12 @@ namespace MentorRouletteTracker
                         break;
                     }
                     tracker.Armed = true;
-                    log.Information("Duty Tracker: recording enabled.");
+                    log.Information("Noumenon: recording enabled.");
                     break;
 
                 case "disarm":
                     tracker.Armed = false;
-                    log.Information("Duty Tracker: recording disabled.");
+                    log.Information("Noumenon: recording disabled.");
                     break;
 
                 default:
@@ -169,8 +172,8 @@ namespace MentorRouletteTracker
                 Cleanup(() => pluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi, "main window callback");
             if (configUiSubscribed)
                 Cleanup(() => pluginInterface.UiBuilder.OpenConfigUi -= OnOpenConfigUi, "settings callback");
-            if (commandRegistered)
-                Cleanup(() => commandManager.RemoveHandler(CommandName), "command handler");
+            foreach (var command in registeredCommands)
+                Cleanup(() => commandManager.RemoveHandler(command), $"{command} command handler");
             Cleanup(windowSystem.RemoveAllWindows, "windows");
             Cleanup(() => pvpMatchService?.Dispose(), "PvP tracking");
             Cleanup(() => mainWindow?.Dispose(), "main window");

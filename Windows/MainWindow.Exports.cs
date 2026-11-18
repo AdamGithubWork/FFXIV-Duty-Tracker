@@ -13,7 +13,7 @@ namespace MentorRouletteTracker
             try
             {
                 var snapshot = CsvExporter.Capture(config.History.Records);
-                var path = Path.Combine(exportDirectory, $"duty_tracker_export_{DateTime.Now:yyyyMMdd_HHmmss_fff}.csv");
+                var path = Path.Combine(exportDirectory, $"noumenon_export_{DateTime.Now:yyyyMMdd_HHmmss_fff}.csv");
                 csvExportPath = path;
                 csvExportCount = snapshot.Length;
                 exportFailed = false;

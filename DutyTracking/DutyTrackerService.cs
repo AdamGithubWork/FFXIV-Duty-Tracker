@@ -289,7 +289,7 @@ namespace MentorRouletteTracker.DutyTracking
         {
             if (duty.ContentType.RowId == 6 && !PvpTrackingAvailable)
             {
-                log.Warning("PvP recording is disabled until PvP Tracker by SaMo is enabled.");
+                log.Warning("PvP recording is disabled until PvP Tracker is enabled.");
                 return;
             }
             ActiveContentTypeId = duty.ContentType.RowId;
