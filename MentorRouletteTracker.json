@@ -2,7 +2,7 @@
   "Author": "Adalith",
   "Name": "Noumenon",
   "InternalName": "MentorRouletteTracker",
-  "AssemblyVersion": "1.0.0.0",
+  "AssemblyVersion": "1.0.0.2",
   "Punchline": "duty tracker, in beta",
   "Description": "See your past duties, who you ran into, deaths, wipes, and milestones. Filter your history, add notes, or export it to CSV. PvP tracking requires PvP Tracker: https://github.com/wrath16/PvpStats",
   "ApplicableVersion": "any",
