@@ -160,74 +160,87 @@ namespace MentorRouletteTracker
                         records = records.OrderByDescending(record => record.Timestamp).ToList();
                     }
 
-                    foreach (var r in records)
+                    var clipper = ImGui.ImGuiListClipper();
+                    try
                     {
-                        var id = GetRecordUiId(r);
-
-                        ImGui.TableNextRow();
-
-                        SetConfiguredColumnIndex(0);
-
-                        if (ImGui.Selectable(
-                                $"{r.DutyName}###record{id}",
-                                false,
-                                ImGuiSelectableFlags.SpanAllColumns))
+                        clipper.Begin(records.Count);
+                        while (clipper.Step())
                         {
-                            selectedRecord = r;
-                            showDetailWindow = true;
-                        }
-
-                        if (ImGui.BeginPopupContextItem($"RecordContext{id}"))
-                        {
-                            try
+                            for (var index = clipper.DisplayStart; index < clipper.DisplayEnd; index++)
                             {
-                                ImGui.TextUnformatted(r.DutyName);
+                                var r = records[index];
+                                var id = GetRecordUiId(r);
 
-                                ImGui.Separator();
+                                ImGui.TableNextRow();
 
-                                if (ImGui.MenuItem("Edit record"))
+                                SetConfiguredColumnIndex(0);
+
+                                if (ImGui.Selectable(
+                                        $"{r.DutyName}###record{id}",
+                                        false,
+                                        ImGuiSelectableFlags.SpanAllColumns))
                                 {
-                                    StartEditingRecord(r);
+                                    selectedRecord = r;
+                                    showDetailWindow = true;
                                 }
 
-                                if (ImGui.MenuItem("Delete record"))
+                                if (ImGui.BeginPopupContextItem($"RecordContext{id}"))
                                 {
-                                    recordPendingDeletion = r;
-                                    openDeleteConfirmation = true;
+                                    try
+                                    {
+                                        ImGui.TextUnformatted(r.DutyName);
+
+                                        ImGui.Separator();
+
+                                        if (ImGui.MenuItem("Edit record"))
+                                        {
+                                            StartEditingRecord(r);
+                                        }
+
+                                        if (ImGui.MenuItem("Delete record"))
+                                        {
+                                            recordPendingDeletion = r;
+                                            openDeleteConfirmation = true;
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        ImGui.EndPopup();
+                                    }
                                 }
-                            }
-                            finally
-                            {
-                                ImGui.EndPopup();
+
+                                DrawTableCell(1, DutyClassification.DisplayType(r));
+                                DrawTableCell(2, r.PlayerJob);
+                                DrawTableCell(3, r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+                                DrawTableCell(4, FormatDuration(r.TimeInDuty));
+                                DrawTableCell(5, r.JoinedInProgress ? "Yes" : "No");
+                                DrawTableCell(6, r.WipeCount.ToString());
+                                if (SetConfiguredColumnIndex(7))
+                                    ImGui.TextUnformatted(Counts(r).Lalafell.ToString());
+                                DrawTableCell(8, r.Completed ? "Yes" : "No");
+                                if (SetConfiguredColumnIndex(9))
+                                    ImGui.TextUnformatted(Counts(r).Sprouts.ToString());
+                                if (SetConfiguredColumnIndex(10))
+                                    ImGui.TextUnformatted(Counts(r).Mentors.ToString());
+                                if (SetConfiguredColumnIndex(11))
+                                    ImGui.TextUnformatted(Counts(r).Players.ToString());
+                                if (SetConfiguredColumnIndex(12))
+                                    ImGui.TextUnformatted(Counts(r).Deaths?.ToString() ?? "-");
+                                DrawTableCell(13, r.DutyType == "PvP" ? PvpPlacementLabel(r.PvPPlacement) : "-");
+                                DrawTableCell(14, RecorderPvpPlayer(r)?.PvPDamageDealt?.ToString("N0") ?? "-");
+                                DrawTableCell(15, RecorderPvpPlayer(r)?.PvPKills?.ToString() ?? "-");
+                                DrawTableCell(16, RecorderPvpPlayer(r)?.PvPAssists?.ToString() ?? "-");
+                                DrawTableCell(17, RecorderPvpPlayer(r)?.PvPDamageTaken?.ToString("N0") ?? "-");
+                                DrawTableCell(18, RecorderPvpPlayer(r)?.PvPHealingDone?.ToString("N0") ?? "-");
+                                DrawTableCell(19, PvpDamagePerMinute(r, RecorderPvpPlayer(r))?.ToString("N0") ?? "-");
+                                DrawTableCell(20, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPDamageTaken)?.ToString("N0") ?? "-");
+                                DrawTableCell(21, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPHealingDone)?.ToString("N0") ?? "-");
                             }
                         }
-
-                        DrawTableCell(1, DutyClassification.DisplayType(r));
-                        DrawTableCell(2, r.PlayerJob);
-                        DrawTableCell(3, r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
-                        DrawTableCell(4, FormatDuration(r.TimeInDuty));
-                        DrawTableCell(5, r.JoinedInProgress ? "Yes" : "No");
-                        DrawTableCell(6, r.WipeCount.ToString());
-                        if (SetConfiguredColumnIndex(7))
-                            ImGui.TextUnformatted(Counts(r).Lalafell.ToString());
-                        DrawTableCell(8, r.Completed ? "Yes" : "No");
-                        if (SetConfiguredColumnIndex(9))
-                            ImGui.TextUnformatted(Counts(r).Sprouts.ToString());
-                        if (SetConfiguredColumnIndex(10))
-                            ImGui.TextUnformatted(Counts(r).Mentors.ToString());
-                        if (SetConfiguredColumnIndex(11))
-                            ImGui.TextUnformatted(Counts(r).Players.ToString());
-                        if (SetConfiguredColumnIndex(12))
-                            ImGui.TextUnformatted(Counts(r).Deaths?.ToString() ?? "-");
-                        DrawTableCell(13, r.DutyType == "PvP" ? PvpPlacementLabel(r.PvPPlacement) : "-");
-                        DrawTableCell(14, RecorderPvpPlayer(r)?.PvPDamageDealt?.ToString("N0") ?? "-");
-                        DrawTableCell(15, RecorderPvpPlayer(r)?.PvPKills?.ToString() ?? "-");
-                        DrawTableCell(16, RecorderPvpPlayer(r)?.PvPAssists?.ToString() ?? "-");
-                        DrawTableCell(17, RecorderPvpPlayer(r)?.PvPDamageTaken?.ToString("N0") ?? "-");
-                        DrawTableCell(18, RecorderPvpPlayer(r)?.PvPHealingDone?.ToString("N0") ?? "-");
-                        DrawTableCell(19, PvpDamagePerMinute(r, RecorderPvpPlayer(r))?.ToString("N0") ?? "-");
-                        DrawTableCell(20, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPDamageTaken)?.ToString("N0") ?? "-");
-                        DrawTableCell(21, PvpRatePerMinute(r, RecorderPvpPlayer(r)?.PvPHealingDone)?.ToString("N0") ?? "-");
+                    }
+                    finally
+                    {
+                        clipper.Destroy();
                     }
                 }
                 finally
