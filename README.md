@@ -20,6 +20,7 @@ let me know what happened.
 ## Using it
 
 Open with `/noumenon` or `/nom`.
+Use `/lastduty` to open your latest saved duty directly.
 
 Recording is on by default and stays on until you turn it off. Your choice is
 saved between reloads and restarts. Change it in Settings, or use `/nom disarm`

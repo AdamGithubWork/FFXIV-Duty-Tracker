@@ -116,6 +116,26 @@ namespace MentorRouletteTracker
             IsOpen = true;
         }
 
+        public void OpenLastDuty()
+        {
+            if (!config.StorageAvailable)
+            {
+                IsOpen = true;
+                return;
+            }
+
+            selectedRecord = config.History.Records.MaxBy(record => record.Timestamp);
+            showDetailWindow = selectedRecord != null;
+            if (selectedRecord == null)
+            {
+                openSettings = false;
+                dutyHistoryFilter = null;
+                dutyHistoryFullRunsOnly = false;
+                openDutyHistory = true;
+                IsOpen = true;
+            }
+        }
+
         public void OpenDutyHistory(string dutyName, bool fullRunsOnly = false)
         {
             openSettings = false;

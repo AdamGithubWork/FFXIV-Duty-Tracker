@@ -9,7 +9,7 @@ namespace MentorRouletteTracker
     public sealed class Plugin : IDalamudPlugin
     {
         public string Name => "Noumenon";
-        private static readonly string[] CommandNames = ["/noumenon", "/nom"];
+        private static readonly string[] CommandNames = ["/noumenon", "/nom", "/lastduty"];
         private readonly IDalamudPluginInterface pluginInterface;
         private readonly ICommandManager commandManager;
         private readonly IPluginLog log;
@@ -98,7 +98,9 @@ namespace MentorRouletteTracker
                 {
                     if (commandManager.AddHandler(command, new Dalamud.Game.Command.CommandInfo(OnCommand)
                         {
-                            HelpMessage = $"Open Noumenon. Recording is on by default. Use '{command} disarm' to turn it off or '{command} arm' to turn it back on. Your choice is saved.",
+                            HelpMessage = command == "/lastduty"
+                                ? "Open your latest saved duty in Noumenon."
+                                : $"Open Noumenon. Recording is on by default. Use '{command} disarm' to turn it off or '{command} arm' to turn it back on. Your choice is saved.",
                         }))
                         registeredCommands.Add(command);
                     else
@@ -134,6 +136,12 @@ namespace MentorRouletteTracker
 
         private void OnCommand(string command, string args)
         {
+            if (command == "/lastduty")
+            {
+                mainWindow.OpenLastDuty();
+                return;
+            }
+
             args = args.Trim().ToLowerInvariant();
 
             switch (args)
