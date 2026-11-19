@@ -10,6 +10,7 @@ namespace MentorRouletteTracker
         private readonly DutyTrackerService tracker;
         private readonly MainWindow mainWindow;
         private readonly Configuration config;
+        private DutyRecord? lastDuty;
         private DutyRecord? cachedDuty;
         private int cachedRecordCount = -1;
         private long cachedChangeVersion = -1;
@@ -22,7 +23,6 @@ namespace MentorRouletteTracker
             MainWindow mainWindow,
             Configuration config)
             : base("Duty Timer###MentorRouletteDutyTimer",
-                ImGuiWindowFlags.NoTitleBar |
                 ImGuiWindowFlags.AlwaysAutoResize |
                 ImGuiWindowFlags.NoScrollbar |
                 ImGuiWindowFlags.NoCollapse)
@@ -33,6 +33,16 @@ namespace MentorRouletteTracker
 
             IsOpen = true;
             RespectCloseHotkey = false;
+        }
+
+        public override void PreOpenCheck()
+        {
+            var duty = tracker.ActiveDuty;
+            if (!ReferenceEquals(lastDuty, duty))
+            {
+                lastDuty = duty;
+                IsOpen = true;
+            }
         }
 
         public override void PreDraw()
