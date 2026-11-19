@@ -30,6 +30,7 @@ namespace MentorRouletteTracker.DutyTracking
         private DateTime nextPvpPlayerRefresh = DateTime.MinValue;
         private DateTime nextHistorySave = DateTime.MinValue;
         private DutyRecord? current;
+        private uint? deathTrackingTerritory;
         private bool pendingRestoreNeeded;
         private bool territoryCheckNeeded;
         private bool dutyStartedWhileWaiting;
@@ -117,7 +118,7 @@ namespace MentorRouletteTracker.DutyTracking
                 if (sameRecorder && cfc != null && current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
                 {
                     ActiveContentTypeId = cfc.Value.ContentType.RowId;
-                    previousDeathStates.Clear();
+                    deathTrackingTerritory = clientState.TerritoryType;
                     return;
                 }
 
@@ -146,7 +147,10 @@ namespace MentorRouletteTracker.DutyTracking
         private void OnDutyWiped(IDutyStateEventArgs args)
         {
             if (current != null)
+            {
+                CaptureResetDeaths();
                 current.WipeCount++;
+            }
         }
 
         private void OnDutyCompleted(IDutyStateEventArgs args)
@@ -165,7 +169,10 @@ namespace MentorRouletteTracker.DutyTracking
                 if (current != null || pendingRestoreNeeded)
                 {
                     territoryCheckNeeded = true;
-                    previousDeathStates.Clear();
+                    if (!clientState.IsLoggedIn)
+                        previousDeathStates.Clear();
+                    else
+                        CaptureResetDeaths();
                 }
                 return;
             }
@@ -240,6 +247,7 @@ namespace MentorRouletteTracker.DutyTracking
                 current.DutyName == CapitalizeFirstLetter(cfc.Value.Name.ExtractText()))
             {
                 ActiveContentTypeId = cfc.Value.ContentType.RowId;
+                deathTrackingTerritory = clientState.TerritoryType;
             }
             else
             {
@@ -320,6 +328,7 @@ namespace MentorRouletteTracker.DutyTracking
             };
             current.PvPMode = DutyClassification.Mode(current);
 
+            deathTrackingTerritory = clientState.TerritoryType;
             previousDeathStates.Clear();
             nextPartyRefresh = DateTime.MinValue;
             nextPvpPlayerRefresh = DateTime.MinValue;
@@ -342,6 +351,7 @@ namespace MentorRouletteTracker.DutyTracking
             config.History.Save();
 
             current = null;
+            deathTrackingTerritory = null;
             ActiveContentTypeId = null;
             territoryCheckNeeded = false;
 
@@ -512,6 +522,24 @@ namespace MentorRouletteTracker.DutyTracking
             }
         }
 
+
+        private void CaptureResetDeaths()
+        {
+            // A wipe can start loading on the same frame that the players die.
+            if (current == null || pendingRestoreNeeded || !clientState.IsLoggedIn ||
+                deathTrackingTerritory != clientState.TerritoryType ||
+                !condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51] ||
+                !condition[ConditionFlag.BoundByDuty] ||
+                (current.DutyType == "PvP" && !PvpTrackingAvailable))
+                return;
+
+            var player = objectTable.LocalPlayer;
+            if (player == null || !player.IsValid() || player.HomeWorld.RowId == 0 || !player.HomeWorld.IsValid ||
+                !IsRecordedByCurrentPlayer(current))
+                return;
+
+            UpdateDeathStates();
+        }
 
         private void UpdateDeathStates()
         {
