@@ -7,11 +7,58 @@ namespace MentorRouletteTracker
 {
     public partial class MainWindow
     {
+        private DutyAnalysisData? dutyAnalysisData;
+        private string? dutyAnalysisFilterKey;
+        private long dutyAnalysisHistoryVersion = -1;
+        private int dutyAnalysisRecordCount = -1;
+        private DateTime nextDutyAnalysisRefresh = DateTime.MinValue;
+
+        private sealed record DutyCount(string Key, int Count);
+        private sealed record DutyHeatmapCell(DayOfWeek Day, string TimePeriod, int Count, double AverageDuration);
+        private sealed record DutyAnalysisData(
+            int CompletedDuties, TimeSpan? AverageFullRunTime, double AverageWipes, int JoinedInProgress,
+            List<DutyCount> TypeCounts, DutyCount? MostCommon, List<DutyHeatmapCell> Heatmap,
+            List<DutyAnalysisRow> Rows);
+
+        private DutyAnalysisData GetDutyAnalysisData()
+        {
+            var filterKey = GetPlayerViewFilterKey();
+            var now = DateTime.UtcNow;
+            if (dutyAnalysisData != null &&
+                dutyAnalysisHistoryVersion == config.History.ChangeVersion &&
+                dutyAnalysisRecordCount == config.History.Records.Count &&
+                dutyAnalysisFilterKey == filterKey &&
+                (selectedTimeRange is not (>= 1 and <= 3) || now < nextDutyAnalysisRefresh))
+                return dutyAnalysisData;
+
+            var records = FilterDutyRecords().OrderBy(record => record.Timestamp).ToList();
+            var fullRuns = records.Where(record => !record.JoinedInProgress).ToList();
+            var typeCounts = records.GroupBy(DutyClassification.DisplayType)
+                .Select(group => new DutyCount(group.Key, group.Count()))
+                .OrderByDescending(group => group.Count).ThenBy(group => group.Key).ToList();
+            var mostCommon = records.GroupBy(record => record.DutyName)
+                .Select(group => new DutyCount(group.Key, group.Count()))
+                .OrderByDescending(group => group.Count).ThenBy(group => group.Key).FirstOrDefault();
+            var heatmap = records.GroupBy(record => (record.Timestamp.DayOfWeek, Period: GetTimePeriod(record.Timestamp)))
+                .Select(group => new DutyHeatmapCell(group.Key.DayOfWeek, group.Key.Period,
+                    group.Count(), group.Average(record => record.TimeInDuty.TotalMinutes))).ToList();
+
+            dutyAnalysisData = new DutyAnalysisData(
+                records.Count,
+                fullRuns.Count == 0 ? null : TimeSpan.FromSeconds(fullRuns.Average(record => record.TimeInDuty.TotalSeconds)),
+                records.Count == 0 ? 0 : records.Average(record => record.WipeCount),
+                records.Count(record => record.JoinedInProgress), typeCounts, mostCommon, heatmap,
+                BuildDutyAnalysisRows(records));
+            dutyAnalysisFilterKey = filterKey;
+            dutyAnalysisHistoryVersion = config.History.ChangeVersion;
+            dutyAnalysisRecordCount = config.History.Records.Count;
+            nextDutyAnalysisRefresh = now.AddSeconds(1);
+            return dutyAnalysisData;
+        }
+
         private void DrawDutyAnalysisTab()
         {
-            var records = FilterDutyRecords()
-                .OrderBy(x => x.Timestamp)
-                .ToList();
+            var data = GetDutyAnalysisData();
 
             try
             {
@@ -26,33 +73,33 @@ namespace MentorRouletteTracker
                     ImGui.Separator();
                     ImGui.Spacing();
 
-                    if (records.Count == 0)
+                    if (data.CompletedDuties == 0)
                     {
                         ImGui.TextDisabled("No completed duties with these filters.");
                     }
                     else
                     {
-                        DrawDutyOverview(records);
+                        DrawDutyOverview(data);
                         ImGui.Spacing();
                         ImGui.Separator();
                         ImGui.Spacing();
 
-                        DrawDutyTypeStatistics(records);
+                        DrawDutyTypeStatistics(data.TypeCounts);
                         ImGui.Spacing();
                         ImGui.Separator();
                         ImGui.Spacing();
 
-                        DrawMostCommonDuty(records);
+                        DrawMostCommonDuty(data.MostCommon!);
                         ImGui.Spacing();
                         ImGui.Separator();
                         ImGui.Spacing();
 
-                        DrawDutiesHeatmap(records);
+                        DrawDutiesHeatmap(data.Heatmap);
                         ImGui.Spacing();
                         ImGui.Separator();
                         ImGui.Spacing();
 
-                        DrawDutySpecificDetails(records);
+                        DrawDutySpecificDetails(data.Rows);
                     }
                 }
             }
@@ -62,7 +109,7 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawDutyOverview(List<DutyRecord> records)
+        private void DrawDutyOverview(DutyAnalysisData data)
         {
             DrawSectionHeading("Overview");
             ImGui.Spacing();
@@ -79,17 +126,11 @@ namespace MentorRouletteTracker
                     ImGui.TableSetupColumn("Statistic");
                     ImGui.TableSetupColumn("Value");
 
-                    DrawStatisticRow("Completed Duties", records.Count.ToString());
-                    var fullRuns = records.Where(record => !record.JoinedInProgress).ToList();
+                    DrawStatisticRow("Completed Duties", data.CompletedDuties.ToString());
                     DrawStatisticRow("Average Duty Length (full runs)",
-                        fullRuns.Count == 0
-                            ? "N/A"
-                            : FormatDuration(TimeSpan.FromSeconds(
-                                fullRuns.Average(record => record.TimeInDuty.TotalSeconds))));
-                    DrawStatisticRow("Average Wipes / Duty",
-                        records.Average(x => x.WipeCount).ToString("F2"));
-                    DrawStatisticRow("Joined In Progress",
-                        records.Count(x => x.JoinedInProgress).ToString());
+                        data.AverageFullRunTime.HasValue ? FormatDuration(data.AverageFullRunTime.Value) : "N/A");
+                    DrawStatisticRow("Average Wipes / Duty", data.AverageWipes.ToString("F2"));
+                    DrawStatisticRow("Joined In Progress", data.JoinedInProgress.ToString());
                 }
                 finally
                 {
@@ -98,17 +139,11 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawDutyTypeStatistics(List<DutyRecord> records)
+        private void DrawDutyTypeStatistics(List<DutyCount> typeCounts)
         {
             DrawSectionHeading("Duties by Type");
 
             ImGui.Spacing();
-
-            var typeCounts = records
-                .GroupBy(DutyClassification.DisplayType)
-                .OrderByDescending(x => x.Count())
-                .ThenBy(x => x.Key)
-                .ToList();
 
             if (BeginStyledTable(
                 "dutyTypeStats",
@@ -133,7 +168,7 @@ namespace MentorRouletteTracker
 
                         ImGui.TableSetColumnIndex(1);
                         ImGui.TextUnformatted(
-                            group.Count().ToString());
+                            group.Count.ToString());
                     }
                 }
                 finally
@@ -143,17 +178,11 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawMostCommonDuty(List<DutyRecord> records)
+        private void DrawMostCommonDuty(DutyCount mostCommon)
         {
             DrawSectionHeading("Most Common Duty");
 
             ImGui.Spacing();
-
-            var mostCommon = records
-                .GroupBy(x => x.DutyName)
-                .OrderByDescending(x => x.Count())
-                .ThenBy(x => x.Key)
-                .First();
 
             if (BeginStyledTable(
                 "mostCommonDuty",
@@ -174,7 +203,7 @@ namespace MentorRouletteTracker
 
                     ImGui.TableSetColumnIndex(1);
                     ImGui.TextUnformatted(
-                        mostCommon.Count().ToString());
+                        mostCommon.Count.ToString());
                 }
                 finally
                 {
@@ -183,23 +212,8 @@ namespace MentorRouletteTracker
             }
         }
 
-        private void DrawDutiesHeatmap(List<DutyRecord> records)
+        private void DrawDutiesHeatmap(List<DutyHeatmapCell> dutiesByDayAndTime)
         {
-            var dutiesByDayAndTime = records
-                .GroupBy(record => new
-                {
-                    Day = record.Timestamp.DayOfWeek,
-                    TimePeriod = GetTimePeriod(record.Timestamp)
-                })
-                .Select(group => new
-                {
-                    group.Key.Day,
-                    group.Key.TimePeriod,
-                    Count = group.Count(),
-                    AverageDuration = group.Average(x => x.TimeInDuty.TotalMinutes)
-                })
-                .ToList();
-
             DrawSectionHeading("Duties by Day and Time");
             ImGui.Separator();
 
@@ -396,7 +410,7 @@ namespace MentorRouletteTracker
             }).ToList();
         }
 
-        private void DrawDutySpecificDetails(List<DutyRecord> records)
+        private void DrawDutySpecificDetails(List<DutyAnalysisRow> stats)
         {
             DrawSectionHeading("Stats by duty");
             ImGui.PushTextWrapPos();
@@ -409,7 +423,6 @@ namespace MentorRouletteTracker
                 ImGui.PopTextWrapPos();
             }
             ImGui.Spacing();
-            var stats = BuildDutyAnalysisRows(records);
             if (stats.Count == 0)
             {
                 ImGui.TextDisabled("No duties with these filters.");

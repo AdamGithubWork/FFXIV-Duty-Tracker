@@ -43,9 +43,7 @@ namespace MentorRouletteTracker
             public PvpStatistics Pvp { get; init; } = new();
         }
 
-        private PlayerViewData GetPlayerViewData()
-        {
-            var filterKey = JsonSerializer.Serialize(new
+        private string GetPlayerViewFilterKey() => JsonSerializer.Serialize(new
             {
                 DutyTypes = selectedDutyTypes.Order(StringComparer.Ordinal),
                 PvpModes = selectedPvpModes.Order(),
@@ -63,6 +61,10 @@ namespace MentorRouletteTracker
                 config.IncludeSelfInStatistics,
                 LocalPlayer = objectTable.LocalPlayer?.Name.TextValue
             });
+
+        private PlayerViewData GetPlayerViewData()
+        {
+            var filterKey = GetPlayerViewFilterKey();
             var now = DateTime.UtcNow;
             if (playerViewData != null &&
                 playerViewHistoryVersion == config.History.ChangeVersion &&
