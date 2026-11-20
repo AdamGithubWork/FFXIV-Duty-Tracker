@@ -23,6 +23,7 @@ namespace MentorRouletteTracker
             MainWindow mainWindow,
             Configuration config)
             : base("Duty Timer###MentorRouletteDutyTimer",
+                ImGuiWindowFlags.NoTitleBar |
                 ImGuiWindowFlags.AlwaysAutoResize |
                 ImGuiWindowFlags.NoScrollbar |
                 ImGuiWindowFlags.NoCollapse)
@@ -75,6 +76,20 @@ namespace MentorRouletteTracker
             RefreshAverage(duty);
 
             ImGui.TextUnformatted(duty.DutyName);
+            ImGui.SameLine();
+            ImGui.PushStyleColor(ImGuiCol.Button, Vector4.Zero);
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            try
+            {
+                if (ImGui.SmallButton("×##CloseDutyTimer"))
+                    IsOpen = false;
+            }
+            finally
+            {
+                ImGui.PopStyleColor(2);
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Hide until your next duty");
             ImGui.Separator();
 
             ImGui.TextUnformatted("Average clear time:");
