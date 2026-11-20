@@ -242,9 +242,9 @@ namespace MentorRouletteTracker.PvP
         }
 
         private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" &&
-            (record.PvPRosterComplete == true
+            (!record.Completed || (record.PvPRosterComplete == true
                 ? !record.PvPCombatStatsComplete || !record.PvPResultsComplete || !record.PvPExtendedStatsComplete
-                : record.PvPRosterComplete == false || record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue));
+                : record.PvPRosterComplete == false || record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue)));
 
         private bool CanKeepLooking(DateTime time, DateTime now)
         {
@@ -279,6 +279,11 @@ namespace MentorRouletteTracker.PvP
                 log.Warning($"PvP scoreboard {result.MatchId}: no matching duty record.");
                 return false;
             }
+            if (record.PvPMode != PvpMode.Unknown && record.PvPMode != result.Mode)
+            {
+                log.Warning($"PvP scoreboard {result.MatchId}: mode does not match the duty.");
+                return false;
+            }
             if (!string.IsNullOrWhiteSpace(result.RecorderName) && !string.IsNullOrWhiteSpace(record.RecorderName) &&
                 !string.IsNullOrWhiteSpace(record.RecorderWorld) &&
                 (result.RecorderName != record.RecorderName || result.RecorderWorld != record.RecorderWorld))
@@ -298,6 +303,21 @@ namespace MentorRouletteTracker.PvP
                 return true;
 
             var changed = false;
+            var recorderResult = result.Players.GetValueOrDefault(recorderKey);
+            var confirmedResult = result.Mode switch
+            {
+                PvpMode.Frontline => recorderResult?.Placement is >= 1 and <= 3,
+                PvpMode.CrystallineConflict or PvpMode.RivalWings => recorderResult?.Placement is 1 or 2,
+                _ => false
+            };
+            if (!record.Completed && confirmedResult &&
+                !string.IsNullOrWhiteSpace(record.RecorderName) && !string.IsNullOrWhiteSpace(record.RecorderWorld) &&
+                result.RecorderName == record.RecorderName && result.RecorderWorld == record.RecorderWorld &&
+                recorderResult!.Name == record.RecorderName && recorderResult.World == record.RecorderWorld)
+            {
+                record.Completed = true;
+                changed = true;
+            }
             if (record.PvPMode != result.Mode)
             {
                 record.PvPMode = result.Mode;
@@ -399,7 +419,7 @@ namespace MentorRouletteTracker.PvP
                 config.History.Save();
                 log.Information($"PvP scoreboard applied: {record.DutyName} | {result.Players.Count} scoreboard players, {record.Party.Count} recorded players.");
             }
-            return complete && resultsComplete && extendedComplete;
+            return record.Completed && complete && resultsComplete && extendedComplete;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
