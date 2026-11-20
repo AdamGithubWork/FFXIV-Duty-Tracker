@@ -156,6 +156,24 @@ namespace MentorRouletteTracker.DutyTracking
         private void OnDutyCompleted(IDutyStateEventArgs args)
         {
             dutyStartedWhileWaiting = false;
+            if (current == null && pendingRestoreNeeded)
+            {
+                var pending = config.History.PendingDuty;
+                var player = objectTable.LocalPlayer;
+                if (pending == null || !clientState.IsLoggedIn || player == null || !player.IsValid() ||
+                    player.HomeWorld.RowId == 0 || !player.HomeWorld.IsValid || !IsRecordedByCurrentPlayer(pending))
+                    return;
+
+                ContentFinderCondition? duty = args != null && args.ContentFinderCondition.IsValid
+                    ? args.ContentFinderCondition.Value
+                    : FindContentFinderCondition(args?.TerritoryType.RowId ?? clientState.TerritoryType);
+                if (duty == null || pending.DutyName != CapitalizeFirstLetter(duty.Value.Name.ExtractText()))
+                    return;
+
+                // Completion can arrive before the first safe frame restores this duty.
+                current = pending;
+                pendingRestoreNeeded = false;
+            }
             CaptureNearbyPvpPlayers();
             FinalizeCurrent(completed: true);
         }
