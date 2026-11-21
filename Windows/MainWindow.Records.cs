@@ -228,12 +228,13 @@ namespace MentorRouletteTracker
                                 SetConfiguredColumnIndex(0);
 
                                 var warnings = GetRecordDataWarnings(r);
+                                var partial = IsPartialPvpScoreboard(r);
                                 if (warnings.Length > 0)
                                     ImGui.PushStyleColor(ImGuiCol.Text, RecordWarningColor);
                                 try
                                 {
                                     if (ImGui.Selectable(
-                                            $"{(warnings.Length > 0 ? "[!] " : "")}{r.DutyName}###record{id}",
+                                            $"{(warnings.Length > 0 ? "[!] " : "")}{r.DutyName}{(partial ? " (Partial)" : "")}###record{id}",
                                             false,
                                             ImGuiSelectableFlags.SpanAllColumns))
                                     {
@@ -246,7 +247,7 @@ namespace MentorRouletteTracker
                                     if (warnings.Length > 0)
                                         ImGui.PopStyleColor();
                                 }
-                                var showWarningTooltip = warnings.Length > 0 && ImGui.IsItemHovered();
+                                var showWarningTooltip = (warnings.Length > 0 || partial) && ImGui.IsItemHovered();
 
                                 if (ImGui.BeginPopupContextItem($"RecordContext{id}"))
                                 {
@@ -274,7 +275,9 @@ namespace MentorRouletteTracker
                                 }
 
                                 if (showWarningTooltip)
-                                    ImGui.SetTooltip("Missing recording data\n" + string.Join("\n", warnings));
+                                    ImGui.SetTooltip(warnings.Length > 0
+                                        ? "Missing recording data\n" + string.Join("\n", warnings)
+                                        : "Partial PvP scoreboard\nAvailable stats are saved. Automatic lookups have finished.");
 
                                 DrawTableCell(1, DutyClassification.DisplayType(r));
                                 DrawTableCell(2, r.PlayerJob);

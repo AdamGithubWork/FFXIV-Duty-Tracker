@@ -55,6 +55,7 @@ public sealed partial class SqliteHistoryStore
                     PvPMode = (PvP.PvpMode)checked((int)(long)reader["pvp_mode"]),
                     PvPResultsComplete = (long)reader["pvp_results_complete"] != 0,
                     PvPExtendedStatsComplete = (long)reader["pvp_extended_stats_complete"] != 0,
+                    PvPLookupFinished = (long)reader["pvp_lookup_finished"] != 0,
                     PvPPlacement = reader["pvp_placement"] is DBNull ? null : checked((int)(long)reader["pvp_placement"])
                 };
                 string id = (string)reader["id"];
@@ -186,6 +187,7 @@ public sealed partial class SqliteHistoryStore
                 ["pvp_mode"] = (int)record.PvPMode,
                 ["pvp_results_complete"] = record.PvPResultsComplete ? 1 : 0,
                 ["pvp_extended_stats_complete"] = record.PvPExtendedStatsComplete ? 1 : 0,
+                ["pvp_lookup_finished"] = record.PvPLookupFinished ? 1 : 0,
                 ["is_pending"] = row.Pending ? 1 : 0,
                 ["checkpoint_utc"] = record.CheckpointUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
             };

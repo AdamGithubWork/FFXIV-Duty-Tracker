@@ -8,6 +8,12 @@ public partial class MainWindow
 {
     private static readonly Vector4 RecordWarningColor = new(1f, 0.75f, 0.3f, 1f);
 
+    private static bool IsPartialPvpScoreboard(DutyRecord record) => record.DutyType == "PvP" &&
+        record.PvPLookupFinished && (record.PvPRosterComplete != true || !record.PvPCombatStatsComplete ||
+            !record.PvPResultsComplete || !record.PvPExtendedStatsComplete) &&
+        record.Party.Any(player => player.PvPScoreboardDeaths.HasValue || player.PvPDamageDealt.HasValue ||
+            player.PvPHealingDone.HasValue);
+
     private static string[] GetRecordDataWarnings(DutyRecord record)
     {
         List<string>? warnings = null;
@@ -18,10 +24,10 @@ public partial class MainWindow
         if (string.IsNullOrWhiteSpace(record.RecorderName) || string.IsNullOrWhiteSpace(record.RecorderWorld))
             Add("The recording character is unknown.");
 
-        if (record.DutyType == "PvP")
+        if (record.DutyType == "PvP" && !IsPartialPvpScoreboard(record))
         {
             if (record.PvPRosterComplete == false)
-                Add("The full PvP scoreboard hasn't been imported.");
+                Add(record.PvPLookupFinished ? "No PvP scoreboard was available." : "The full PvP scoreboard hasn't been imported.");
             else if (record.PvPRosterComplete == true)
             {
                 if (!record.PvPCombatStatsComplete)
@@ -41,17 +47,23 @@ public partial class MainWindow
     private static void DrawRecordDataWarnings(DutyRecord record)
     {
         var warnings = GetRecordDataWarnings(record);
-        if (warnings.Length == 0)
+        var partial = IsPartialPvpScoreboard(record);
+        if (warnings.Length == 0 && !partial)
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(RecordWarningColor, "Some recording data is missing");
+        if (warnings.Length > 0)
+            ImGui.TextColored(RecordWarningColor, "Some recording data is missing");
+        else
+            ImGui.TextDisabled("Partial PvP scoreboard");
         ImGui.PushTextWrapPos();
         try
         {
             foreach (var warning in warnings)
                 ImGui.TextUnformatted("- " + warning);
-            if (record.DutyType == "PvP")
+            if (partial)
+                ImGui.TextUnformatted("Available stats are saved. Automatic lookups have finished; missing entries stay unknown.");
+            else if (record.DutyType == "PvP" && !record.PvPLookupFinished)
                 ImGui.TextDisabled("PvP results can take a few minutes to appear.");
         }
         finally

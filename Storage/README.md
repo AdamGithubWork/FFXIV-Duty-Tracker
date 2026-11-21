@@ -35,7 +35,7 @@ Unload Noumenon before replacing the history database with a backup.
 
 ## Schema
 
-New databases create schema 12 directly:
+New databases create schema 13 directly:
 
 - `duty_runs`: duty records, including the pending duty and its checkpoint.
 - `duty_players`: party snapshots in their recorded order.
@@ -47,7 +47,7 @@ Checkpoints stay in UTC. Durations use .NET ticks, and unknown scoreboard deaths
 stay null rather than becoming zero.
 
 `pvp_roster_complete` tracks whether a new PvP scoreboard roster was fully imported.
-False imports can resume after reload. `pvp_combat_stats_complete` records whether
+False imports can resume after reload while automatic lookup is still active. `pvp_combat_stats_complete` records whether
 the full source scoreboard also supplied teams, damage, kills, and assists. Previously
 imported full rosters can gain those fields on reload. Null keeps older records
 unchanged unless they already need missing scoreboard results recovered.
@@ -60,10 +60,15 @@ inheriting the recorder's result. `pvp_results_complete` tracks finished player
 results separately from combat scores. Older complete scoreboards get another
 lookup for missing results; absent results stay null.
 
+`pvp_lookup_finished` remembers when automatic lookup has finished, including after
+the 30-minute retry window. Reloading doesn't restart it. Partial scoreboards keep
+the available stats, and missing entries stay unknown. Older records get one last
+lookup before they stop.
+
 ## Database upgrades
 
-Schemas 6 through 11 upgrade to schema 12. Before upgrading, the plugin saves a
-complete backup under `backups/history-before-v12-*.sqlite`. If the backup fails,
+Schemas 6 through 12 upgrade to schema 13. Before upgrading, the plugin saves a
+complete backup under `backups/history-before-v13-*.sqlite`. If the backup fails,
 the upgrade stops.
 
 Upgrades keep existing records, IDs, player order, and the write revision. They add

@@ -24,5 +24,6 @@ namespace MentorRouletteTracker.DutyTracking
         public PvP.PvpMode PvPMode { get; set; }
         public bool PvPResultsComplete { get; set; }
         public bool PvPExtendedStatsComplete { get; set; }
+        public bool PvPLookupFinished { get; set; }
     }
 }

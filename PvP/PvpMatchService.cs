@@ -39,6 +39,7 @@ namespace MentorRouletteTracker.PvP
             public DateTime NextCheck { get; set; }
             public PvpMode Mode { get; set; }
             public bool AllowCatchUp { get; set; }
+            public DutyRecord? Record { get; set; }
             public Task<PvpMode>? ModeRead { get; set; }
             public Task<PvpMatchResult?>? ScoreboardRead { get; set; }
             public bool ReadInProgress => ModeRead != null || ScoreboardRead != null;
@@ -109,6 +110,11 @@ namespace MentorRouletteTracker.PvP
                 restoreTimes ??= records.Where(NeedsPvpLookup)
                     .Select(record => record.Timestamp).ToArray();
                 var times = restoreTimes;
+                if (times.Length == 0)
+                {
+                    restoreNeeded = false;
+                    return;
+                }
                 // Only the timestamp copy goes to the worker. History stays on the game thread.
                 restoreTask = Task.Run(() => findMatches(times));
                 return;
@@ -136,10 +142,15 @@ namespace MentorRouletteTracker.PvP
             }
             foreach (var match in matches)
             {
-                if (processedPvpMatches.Contains(match.MatchId) || pendingPvpMatches.ContainsKey(match.MatchId))
-                    continue;
                 var record = FindMatchingRecord(match.DutyStartTime, includePending: true);
                 if (record == null || !NeedsPvpLookup(record))
+                    continue;
+                if (pendingPvpMatches.TryGetValue(match.MatchId, out var existing))
+                {
+                    existing.Record ??= record;
+                    continue;
+                }
+                if (processedPvpMatches.Contains(match.MatchId))
                     continue;
 
                 var queuedAt = ReferenceEquals(record, config.History.PendingDuty)
@@ -147,6 +158,7 @@ namespace MentorRouletteTracker.PvP
                 if (queuedAt > now)
                     queuedAt = now;
                 var pending = new PendingMatch(queuedAt, match.Mode);
+                pending.Record = record;
                 pending.NextCheck = pending.FirstCheck > now ? pending.FirstCheck : now;
                 // Older duties get one lookup for results that are already available.
                 pending.AllowCatchUp = true;
@@ -175,8 +187,7 @@ namespace MentorRouletteTracker.PvP
 
         private void QueueSavedMatch(string matchId, DateTime queuedAt)
         {
-            if (processedPvpMatches.Contains(matchId) ||
-                pendingPvpMatches.ContainsKey(matchId))
+            if (processedPvpMatches.Contains(matchId) || pendingPvpMatches.ContainsKey(matchId))
                 return;
 
             pendingPvpMatches.Add(matchId, new PendingMatch(queuedAt)
@@ -221,6 +232,8 @@ namespace MentorRouletteTracker.PvP
                 try
                 {
                     var result = scoreboardRead.GetAwaiter().GetResult();
+                    if (result != null)
+                        pending.Record ??= FindMatchingRecord(result.DutyStartTime, includePending: true);
                     if (result != null && ApplyPvpMatchResult(result))
                     {
                         RememberProcessedMatch(matchId);
@@ -241,7 +254,7 @@ namespace MentorRouletteTracker.PvP
             }
         }
 
-        private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" &&
+        private static bool NeedsPvpLookup(DutyRecord record) => record.DutyType == "PvP" && !record.PvPLookupFinished &&
             (!record.Completed || (record.PvPRosterComplete == true
                 ? !record.PvPCombatStatsComplete || !record.PvPResultsComplete || !record.PvPExtendedStatsComplete
                 : record.PvPRosterComplete == false || record.Party.Any(player => !player.PvPScoreboardDeaths.HasValue)));
@@ -249,9 +262,24 @@ namespace MentorRouletteTracker.PvP
         private bool CanKeepLooking(DateTime time, DateTime now)
         {
             var record = FindMatchingRecord(time, includePending: true);
-            return record != null && NeedsPvpLookup(record) &&
-                (ReferenceEquals(record, config.History.PendingDuty) ||
-                 now - (record.Timestamp.ToUniversalTime() + record.TimeInDuty) < PvpRetryLimit);
+            if (record == null || !NeedsPvpLookup(record))
+                return false;
+            if (ReferenceEquals(record, config.History.PendingDuty) ||
+                now - (record.Timestamp.ToUniversalTime() + record.TimeInDuty) < PvpRetryLimit)
+                return true;
+
+            FinishPvpLookup(record);
+            return false;
+        }
+
+        private void FinishPvpLookup(DutyRecord? record)
+        {
+            if (record == null || record.PvPLookupFinished || ReferenceEquals(record, config.History.PendingDuty) ||
+                !config.History.Records.Contains(record))
+                return;
+
+            record.PvPLookupFinished = true;
+            config.History.Save();
         }
 
         private void DiscoverNewDuties()
@@ -299,7 +327,8 @@ namespace MentorRouletteTracker.PvP
                 log.Warning($"PvP scoreboard {result.MatchId}: no recorded players matched the roster.");
                 return false;
             }
-            if (record.PvPRosterComplete == true && !NeedsPvpLookup(record))
+            if (record.Completed && record.PvPRosterComplete == true && record.PvPCombatStatsComplete &&
+                record.PvPResultsComplete && record.PvPExtendedStatsComplete)
                 return true;
 
             var changed = false;
@@ -414,12 +443,18 @@ namespace MentorRouletteTracker.PvP
                 record.PvPRosterComplete = complete;
                 changed = true;
             }
+            var finished = record.Completed && complete && resultsComplete && extendedComplete;
+            if (finished && !record.PvPLookupFinished)
+            {
+                record.PvPLookupFinished = true;
+                changed = true;
+            }
             if (changed)
             {
                 config.History.Save();
                 log.Information($"PvP scoreboard applied: {record.DutyName} | {result.Players.Count} scoreboard players, {record.Party.Count} recorded players.");
             }
-            return record.Completed && complete && resultsComplete && extendedComplete;
+            return finished;
         }
 
         private void OnFrameworkUpdate(IFramework framework)
@@ -450,11 +485,19 @@ namespace MentorRouletteTracker.PvP
             {
                 if (pending.ReadInProgress)
                     continue;
-                if (now - pending.QueuedAt >= PvpRetryLimit && !pending.AllowCatchUp)
+                if (pending.Record?.PvPLookupFinished == true)
                 {
                     pendingPvpMatches.Remove(matchId);
                     RememberProcessedMatch(matchId);
-                    log.Warning($"PvP scoreboard {matchId}: stopped retrying after 30 minutes; results are still incomplete.");
+                    continue;
+                }
+                if (now - pending.QueuedAt >= PvpRetryLimit && !pending.AllowCatchUp &&
+                    (pending.Record == null || !ReferenceEquals(pending.Record, config.History.PendingDuty)))
+                {
+                    FinishPvpLookup(pending.Record);
+                    pendingPvpMatches.Remove(matchId);
+                    RememberProcessedMatch(matchId);
+                    log.Information($"PvP scoreboard {matchId}: automatic lookup finished; keeping available results.");
                     continue;
                 }
 
