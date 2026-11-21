@@ -7,6 +7,17 @@ in the JSON config. New installs create SQLite history automatically.
 and PvP updates. `SqliteHistoryStore` loads and saves them. There is one storage
 backend; JSON is used for settings and recovery files.
 
+## Manual backups
+
+Use **Settings → History & exports → Create backup** to save a history backup.
+It saves current changes first, then takes a SQLite snapshot on a background task.
+The backup includes duty/player records, notes, and the pending duty. Settings and
+CSV exports aren't included. **Open backups folder** opens the backup directory.
+
+Manual backups are named `history-manual-*.sqlite` and don't need separate WAL or
+SHM files. They aren't removed automatically. Restore controls aren't available yet;
+unload Noumenon before replacing a history database manually.
+
 ## Clearing history and keeping copies
 
 **Clear all records** clears saved duties, both completed and incomplete, along with
@@ -23,6 +34,8 @@ it started with.
 | --- | --- |
 | `history.sqlite` | The database stays in place. Clearing records removes saved duty/player rows but keeps the current duty. |
 | `backups/history-before-v*.sqlite` | Created before supported database upgrades. Kept until removed manually; there is no age limit or scheduled cleanup. These aren't regular, per-duty backups. |
+| `backups/history-manual-*.sqlite` | Created with the backup button. Kept until removed manually, including after clearing records. |
+| `backups/history-manual-*.sqlite.tmp*` | Unfinished manual backup files. Normally removed if creating the backup fails; a process interruption can leave them behind. |
 | `history-recovery-*.json` | Written after a failed or timed-out save. Compatible recovery data is loaded at startup. The current session's copy is removed after a successful save; a successfully handled startup recovery is removed too. |
 | `history-recovery-*.json.stale` | An older recovery copy, kept for review rather than restored over newer history. Not deleted by clearing records or on a schedule. |
 | `history-recovery-*.json.tmp` | A recovery write that didn't finish. Not loaded as history or removed by clearing records. |

@@ -397,7 +397,37 @@ namespace MentorRouletteTracker
         private void DrawHistorySettings()
         {
             UpdateCsvExport();
-            ImGui.TextWrapped("Export all saved records to CSV, or clear saved duty history. Filters don't limit these actions.");
+            UpdateHistoryBackup();
+            ImGui.TextWrapped("Back up your history, export it to CSV, or clear saved records. Filters don't limit these actions.");
+            ImGui.Spacing();
+            ImGui.BeginDisabled(historyBackupTask != null);
+            try
+            {
+                if (ImGui.Button("Create backup"))
+                    StartHistoryBackup();
+            }
+            finally
+            {
+                ImGui.EndDisabled();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Saves duty history, player details, notes, and your current duty. Settings and CSV files aren't included.");
+            ImGui.SameLine();
+            if (ImGui.Button("Open backups folder"))
+                OpenHistoryBackupsFolder();
+            if (!string.IsNullOrEmpty(lastBackupMessage))
+            {
+                ImGui.PushTextWrapPos();
+                try
+                {
+                    ImGui.TextColored(backupFailed ? new Vector4(1f, 0.4f, 0.4f, 1f) : new Vector4(0.4f, 1f, 0.4f, 1f),
+                        lastBackupMessage);
+                }
+                finally
+                {
+                    ImGui.PopTextWrapPos();
+                }
+            }
             ImGui.Spacing();
             ImGui.BeginDisabled(csvExportTask != null);
             try

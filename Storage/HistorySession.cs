@@ -178,6 +178,23 @@ public sealed class HistorySession : IDisposable
         }
     }
 
+    internal string BackupDirectory => store.BackupDirectory;
+
+    internal Task<string> CreateBackupAsync()
+    {
+        Save();
+        Task saving;
+        lock (gate) saving = worker;
+        return Task.Run(async () =>
+        {
+            await saving.ConfigureAwait(false);
+            lock (gate)
+                if (lastError != null || shutdownTimedOut || retryFullSave)
+                    throw new IOException("History couldn't be saved before the backup. Check the recovery file and plugin log.", lastError);
+            return store.CreateBackup();
+        });
+    }
+
     private void WritePending()
     {
         while (true)
