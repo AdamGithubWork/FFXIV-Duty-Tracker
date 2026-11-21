@@ -26,6 +26,7 @@ namespace MentorRouletteTracker.PvP
         private DateTime[]? restoreTimes;
         private bool restoreNeeded = true;
         private int observedRecordCount;
+        private long observedReplacementVersion;
         private DateTime nextRestoreAttempt = DateTime.MinValue;
         private DateTime nextPvpCheck = DateTime.MinValue;
         private static readonly TimeSpan PvpRetryInterval =
@@ -468,6 +469,27 @@ namespace MentorRouletteTracker.PvP
             if (disposed || !config.StorageAvailable)
                 return;
 
+            if (observedReplacementVersion != config.History.ReplacementVersion)
+            {
+                observedReplacementVersion = config.History.ReplacementVersion;
+                foreach (var pending in pendingPvpMatches.Values)
+                {
+                    ObserveDiscardedRead(pending.ModeRead);
+                    ObserveDiscardedRead(pending.ScoreboardRead);
+                }
+                ObserveDiscardedRead(restoreTask);
+                pendingPvpMatches.Clear();
+                processedPvpMatches.Clear();
+                processedMatchOrder.Clear();
+                savedMatches.Clear();
+                restoreTask = null;
+                restoreTimes = null;
+                restoreNeeded = true;
+                observedRecordCount = config.History.Records.Count;
+                nextRestoreAttempt = DateTime.MinValue;
+                nextPvpCheck = DateTime.MinValue;
+            }
+
             var now = DateTime.UtcNow;
 
             DiscoverNewDuties();
@@ -510,6 +532,14 @@ namespace MentorRouletteTracker.PvP
                 else
                     pending.ScoreboardRead = Task.Run(() => readScoreboard(matchId));
             }
+        }
+
+        private static void ObserveDiscardedRead(Task? task)
+        {
+            if (task != null)
+                _ = task.ContinueWith(completed => { _ = completed.Exception; },
+                    CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
         }
 
         public void Dispose()

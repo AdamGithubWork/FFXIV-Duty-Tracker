@@ -27,6 +27,7 @@ public sealed class HistorySession : IDisposable
 
     public List<DutyRecord> Records => data.Records;
     internal long ChangeVersion { get; private set; }
+    internal long ReplacementVersion { get; private set; }
     public DutyRecord? PendingDuty { get => data.PendingDuty; set => data.PendingDuty = value; }
 
     public HistorySession(SqliteHistoryStore store, Action<Exception>? reportError = null)
@@ -193,6 +194,28 @@ public sealed class HistorySession : IDisposable
                     throw new IOException("History couldn't be saved before the backup. Check the recovery file and plugin log.", lastError);
             return store.CreateBackup();
         });
+    }
+
+    internal string RestoreBackup(HistoryData restored)
+    {
+        if (PendingDuty != null)
+            throw new InvalidOperationException("Finish your current duty before restoring history.");
+        if (restored.PendingDuty != null)
+            throw new InvalidDataException("The backup's unfinished duty must be kept as an incomplete record.");
+        var snapshot = SqliteHistoryStore.Capture(restored);
+        Flush();
+        var safetyBackup = store.CreateBackup(beforeRestore: true);
+        // SaveHistory replaces all rows in one transaction. Memory changes only after it commits.
+        store.SaveHistory(snapshot, replaceAll: true);
+        data.Records.Clear();
+        data.Records.AddRange(restored.Records);
+        data.RecordIds.Clear();
+        foreach (var (record, id) in restored.RecordIds)
+            data.RecordIds.Add(record, id);
+        recoverySnapshot = snapshot;
+        ChangeVersion++;
+        ReplacementVersion++;
+        return safetyBackup;
     }
 
     private void WritePending()

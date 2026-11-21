@@ -49,6 +49,8 @@ namespace MentorRouletteTracker.DutyTracking
             }
         }
         public bool PvpTrackingAvailable => pvpStatsEnabled();
+        internal bool CanRestoreHistory => current == null && !pendingRestoreNeeded &&
+            CanCheckDutyState() && !territoryCheckNeeded && !condition[ConditionFlag.BoundByDuty];
 
         public DutyTrackerService(
             IClientState clientState,

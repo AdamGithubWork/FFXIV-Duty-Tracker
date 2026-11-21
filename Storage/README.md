@@ -15,8 +15,20 @@ The backup includes duty/player records, notes, and the pending duty. Settings a
 CSV exports aren't included. **Open backups folder** opens the backup directory.
 
 Manual backups are named `history-manual-*.sqlite` and don't need separate WAL or
-SHM files. They aren't removed automatically. Restore controls aren't available yet;
-unload Noumenon before replacing a history database manually.
+SHM files. They aren't removed automatically.
+
+**Restore backup** lists history backups in that folder. Choose one, review the
+record count, and confirm that it should replace your history. Restore is available
+only while logged in outside a duty, with no pending recording. It checks a temporary
+copy first, including upgrading supported older schemas; the selected file stays unchanged.
+An unfinished duty in the backup becomes an incomplete record at its saved checkpoint.
+
+Before restoring, current edits are saved and a `history-before-restore-*.sqlite`
+safety backup is created. If either step fails, replacement stops. The history rows
+are then replaced in one SQLite transaction, keeping duty IDs and player order.
+Settings and CSV exports stay unchanged. Restore may take a moment for large histories.
+To undo it, restore the safety backup. If history cannot load at all, unload Noumenon
+before replacing its database manually.
 
 ## Clearing history and keeping copies
 
@@ -35,15 +47,16 @@ it started with.
 | `history.sqlite` | The database stays in place. Clearing records removes saved duty/player rows but keeps the current duty. |
 | `backups/history-before-v*.sqlite` | Created before supported database upgrades. Kept until removed manually; there is no age limit or scheduled cleanup. These aren't regular, per-duty backups. |
 | `backups/history-manual-*.sqlite` | Created with the backup button. Kept until removed manually, including after clearing records. |
-| `backups/history-manual-*.sqlite.tmp*` | Unfinished manual backup files. Normally removed if creating the backup fails; a process interruption can leave them behind. |
+| `backups/history-before-restore-*.sqlite` | Safety copy created before restoring. Kept until removed manually; it can be restored with the same controls. |
+| `backups/history-*.sqlite.tmp*` | Unfinished manual or pre-restore backup files. Normally removed if creating the backup fails; a process interruption can leave them behind. |
 | `history-recovery-*.json` | Written after a failed or timed-out save. Compatible recovery data is loaded at startup. The current session's copy is removed after a successful save; a successfully handled startup recovery is removed too. |
 | `history-recovery-*.json.stale` | An older recovery copy, kept for review rather than restored over newer history. Not deleted by clearing records or on a schedule. |
 | `history-recovery-*.json.tmp` | A recovery write that didn't finish. Not loaded as history or removed by clearing records. |
 | `*.csv` | Separate exports. Clearing history doesn't change them. |
 | `*.csv.*.tmp` | Temporary export output, normally removed when the export finishes or fails. A process interruption can leave one behind; clearing history doesn't remove it. |
 
-The clear action can't be undone in the plugin. Keep recovery files if a save failed
-or history won't load; they may contain edits that never reached the database.
+Clearing doesn't create a backup. Create one first if you want to restore it later.
+Keep recovery files if a save failed or history won't load; they may contain edits that never reached the database.
 Unload Noumenon before replacing the history database with a backup.
 
 ## Schema

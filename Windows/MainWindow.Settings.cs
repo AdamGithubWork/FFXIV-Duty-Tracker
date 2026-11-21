@@ -415,6 +415,17 @@ namespace MentorRouletteTracker
             ImGui.SameLine();
             if (ImGui.Button("Open backups folder"))
                 OpenHistoryBackupsFolder();
+            ImGui.Spacing();
+            ImGui.BeginDisabled(historyBackupTask != null || !tracker.CanRestoreHistory);
+            try
+            {
+                if (ImGui.Button("Restore backup..."))
+                    OpenHistoryRestore();
+            }
+            finally { ImGui.EndDisabled(); }
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip("Restore outside a duty. Your current history is backed up first. Settings stay as they are.");
+            DrawHistoryRestore();
             if (!string.IsNullOrEmpty(lastBackupMessage))
             {
                 ImGui.PushTextWrapPos();

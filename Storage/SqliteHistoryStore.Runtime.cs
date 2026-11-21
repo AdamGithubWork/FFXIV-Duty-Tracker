@@ -139,7 +139,7 @@ public sealed partial class SqliteHistoryStore
         return new HistoryWrite(rows, PendingOnly: true);
     }
 
-    internal void SaveHistory(HistoryWrite snapshot, CancellationToken cancellationToken = default)
+    internal void SaveHistory(HistoryWrite snapshot, CancellationToken cancellationToken = default, bool replaceAll = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var connection = OpenExisting();
@@ -158,8 +158,8 @@ public sealed partial class SqliteHistoryStore
             desired.Remove(pendingDutyId);
         foreach (var row in snapshot.Duties)
             desired.Add(row.Id, row);
-        var deleted = savedDuties.Keys.Except(desired.Keys).ToArray();
-        var changed = snapshot.Duties.Where(row => !savedDuties.TryGetValue(row.Id, out var previous) || !row.SameValues(previous)).ToArray();
+        var deleted = (replaceAll ? savedDuties.Keys : savedDuties.Keys.Except(desired.Keys)).ToArray();
+        var changed = snapshot.Duties.Where(row => replaceAll || !savedDuties.TryGetValue(row.Id, out var previous) || !row.SameValues(previous)).ToArray();
         if (deleted.Length == 0 && changed.Length == 0) { transaction.Commit(); return; }
 
         foreach (string id in deleted)
