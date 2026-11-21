@@ -83,16 +83,101 @@ namespace MentorRouletteTracker
             }
         }
 
+        private readonly Dictionary<bool, RecordsViewData> recordsViews = new();
+        private (string PlayerFilters, string? DutyHistory, bool FullRunsOnly)? recordsViewFilterKey;
+        private long recordsViewHistoryVersion = -1;
+        private int recordsViewRecordCount = -1;
+        private DateTime nextRecordsViewRefresh = DateTime.MinValue;
+
+        private sealed class RecordsViewData
+        {
+            public required List<DutyRecord> Records { get; init; }
+            public List<DutyRecord> SortedRecords { get; set; } = new();
+            public (int Column, bool Ascending)? Sort { get; set; }
+            public readonly Dictionary<DutyRecord, DutyPlayerCounts> PlayerCounts = new(ReferenceEqualityComparer.Instance);
+        }
+
+        private RecordsViewData GetRecordsViewData(bool completed)
+        {
+            var filterKey = (GetPlayerViewFilterKey(), dutyHistoryFilter, dutyHistoryFullRunsOnly);
+            var now = DateTime.UtcNow;
+            if (recordsViewHistoryVersion != config.History.ChangeVersion ||
+                recordsViewRecordCount != config.History.Records.Count || recordsViewFilterKey != filterKey ||
+                (selectedTimeRange is >= 1 and <= 3 && now >= nextRecordsViewRefresh))
+            {
+                recordsViews.Clear();
+                recordsViewHistoryVersion = config.History.ChangeVersion;
+                recordsViewRecordCount = config.History.Records.Count;
+                recordsViewFilterKey = filterKey;
+                nextRecordsViewRefresh = now.AddSeconds(1);
+            }
+
+            if (!recordsViews.TryGetValue(completed, out var data))
+            {
+                var localNow = DateTime.Now;
+                data = new RecordsViewData
+                {
+                    Records = config.History.Records
+                        .Where(record => record.Completed == completed && MatchesDutyHistory(record) &&
+                            MatchesDutyFilters(record, localNow) && MatchesDutyPlayerFilters(record)).ToList()
+                };
+                recordsViews.Add(completed, data);
+            }
+            return data;
+        }
+
+        private DutyPlayerCounts GetRecordPlayerCounts(RecordsViewData data, DutyRecord record)
+        {
+            if (!data.PlayerCounts.TryGetValue(record, out var counts))
+            {
+                counts = GetDutyPlayerCounts(record);
+                data.PlayerCounts.Add(record, counts);
+            }
+            return counts;
+        }
+
+        private List<DutyRecord> GetSortedRecords(RecordsViewData data, int column, bool ascending)
+        {
+            if (data.Sort == (column, ascending))
+                return data.SortedRecords;
+
+            DutyPlayerCounts Counts(DutyRecord record) => GetRecordPlayerCounts(data, record);
+            data.SortedRecords = column < 0
+                ? data.Records.OrderByDescending(record => record.Timestamp).ToList()
+                : SortTableRows(data.Records, record => column switch
+                {
+                    0 => record.DutyName,
+                    1 => DutyClassification.DisplayType(record),
+                    2 => record.PlayerJob,
+                    3 => record.Timestamp,
+                    4 => record.TimeInDuty,
+                    5 => record.JoinedInProgress,
+                    6 => record.WipeCount,
+                    7 => Counts(record).Lalafell,
+                    8 => record.Completed,
+                    9 => Counts(record).Sprouts,
+                    10 => Counts(record).Mentors,
+                    11 => Counts(record).Players,
+                    12 => Counts(record).Deaths,
+                    13 => record.PvPPlacement,
+                    14 => RecorderPvpPlayer(record)?.PvPDamageDealt,
+                    15 => RecorderPvpPlayer(record)?.PvPKills,
+                    16 => RecorderPvpPlayer(record)?.PvPAssists,
+                    17 => RecorderPvpPlayer(record)?.PvPDamageTaken,
+                    18 => RecorderPvpPlayer(record)?.PvPHealingDone,
+                    19 => PvpDamagePerMinute(record, RecorderPvpPlayer(record)),
+                    20 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPDamageTaken),
+                    21 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPHealingDone),
+                    _ => record.DutyName
+                }, ascending, record => record.DutyName);
+            data.Sort = (column, ascending);
+            return data.SortedRecords;
+        }
+
         private void DrawRecordsTable(bool completed)
         {
-            var now = DateTime.Now;
-
-            var records = config.History.Records
-                .Where(x => x.Completed == completed)
-                .Where(x => MatchesDutyHistory(x))
-                .Where(x => MatchesDutyFilters(x, now))
-                .Where(x => MatchesDutyPlayerFilters(x))
-                .ToList();
+            var data = GetRecordsViewData(completed);
+            var records = data.Records;
 
             if (records.Count == 0)
             {
@@ -102,16 +187,7 @@ namespace MentorRouletteTracker
                 return;
             }
 
-            Dictionary<DutyRecord, DutyPlayerCounts> playerCounts = new(ReferenceEqualityComparer.Instance);
-            DutyPlayerCounts Counts(DutyRecord record)
-            {
-                if (!playerCounts.TryGetValue(record, out var counts))
-                {
-                    counts = GetDutyPlayerCounts(record);
-                    playerCounts.Add(record, counts);
-                }
-                return counts;
-            }
+            DutyPlayerCounts Counts(DutyRecord record) => GetRecordPlayerCounts(data, record);
 
             var recordRowHeight = ImGui.GetTextLineHeight() + TableCellVerticalPadding * 2;
             var tableHeight = Math.Min(Math.Max(1, ImGui.GetContentRegionAvail().Y),
@@ -127,37 +203,13 @@ namespace MentorRouletteTracker
                     if (sortSpecs.SpecsCount > 0 && IsTableColumnVisible("Records", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)))
                     {
                         var spec = sortSpecs.Specs;
-                        records = SortTableRows(records, record => ConfiguredSortColumn(spec.ColumnIndex) switch
-                        {
-                            0 => record.DutyName,
-                            1 => DutyClassification.DisplayType(record),
-                            2 => record.PlayerJob,
-                            3 => record.Timestamp,
-                            4 => record.TimeInDuty,
-                            5 => record.JoinedInProgress,
-                            6 => record.WipeCount,
-                            7 => Counts(record).Lalafell,
-                            8 => record.Completed,
-                            9 => Counts(record).Sprouts,
-                            10 => Counts(record).Mentors,
-                            11 => Counts(record).Players,
-                            12 => Counts(record).Deaths,
-                            13 => record.PvPPlacement,
-                            14 => RecorderPvpPlayer(record)?.PvPDamageDealt,
-                            15 => RecorderPvpPlayer(record)?.PvPKills,
-                            16 => RecorderPvpPlayer(record)?.PvPAssists,
-                            17 => RecorderPvpPlayer(record)?.PvPDamageTaken,
-                            18 => RecorderPvpPlayer(record)?.PvPHealingDone,
-                            19 => PvpDamagePerMinute(record, RecorderPvpPlayer(record)),
-                            20 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPDamageTaken),
-                            21 => PvpRatePerMinute(record, RecorderPvpPlayer(record)?.PvPHealingDone),
-                            _ => record.DutyName
-                        }, spec.SortDirection == ImGuiSortDirection.Ascending, record => record.DutyName);
+                        records = GetSortedRecords(data, ConfiguredSortColumn(spec.ColumnIndex),
+                            spec.SortDirection == ImGuiSortDirection.Ascending);
                         sortSpecs.SpecsDirty = false;
                     }
                     else
                     {
-                        records = records.OrderByDescending(record => record.Timestamp).ToList();
+                        records = GetSortedRecords(data, -1, false);
                     }
 
                     var clipper = ImGui.ImGuiListClipper();
