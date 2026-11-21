@@ -2,7 +2,7 @@
   "Author": "Adalith",
   "Name": "Noumenon",
   "InternalName": "MentorRouletteTracker",
-  "AssemblyVersion": "1.0.0.4",
+  "AssemblyVersion": "1.0.0.5",
   "Punchline": "duty tracker, in beta",
   "Description": "Keep track of your duties, the people you meet, and your stats. Look through past runs, add notes, and export your records.",
   "ApplicableVersion": "any",
