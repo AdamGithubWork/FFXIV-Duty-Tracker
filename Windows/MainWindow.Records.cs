@@ -227,14 +227,26 @@ namespace MentorRouletteTracker
 
                                 SetConfiguredColumnIndex(0);
 
-                                if (ImGui.Selectable(
-                                        $"{r.DutyName}###record{id}",
-                                        false,
-                                        ImGuiSelectableFlags.SpanAllColumns))
+                                var warnings = GetRecordDataWarnings(r);
+                                if (warnings.Length > 0)
+                                    ImGui.PushStyleColor(ImGuiCol.Text, RecordWarningColor);
+                                try
                                 {
-                                    selectedRecord = r;
-                                    showDetailWindow = true;
+                                    if (ImGui.Selectable(
+                                            $"{(warnings.Length > 0 ? "[!] " : "")}{r.DutyName}###record{id}",
+                                            false,
+                                            ImGuiSelectableFlags.SpanAllColumns))
+                                    {
+                                        selectedRecord = r;
+                                        showDetailWindow = true;
+                                    }
                                 }
+                                finally
+                                {
+                                    if (warnings.Length > 0)
+                                        ImGui.PopStyleColor();
+                                }
+                                var showWarningTooltip = warnings.Length > 0 && ImGui.IsItemHovered();
 
                                 if (ImGui.BeginPopupContextItem($"RecordContext{id}"))
                                 {
@@ -260,6 +272,9 @@ namespace MentorRouletteTracker
                                         ImGui.EndPopup();
                                     }
                                 }
+
+                                if (showWarningTooltip)
+                                    ImGui.SetTooltip("Missing recording data\n" + string.Join("\n", warnings));
 
                                 DrawTableCell(1, DutyClassification.DisplayType(r));
                                 DrawTableCell(2, r.PlayerJob);
@@ -471,6 +486,8 @@ namespace MentorRouletteTracker
 
                     ImGui.Separator();
 
+                    DrawRecordDataWarnings(r);
+
                     ImGui.Text($"Type: {DutyClassification.DisplayType(r)}");
                     ImGui.Text($"Your job: {r.PlayerJob}");
                     if (r.DutyType == "PvP")
@@ -496,24 +513,20 @@ namespace MentorRouletteTracker
                     ImGui.Spacing();
 
                     ImGui.Text(r.DutyType == "PvP" ? $"PvP records ({r.Party.Count})" : $"Party ({r.Party.Count})");
-                    if (r.PvPRosterComplete.HasValue)
+                    if (r.PvPRosterComplete == true)
                     {
                         ImGui.PushTextWrapPos();
                         try
                         {
-                            ImGui.TextDisabled(r.PvPRosterComplete.Value
-                                ? r.TrackPvpEnemies ? "PvP Tracker roster imported. Some character details may be unknown."
-                                    : "PvP Tracker teammate roster imported. Opposing members weren't tracked for this duty."
-                                : "Waiting for the full PvP Tracker scoreboard.");
+                            ImGui.TextDisabled(r.TrackPvpEnemies
+                                ? "PvP Tracker roster imported. Some character details may be unknown."
+                                : "PvP Tracker teammate roster imported. Opposing members weren't tracked for this duty.");
                         }
                         finally
                         {
                             ImGui.PopTextWrapPos();
                         }
                     }
-                    if (r.PvPRosterComplete == true && (!r.PvPCombatStatsComplete || !r.PvPResultsComplete || !r.PvPExtendedStatsComplete))
-                        ImGui.TextDisabled("Checking PvP Tracker for missing scores, teams, and results.");
-
                     ImGui.Spacing();
 
                     if (r.DutyType == "PvP")

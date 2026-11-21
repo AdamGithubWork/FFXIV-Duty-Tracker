@@ -137,76 +137,94 @@ namespace MentorRouletteTracker
 
             if (people.Count > 0 && BeginConfiguredTable("People", "peopleTable", verticalScroll: true))
             {
-                SetupConfiguredColumns("People", scrollable: true);
-
-                var sortSpecs = ImGui.TableGetSortSpecs();
-                var sortColumn = sortSpecs.SpecsCount > 0 && IsTableColumnVisible("People", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex))
-                    ? ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) : 0;
-                var direction = sortSpecs.SpecsCount > 0 && sortColumn == ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)
-                    ? sortSpecs.Specs.SortDirection : ImGuiSortDirection.Ascending;
-                if (sortSpecs.SpecsDirty || data.PeopleSort != (sortColumn, (int)direction))
+                try
                 {
-                    people = SortTableRows(people, player => sortColumn switch
-                    {
-                        0 => player.Name,
-                        1 => player.World,
-                        2 => player.Race,
-                        3 => player.Gender,
-                        4 => player.TimesSeen,
-                        5 => player.TotalDeaths,
-                        6 => player.AverageDeaths,
-                        7 => player.FirstSeen,
-                        8 => player.LastSeen,
-                        9 => player.DifferentDuties,
-                        10 => player.KnownDeathEncounters,
-                        11 => player.DeathlessEncounters,
-                        12 => player.SproutEncounters,
-                        13 => player.MentorEncounters,
-                        14 => player.PvpDamage,
-                        15 => player.PvpKills,
-                        16 => player.PvpAssists,
-                        17 => player.TeammateEncounters,
-                        18 => player.EnemyEncounters,
-                        >= 19 and <= 32 => PvpStatisticValue(player.Pvp, sortColumn - 16),
-                        _ => player.Name
-                    }, direction == ImGuiSortDirection.Ascending, player => player.Name);
-                    data.People = people;
-                    data.PeopleSort = (sortColumn, (int)direction);
-                    sortSpecs.SpecsDirty = false;
-                }
+                    SetupConfiguredColumns("People", scrollable: true);
 
-                for (int i = 0; i < people.Count; i++)
-                {
-                    var player = people[i];
-                    ImGui.TableNextRow();
-                    SetConfiguredColumnIndex(0);
-                    if (ImGui.Selectable($"{player.Name}###person{player.Name}@{player.World}"))
+                    var sortSpecs = ImGui.TableGetSortSpecs();
+                    var sortColumn = sortSpecs.SpecsCount > 0 && IsTableColumnVisible("People", ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex))
+                        ? ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex) : 0;
+                    var direction = sortSpecs.SpecsCount > 0 && sortColumn == ConfiguredSortColumn(sortSpecs.Specs.ColumnIndex)
+                        ? sortSpecs.Specs.SortDirection : ImGuiSortDirection.Ascending;
+                    if (sortSpecs.SpecsDirty || data.PeopleSort != (sortColumn, (int)direction))
                     {
-                        historyPlayerName = player.Name;
-                        historyPlayerWorld = player.World;
-                        showPlayerHistory = true;
+                        people = SortTableRows(people, player => sortColumn switch
+                        {
+                            0 => player.Name,
+                            1 => player.World,
+                            2 => player.Race,
+                            3 => player.Gender,
+                            4 => player.TimesSeen,
+                            5 => player.TotalDeaths,
+                            6 => player.AverageDeaths,
+                            7 => player.FirstSeen,
+                            8 => player.LastSeen,
+                            9 => player.DifferentDuties,
+                            10 => player.KnownDeathEncounters,
+                            11 => player.DeathlessEncounters,
+                            12 => player.SproutEncounters,
+                            13 => player.MentorEncounters,
+                            14 => player.PvpDamage,
+                            15 => player.PvpKills,
+                            16 => player.PvpAssists,
+                            17 => player.TeammateEncounters,
+                            18 => player.EnemyEncounters,
+                            >= 19 and <= 32 => PvpStatisticValue(player.Pvp, sortColumn - 16),
+                            _ => player.Name
+                        }, direction == ImGuiSortDirection.Ascending, player => player.Name);
+                        data.People = people;
+                        data.PeopleSort = (sortColumn, (int)direction);
+                        sortSpecs.SpecsDirty = false;
                     }
-                    DrawTableCell(1, player.World);
-                    DrawTableCell(2, player.Race);
-                    DrawTableCell(3, player.Gender);
-                    DrawTableCell(4, player.TimesSeen.ToString());
-                    DrawTableCell(5, player.TotalDeaths?.ToString() ?? "-");
-                    DrawTableCell(6, player.AverageDeaths?.ToString("F2") ?? "-");
-                    DrawTableCell(7, player.FirstSeen.ToString("yyyy-MM-dd HH:mm"));
-                    DrawTableCell(8, player.LastSeen.ToString("yyyy-MM-dd HH:mm"));
-                    DrawTableCell(9, player.DifferentDuties.ToString());
-                    DrawTableCell(10, player.KnownDeathEncounters.ToString());
-                    DrawTableCell(11, player.DeathlessEncounters.ToString());
-                    DrawTableCell(12, player.SproutEncounters.ToString());
-                    DrawTableCell(13, player.MentorEncounters.ToString());
-                    DrawTableCell(14, player.PvpDamage?.ToString("N0") ?? "-");
-                    DrawTableCell(15, player.PvpKills?.ToString("N0") ?? "-");
-                    DrawTableCell(16, player.PvpAssists?.ToString("N0") ?? "-");
-                    DrawTableCell(17, player.TeammateEncounters.ToString());
-                    DrawTableCell(18, player.EnemyEncounters.ToString());
-                    DrawPvpStatisticCells(19, player.Pvp, includeScores: false);
+
+                    var clipper = ImGui.ImGuiListClipper();
+                    try
+                    {
+                        clipper.Begin(people.Count);
+                        while (clipper.Step())
+                        {
+                            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+                            {
+                                var player = people[i];
+                                ImGui.TableNextRow();
+                                SetConfiguredColumnIndex(0);
+                                if (ImGui.Selectable($"{player.Name}###person{player.Name}@{player.World}"))
+                                {
+                                    historyPlayerName = player.Name;
+                                    historyPlayerWorld = player.World;
+                                    showPlayerHistory = true;
+                                }
+                                DrawTableCell(1, player.World);
+                                DrawTableCell(2, player.Race);
+                                DrawTableCell(3, player.Gender);
+                                DrawTableCell(4, player.TimesSeen.ToString());
+                                DrawTableCell(5, player.TotalDeaths?.ToString() ?? "-");
+                                DrawTableCell(6, player.AverageDeaths?.ToString("F2") ?? "-");
+                                DrawTableCell(7, player.FirstSeen.ToString("yyyy-MM-dd HH:mm"));
+                                DrawTableCell(8, player.LastSeen.ToString("yyyy-MM-dd HH:mm"));
+                                DrawTableCell(9, player.DifferentDuties.ToString());
+                                DrawTableCell(10, player.KnownDeathEncounters.ToString());
+                                DrawTableCell(11, player.DeathlessEncounters.ToString());
+                                DrawTableCell(12, player.SproutEncounters.ToString());
+                                DrawTableCell(13, player.MentorEncounters.ToString());
+                                DrawTableCell(14, player.PvpDamage?.ToString("N0") ?? "-");
+                                DrawTableCell(15, player.PvpKills?.ToString("N0") ?? "-");
+                                DrawTableCell(16, player.PvpAssists?.ToString("N0") ?? "-");
+                                DrawTableCell(17, player.TeammateEncounters.ToString());
+                                DrawTableCell(18, player.EnemyEncounters.ToString());
+                                DrawPvpStatisticCells(19, player.Pvp, includeScores: false);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        clipper.Destroy();
+                    }
                 }
-                EndStyledTable();
+                finally
+                {
+                    EndStyledTable();
+                }
             }
 
         }
