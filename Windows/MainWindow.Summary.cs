@@ -33,7 +33,7 @@ namespace MentorRouletteTracker
                 globalDutySearchText.Trim(),
                 selectedTimeRange.ToString(),
                 customStartDate.Date.ToString("yyyyMMdd"),
-                customEndDate.Date.ToString("yyyyMMdd"));
+                customEndDate.Date.ToString("yyyyMMdd"), EncounterTargetRace, EncounterTargetGender);
 
             if (milestoneHistoryVersion != config.History.ChangeVersion ||
                 milestoneRecordCount != config.History.Records.Count ||
@@ -96,7 +96,7 @@ namespace MentorRouletteTracker
                                         {
                                             ImGui.TableNextRow();
                                             ImGui.TableSetColumnIndex(0);
-                                            ImGui.TextUnformatted(row.Label);
+                                            ImGui.TextUnformatted(EncounterMilestoneLabel(row.Label));
                                             ImGui.TableSetColumnIndex(1);
 
                                             if (row.Value.Record is DutyRecord record)
@@ -236,8 +236,8 @@ namespace MentorRouletteTracker
             int CountStatus(DutyRecord r, string value) => byRecord[r].Count(e =>
                 MatchesStatus(e.Player, value));
 
-            int CountLalafell(DutyRecord r) => byRecord[r].Count(e =>
-                e.Player.Race == "Lalafell");
+            int CountTargetPlayers(DutyRecord r) => byRecord[r].Count(e =>
+                MatchesEncounterTarget(e.Player));
 
             void Add(string title, List<(string Label, MilestoneResult Value)> rows) =>
                 milestoneSections.Add((title, rows));
@@ -334,8 +334,8 @@ namespace MentorRouletteTracker
                     r => $"{TotalDeaths(r) / r.TimeInDuty.TotalMinutes:F2} deaths/min")),
                 ("Most wipes in a single duty", DutyExt(records, r => r.WipeCount, true,
                     r => $"{r.WipeCount} wipes")),
-                ("Most Lalafell in one duty", DutyExt(records, r => CountLalafell(r), true,
-                    r => $"{CountLalafell(r)} Lalafell")),
+                ("Most Lalafell in one duty", DutyExt(records, r => CountTargetPlayers(r), true,
+                    r => $"{CountTargetPlayers(r)} {EncounterTargetLabel}")),
                 ("Most sprouts in one duty", DutyExt(records, r => CountStatus(r, "Sprout"), true,
                     r => $"{CountStatus(r, "Sprout")} sprouts")),
                 ("Most mentors in one duty", DutyExt(records, r => CountStatus(r, "Mentor"), true,
@@ -458,8 +458,8 @@ namespace MentorRouletteTracker
                 ("Longest streak without a player death", Streak(r =>
                     byRecord[r].Count > 0 && byRecord[r].All(e => e.IsConfirmedDeathless))),
                 ("Longest streak with deaths", Streak(r => TotalDeaths(r) > 0)),
-                ("Longest streak without a Lalafell", Streak(r => CountLalafell(r) == 0)),
-                ("Longest streak with a Lalafell", Streak(r => CountLalafell(r) > 0)),
+                ("Longest streak without a Lalafell", Streak(r => CountTargetPlayers(r) == 0)),
+                ("Longest streak with a Lalafell", Streak(r => CountTargetPlayers(r) > 0)),
                 ("Longest streak without a sprout", Streak(r => CountStatus(r, "Sprout") == 0)),
                 ("Longest streak without a mentor", Streak(r => CountStatus(r, "Mentor") == 0)),
                 ("Longest streak of the same duty", RepeatedDutyStreak()),
@@ -491,8 +491,8 @@ namespace MentorRouletteTracker
                 playerByDay.TryGetValue(day, out var items) ? items : new();
 
             int? DayDeaths(DateTime day) => TotalKnownDeaths(DayPlayers(day).Select(e => e.KnownDeaths));
-            int DayLalafell(DateTime day) =>
-                DayPlayers(day).Count(e => e.Player.Race == "Lalafell");
+            int DayTargetPlayers(DateTime day) =>
+                DayPlayers(day).Count(e => MatchesEncounterTarget(e.Player));
 
             int DayStatus(DateTime day, string status) =>
                 DayPlayers(day).Count(e =>
@@ -581,8 +581,8 @@ namespace MentorRouletteTracker
                     g => DayUniquePlayers(g.Key),
                     g => $"{DayUniquePlayers(g.Key)} players — {g.Key:yyyy-MM-dd}")),
                 ("Most Lalafell in one day", TopPeriod(byDay,
-                    g => DayLalafell(g.Key),
-                    g => $"{DayLalafell(g.Key)} Lalafell — {g.Key:yyyy-MM-dd}")),
+                    g => DayTargetPlayers(g.Key),
+                    g => $"{DayTargetPlayers(g.Key)} {EncounterTargetLabel} — {g.Key:yyyy-MM-dd}")),
                 ("Most sprouts in one day", TopPeriod(byDay,
                     g => DayStatus(g.Key, "Sprout"),
                     g => $"{DayStatus(g.Key, "Sprout")} sprouts — {g.Key:yyyy-MM-dd}")),

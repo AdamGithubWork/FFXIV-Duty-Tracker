@@ -59,6 +59,8 @@ namespace MentorRouletteTracker
                 EndDate = customEndDate.Date,
                 minimumEncounters,
                 config.IncludeSelfInStatistics,
+                EncounterTargetRace,
+                EncounterTargetGender,
                 LocalPlayer = objectTable.LocalPlayer?.Name.TextValue
             });
 
@@ -78,11 +80,13 @@ namespace MentorRouletteTracker
             var matchingCounts = encounters.GroupBy(encounter => encounter.Record)
                 .ToDictionary(group => group.Key, group => group.Count());
             var orderedRecords = records.OrderBy(record => record.Timestamp).ToList();
+            var targetDuties = encounters.Where(encounter => MatchesEncounterTarget(encounter.Player))
+                .Select(encounter => encounter.Record).ToHashSet();
             var currentDrought = 0;
             var longestDrought = 0;
             foreach (var record in orderedRecords)
             {
-                currentDrought = matchingCounts.ContainsKey(record) ? 0 : currentDrought + 1;
+                currentDrought = targetDuties.Contains(record) ? 0 : currentDrought + 1;
                 longestDrought = Math.Max(longestDrought, currentDrought);
             }
 

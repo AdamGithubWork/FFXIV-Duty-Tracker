@@ -115,10 +115,10 @@ namespace MentorRouletteTracker
             var data = GetPlayerViewData();
             var people = GetPeopleRows(data);
 
-            int uniqueLalafell = people.Count(x => x.Race == "Lalafell");
+            int matchingPlayers = people.Count(x => MatchesEncounterTarget(x.Race, x.Gender));
             ImGui.Text($"Unique players: {people.Count}");
             ImGui.SameLine();
-            ImGui.TextDisabled($"({uniqueLalafell} Lalafell)");
+            ImGui.TextDisabled($"({matchingPlayers} {EncounterTargetLabel})");
             ImGui.Spacing();
             ImGui.PushTextWrapPos();
             try

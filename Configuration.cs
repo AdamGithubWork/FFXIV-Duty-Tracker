@@ -16,6 +16,8 @@ namespace MentorRouletteTracker
         public bool TrackAllianceMembers { get; set; } = true;
         public bool TrackPvpEnemies { get; set; } = true;
         public bool IncludeSelfInStatistics { get; set; }
+        public string EncounterTargetRace { get; set; } = "Lalafell";
+        public string EncounterTargetGender { get; set; } = string.Empty;
         public bool ShowStatisticsOverview { get; set; } = true;
         public bool ShowRaceStatistics { get; set; } = true;
         public bool ShowGenderStatistics { get; set; } = true;
@@ -27,10 +29,21 @@ namespace MentorRouletteTracker
         public Dictionary<string, HashSet<string>> TableColumns { get; set; } = new();
         public Dictionary<string, List<string>> TableColumnOrder { get; set; } = new();
         public uint? WindowBackgroundColor { get; set; }
+        public string? AppearanceTheme { get; set; }
         public uint? PanelBackgroundColor { get; set; }
         public uint? TableHeaderBackgroundColor { get; set; }
         public uint? TableRowBackgroundColor { get; set; }
         public uint? AlternateRowBackgroundColor { get; set; }
+        public uint? TabColor { get; set; }
+        public uint? SelectedTabColor { get; set; }
+        public uint? HoveredTabColor { get; set; }
+        public uint? ButtonColor { get; set; }
+        public uint? HoveredButtonColor { get; set; }
+        public uint? PressedButtonColor { get; set; }
+        public uint? ControlBackgroundColor { get; set; }
+        public uint? HoveredControlColor { get; set; }
+        public uint? ActiveControlColor { get; set; }
+        public uint? AccentColor { get; set; }
         public bool WrapTableHeaders { get; set; } = true;
 
         [NonSerialized]

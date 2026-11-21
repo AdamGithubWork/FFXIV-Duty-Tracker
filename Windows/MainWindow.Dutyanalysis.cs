@@ -384,7 +384,7 @@ namespace MentorRouletteTracker
 
         private sealed record DutyAnalysisRow(
             string Duty, int Runs, int? Deaths, double? AverageDeaths, int TotalWipes,
-            TimeSpan AverageTime, int InProgress, int Sprouts, int Mentors, int Players, int Lalafell)
+            TimeSpan AverageTime, int InProgress, int Sprouts, int Mentors, int Players, int TargetPlayers)
         {
             public double WipesPerRun => Runs == 0 ? 0 : (double)TotalWipes / Runs;
             public PvpStatistics Pvp { get; init; } = new();
@@ -400,7 +400,7 @@ namespace MentorRouletteTracker
                     TotalKnownDeaths(counts.Select(count => count.Deaths)), AverageKnownDeathsPerRun(runs),
                     runs.Sum(record => record.WipeCount), TimeSpan.FromTicks((long)runs.Average(record => record.TimeInDuty.Ticks)),
                     runs.Count(record => record.JoinedInProgress), counts.Sum(count => count.Sprouts),
-                    counts.Sum(count => count.Mentors), counts.Sum(count => count.Players), counts.Sum(count => count.Lalafell))
+                    counts.Sum(count => count.Mentors), counts.Sum(count => count.Players), counts.Sum(count => count.TargetPlayers))
                 {
                     Pvp = BuildPvpStatistics(runs.Where(record => record.DutyType == "PvP")
                         .Select(record => (Record: record, Player: RecorderPvpPlayer(record)))
@@ -453,7 +453,7 @@ namespace MentorRouletteTracker
                             8 => row.Sprouts,
                             9 => row.Mentors,
                             10 => row.Players,
-                            11 => row.Lalafell,
+                            11 => row.TargetPlayers,
                             >= 12 and <= 28 => PvpStatisticValue(row.Pvp, ConfiguredSortColumn(spec.ColumnIndex) - 12),
                             _ => row.Duty
                         }, spec.SortDirection == ImGuiSortDirection.Ascending, row => row.Duty);
@@ -473,7 +473,7 @@ namespace MentorRouletteTracker
                         DrawTableCell(8, row.Sprouts.ToString());
                         DrawTableCell(9, row.Mentors.ToString());
                         DrawTableCell(10, row.Players.ToString());
-                        DrawTableCell(11, row.Lalafell.ToString());
+                        DrawTableCell(11, row.TargetPlayers.ToString());
                         DrawPvpStatisticCells(12, row.Pvp);
                     }
                 }

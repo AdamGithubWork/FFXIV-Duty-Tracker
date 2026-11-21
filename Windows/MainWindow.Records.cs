@@ -153,7 +153,7 @@ namespace MentorRouletteTracker
                     4 => record.TimeInDuty,
                     5 => record.JoinedInProgress,
                     6 => record.WipeCount,
-                    7 => Counts(record).Lalafell,
+                    7 => Counts(record).TargetPlayers,
                     8 => record.Completed,
                     9 => Counts(record).Sprouts,
                     10 => Counts(record).Mentors,
@@ -286,7 +286,7 @@ namespace MentorRouletteTracker
                                 DrawTableCell(5, r.JoinedInProgress ? "Yes" : "No");
                                 DrawTableCell(6, r.WipeCount.ToString());
                                 if (SetConfiguredColumnIndex(7))
-                                    ImGui.TextUnformatted(Counts(r).Lalafell.ToString());
+                                    ImGui.TextUnformatted(Counts(r).TargetPlayers.ToString());
                                 DrawTableCell(8, r.Completed ? "Yes" : "No");
                                 if (SetConfiguredColumnIndex(9))
                                     ImGui.TextUnformatted(Counts(r).Sprouts.ToString());
@@ -506,7 +506,7 @@ namespace MentorRouletteTracker
                         $"Joined in progress: {(r.JoinedInProgress ? "Yes" : "No")}");
 
                     ImGui.Text($"Wipes: {r.WipeCount}");
-                    ImGui.Text($"Lalafell count: {r.LalafellCount}");
+                    ImGui.Text($"{EncounterTargetLabel} count: {GetDutyPlayerCounts(r).TargetPlayers}");
 
                     ImGui.Text(
                         $"Completed: {(r.Completed ? "Yes" : "No")}");

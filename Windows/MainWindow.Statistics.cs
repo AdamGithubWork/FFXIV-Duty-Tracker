@@ -103,11 +103,11 @@ namespace MentorRouletteTracker
                         overview.DutiesWithPlayers.ToString());
 
                     DrawStatisticRow(
-                        "Duties Since Last Encounter",
+                        $"Duties since last {EncounterTargetLabel} encounter",
                         overview.CurrentDrought.ToString());
 
                     DrawStatisticRow(
-                        "Longest Encounter Drought",
+                        $"Longest {EncounterTargetLabel} drought",
                         $"{overview.LongestDrought} duties");
                 }
                 finally

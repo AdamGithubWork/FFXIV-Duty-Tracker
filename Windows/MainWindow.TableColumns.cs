@@ -170,10 +170,11 @@ namespace MentorRouletteTracker
         {
             flags = (flags & ~ImGuiTableFlags.BordersInnerV) | ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerH;
             ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(8, TableCellVerticalPadding));
-            ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, config.TableHeaderBackgroundColor ??
+            var customColors = WindowAppearance.SelectedTheme(config) == "Custom";
+            ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, (customColors ? config.TableHeaderBackgroundColor : null) ??
                 ImGui.ColorConvertFloat4ToU32(WindowAppearance.DefaultTableHeader));
-            ImGui.PushStyleColor(ImGuiCol.TableRowBg, config.TableRowBackgroundColor ?? ImGui.GetColorU32(ImGuiCol.TableRowBg));
-            ImGui.PushStyleColor(ImGuiCol.TableRowBgAlt, config.AlternateRowBackgroundColor ??
+            ImGui.PushStyleColor(ImGuiCol.TableRowBg, (customColors ? config.TableRowBackgroundColor : null) ?? ImGui.GetColorU32(ImGuiCol.TableRowBg));
+            ImGui.PushStyleColor(ImGuiCol.TableRowBgAlt, (customColors ? config.AlternateRowBackgroundColor : null) ??
                 ImGui.ColorConvertFloat4ToU32(WindowAppearance.DefaultAlternateRow));
             if (ImGui.BeginTable(id, columns, flags, size, innerWidth))
                 return true;
@@ -212,7 +213,7 @@ namespace MentorRouletteTracker
                 "Sprouts seen" => "Sprouts\nseen",
                 "Mentors seen" => "Mentors\nseen",
                 "Players seen" => "Players\nseen",
-                "Lalafell seen" => "Lalafell\nseen",
+                _ when label == $"{EncounterTargetLabel} seen" => $"{EncounterTargetLabel}\nseen",
                 "Known deaths" => "Known\ndeaths",
                 "Average time" => "Average\ntime",
                 _ => label
@@ -243,7 +244,7 @@ namespace MentorRouletteTracker
                     flags |= ImGuiTableColumnFlags.PreferSortAscending;
                 if (table == "People" && columns[i].Id == "seen")
                     flags |= ImGuiTableColumnFlags.PreferSortDescending;
-                var label = i == 0 && groupLabel != null ? groupLabel : columns[i].Label;
+                var label = i == 0 && groupLabel != null ? groupLabel : ColumnLabel(columns[i]);
                 if (table.StartsWith("Statistics: ", StringComparison.Ordinal) && i == 1)
                     label = "Gender";
                 labels[i] = label;
@@ -283,7 +284,7 @@ namespace MentorRouletteTracker
                 .ThenBy(name).ToList();
         }
 
-        private readonly record struct DutyPlayerCounts(int Players, int Sprouts, int Mentors, int Lalafell, int? Deaths);
+        private readonly record struct DutyPlayerCounts(int Players, int Sprouts, int Mentors, int TargetPlayers, int? Deaths);
 
         private DutyPlayerCounts GetDutyPlayerCounts(DutyRecord record)
         {
@@ -294,7 +295,7 @@ namespace MentorRouletteTracker
                 MatchesPlayerFilters(player)).ToList();
             return new DutyPlayerCounts(players.Count,
                 players.Count(player => GetPlayerStatus(player) == "Sprout"),
-                players.Count(IsMentor), players.Count(player => player.Race == "Lalafell"),
+                players.Count(IsMentor), players.Count(MatchesEncounterTarget),
                 TotalKnownDeaths(players.Select(player => EffectiveDeaths(record, player))));
         }
 
@@ -371,7 +372,7 @@ namespace MentorRouletteTracker
                                         EndPvpControl(pvpDisabled);
                                     }
                                     ImGui.SameLine();
-                                    ImGui.Selectable($"{column.Label}{(column.Required ? " (always shown)" : "")}###dragColumn");
+                                    ImGui.Selectable($"{ColumnLabel(column)}{(column.Required ? " (always shown)" : "")}###dragColumn");
                                     if (ImGui.BeginDragDropSource())
                                     {
                                         try
@@ -379,7 +380,7 @@ namespace MentorRouletteTracker
                                             draggedColumnTable = table;
                                             draggedColumnId = column.Id;
                                             ImGui.SetDragDropPayload("DUTY_TRACKER_COLUMN", BitConverter.GetBytes(index), ImGuiCond.Once);
-                                            ImGui.TextUnformatted(column.Label);
+                                            ImGui.TextUnformatted(ColumnLabel(column));
                                         }
                                         finally
                                         {

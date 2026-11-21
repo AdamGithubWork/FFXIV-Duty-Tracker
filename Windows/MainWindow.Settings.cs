@@ -274,6 +274,13 @@ namespace MentorRouletteTracker
             }
 
             ImGui.Spacing();
+            if (BeginSettingsSection("Encounter target"))
+            {
+                try { DrawEncounterTargetSettings(); }
+                finally { EndSettingsSection(); }
+            }
+
+            ImGui.Spacing();
             if (BeginSettingsSection("History & exports"))
             {
                 try
@@ -535,10 +542,11 @@ namespace MentorRouletteTracker
 
         private void DrawAppearanceSettings()
         {
+            DrawThemeSettings();
             ImGui.PushTextWrapPos();
             try
             {
-                ImGui.TextDisabled("Choose background colors below. Use Opacity to control transparency. Reset restores the default color.");
+                ImGui.TextDisabled("Your theme and colors are saved just for you. Use Opacity to control transparency. Reset colors returns to your Dalamud theme.");
             }
             finally
             {
@@ -546,24 +554,41 @@ namespace MentorRouletteTracker
             }
             ImGui.Spacing();
 
-            DrawBackgroundColor("Window background", config.WindowBackgroundColor,
-                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.WindowBg)), value => config.WindowBackgroundColor = value);
-            DrawBackgroundColor("Panel background", config.PanelBackgroundColor,
-                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.ChildBg)), value => config.PanelBackgroundColor = value);
-            DrawBackgroundColor("Table headers", config.TableHeaderBackgroundColor,
-                WindowAppearance.DefaultTableHeader, value => config.TableHeaderBackgroundColor = value);
-            DrawBackgroundColor("Table rows", config.TableRowBackgroundColor,
-                ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.TableRowBg)), value => config.TableRowBackgroundColor = value);
-            DrawBackgroundColor("Alternate table rows", config.AlternateRowBackgroundColor,
-                WindowAppearance.DefaultAlternateRow, value => config.AlternateRowBackgroundColor = value);
+            ImGui.BeginDisabled(WindowAppearance.SelectedTheme(config) != "Custom");
+            try
+            {
+                DrawBackgroundColor("Window background", config.WindowBackgroundColor,
+                    ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.WindowBg)), value => config.WindowBackgroundColor = value);
+                DrawBackgroundColor("Panel background", config.PanelBackgroundColor,
+                    ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.ChildBg)), value => config.PanelBackgroundColor = value);
+                DrawBackgroundColor("Table headers", config.TableHeaderBackgroundColor,
+                    WindowAppearance.DefaultTableHeader, value => config.TableHeaderBackgroundColor = value);
+                DrawBackgroundColor("Table rows", config.TableRowBackgroundColor,
+                    ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.TableRowBg)), value => config.TableRowBackgroundColor = value);
+                DrawBackgroundColor("Alternate table rows", config.AlternateRowBackgroundColor,
+                    WindowAppearance.DefaultAlternateRow, value => config.AlternateRowBackgroundColor = value);
+
+            }
+            finally { ImGui.EndDisabled(); }
 
             if (ImGui.Button("Reset colors"))
             {
+                config.AppearanceTheme = "Dalamud";
                 config.WindowBackgroundColor = null;
                 config.PanelBackgroundColor = null;
                 config.TableHeaderBackgroundColor = null;
                 config.TableRowBackgroundColor = null;
                 config.AlternateRowBackgroundColor = null;
+                config.TabColor = null;
+                config.SelectedTabColor = null;
+                config.HoveredTabColor = null;
+                config.ButtonColor = null;
+                config.HoveredButtonColor = null;
+                config.PressedButtonColor = null;
+                config.ControlBackgroundColor = null;
+                config.HoveredControlColor = null;
+                config.ActiveControlColor = null;
+                config.AccentColor = null;
                 appearanceSettingsDirty = true;
                 SaveAppearanceChanges();
             }
@@ -709,7 +734,7 @@ namespace MentorRouletteTracker
                                 var pvpDisabled = BeginPvpControl(section.Title is "PvP player stats" or "Your PvP results" || row.Label.Contains("(PvP)", StringComparison.Ordinal));
                                 try
                                 {
-                                    toggled = ImGui.Checkbox(row.Label, ref visible);
+                                    toggled = ImGui.Checkbox($"{EncounterMilestoneLabel(row.Label)}##{row.Label}", ref visible);
                                 }
                                 finally
                                 {
