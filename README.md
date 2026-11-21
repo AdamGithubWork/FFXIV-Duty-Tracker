@@ -12,7 +12,7 @@ let me know what happened.
 2. Add this under **Custom Plugin Repositories**:
 
    ```text
-   https://raw.githubusercontent.com/AdalithCode/FFXIV-Duty-Tracker/main/repo.json
+   https://raw.githubusercontent.com/AdalithCode/Noumenon/main/repo.json
    ```
 
 3. Save, open `/xlplugins`, and search for **Noumenon** to install it.

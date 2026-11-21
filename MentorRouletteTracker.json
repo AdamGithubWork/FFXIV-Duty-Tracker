@@ -6,7 +6,7 @@
   "Punchline": "duty tracker, in beta",
   "Description": "Keep track of your duties, the people you meet, and your stats. Look through past runs, add notes, and export your records.",
   "ApplicableVersion": "any",
-  "RepoUrl": "https://github.com/AdalithCode/FFXIV-Duty-Tracker",
+  "RepoUrl": "https://github.com/AdalithCode/Noumenon",
   "Tags": [ "utility", "tracking", "stats" ],
   "DalamudApiLevel": 15
 }
